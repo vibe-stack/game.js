@@ -1,0 +1,25 @@
+{
+  "name": "@game.js/core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.177.0",
+    "reflect-metadata": "^0.1.13"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2",
+    "@types/three": "^0.160.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+} 

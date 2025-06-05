@@ -1,0 +1,20 @@
+{
+  "name": "my-game",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@game.js/core": "workspace:*",
+    "three": "^0.177.0"
+  },
+  "devDependencies": {
+    "@game.js/vite-plugin": "workspace:*",
+    "@types/three": "^0.160.0",
+    "typescript": "^5.8.2",
+    "vite": "^5.0.0"
+  }
+}

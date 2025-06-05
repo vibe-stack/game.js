@@ -1,0 +1,30 @@
+{
+  "name": "@game.js/vite-plugin",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fast-glob": "^3.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "typescript": "^5.8.2",
+    "vite": "^5.0.0"
+  },
+  "peerDependencies": {
+    "vite": "^5.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
