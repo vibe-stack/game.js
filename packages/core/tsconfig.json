@@ -14,7 +14,8 @@
     "outDir": "dist",
     "rootDir": "src",
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "types": ["vite/client", "reflect-metadata"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

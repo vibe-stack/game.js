@@ -14,10 +14,13 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "fast-glob": "^3.3.0"
+    "chokidar": "^4.0.3",
+    "fast-glob": "^3.3.0",
+    "ws": "^8.14.2"
   },
   "devDependencies": {
     "@types/node": "^22.15.29",
+    "@types/ws": "^8.5.8",
     "typescript": "^5.8.2",
     "vite": "^5.0.0"
   },

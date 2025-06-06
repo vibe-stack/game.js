@@ -3,9 +3,10 @@ import gameJSPlugin from '@game.js/vite-plugin';
 
 export default defineConfig({
   plugins: [
-    gameJSPlugin({
+    ...gameJSPlugin({
       srcDir: 'src',
-      appDir: 'app'
+      appDir: 'app',
+      enableEditor: true // Enable WebSocket editor integration
     })
   ],
   server: {

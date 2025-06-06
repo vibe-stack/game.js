@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { Scene, Editable } from '@game.js/core';
-import sceneMetadata from './scene.editor.json';
 
 export default class HomeScene extends Scene {
   @Editable({ type: 'number', min: 0, max: 20, default: 5, label: 'Camera Y Position' })
@@ -19,64 +18,82 @@ export default class HomeScene extends Scene {
   rotationSpeed = 1;
 
   private cube: THREE.Mesh | null = null;
-
-  constructor() {
-    super();
-    // Apply metadata immediately after construction
-    this.setMetadata(sceneMetadata);
-  }
+  private ambientLight: THREE.AmbientLight | null = null;
+  private directionalLight: THREE.DirectionalLight | null = null;
 
   async init(): Promise<void> {
-    // Log the applied metadata to show how it works
-    console.log('🎮 Scene Metadata Applied:', this.metadata);
+    // Load editor overrides from .editor.json if they exist
+    await this.loadEditorOverrides();
+
+    console.log('🎮 Scene initialized with properties:');
     console.log('📐 Camera Y Position:', this.cameraY);
     console.log('📐 Camera Z Position:', this.cameraZ);
     console.log('🎨 Cube Color:', this.cubeColor);
     console.log('📏 Cube Scale:', this.cubeScale);
     console.log('🌀 Rotation Speed:', this.rotationSpeed);
 
-    // Apply camera position (these values can be overridden by editor metadata)
+    // Setup camera with editable properties
     this.camera.position.set(0, this.cameraY, this.cameraZ);
     this.camera.lookAt(0, 0, 0);
 
-    // Create cube with metadata-driven properties
+    // Create cube with editable properties
     const geometry = new THREE.BoxGeometry();
     const material = new THREE.MeshPhongMaterial({ color: this.cubeColor });
     this.cube = new THREE.Mesh(geometry, material);
     this.cube.scale.setScalar(this.cubeScale);
     this.scene.add(this.cube);
 
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
-    this.scene.add(ambientLight);
+    // Register cube for editor access
+    this.registerObject('cube', this.cube);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(1, 1, 1);
-    this.scene.add(directionalLight);
+    // Create lights
+    this.ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+    this.scene.add(this.ambientLight);
+    this.registerObject('ambientLight', this.ambientLight);
 
-    // Log any additional editor metadata
-    if (this.metadata.editorNotes) {
-      console.log('📝 Editor Notes:', this.metadata.editorNotes);
-    }
-    if (this.metadata.lastEditedBy) {
-      console.log('👤 Last Edited By:', this.metadata.lastEditedBy);
+    this.directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    this.directionalLight.position.set(1, 1, 1);
+    this.scene.add(this.directionalLight);
+    this.registerObject('directionalLight', this.directionalLight);
+
+    console.log('✅ Scene objects registered for editor access');
+  }
+
+  private async loadEditorOverrides(): Promise<void> {
+    try {
+      const response = await fetch('./scene.editor.json');
+      if (response.ok) {
+        const overrides = await response.json();
+        
+        // Apply overrides to @Editable properties
+        if (overrides.cameraY !== undefined) this.cameraY = overrides.cameraY;
+        if (overrides.cameraZ !== undefined) this.cameraZ = overrides.cameraZ;
+        if (overrides.cubeColor !== undefined) this.cubeColor = overrides.cubeColor;
+        if (overrides.cubeScale !== undefined) this.cubeScale = overrides.cubeScale;
+        if (overrides.rotationSpeed !== undefined) this.rotationSpeed = overrides.rotationSpeed;
+        
+        console.log('📝 Loaded editor overrides:', overrides);
+      }
+    } catch (error) {
+      // No editor overrides file, use defaults
     }
   }
 
   update(deltaTime: number): void {
     if (this.cube) {
-      // Use metadata-driven rotation speed
+      // Animate cube with editable rotation speed
       this.cube.rotation.x += deltaTime * 0.001 * this.rotationSpeed;
       this.cube.rotation.y += deltaTime * 0.002 * this.rotationSpeed;
       
-      // Apply color and scale changes (useful for hot reloading)
+      // Apply real-time property changes (for editor live updates)
       (this.cube.material as THREE.MeshPhongMaterial).color.setStyle(this.cubeColor);
       this.cube.scale.setScalar(this.cubeScale);
     }
 
-    // Apply camera position changes (useful for hot reloading)
-    this.camera.position.y = this.cameraY;
-    this.camera.position.z = this.cameraZ;
+    // Apply camera position changes (for editor live updates)
+    this.camera.position.set(0, this.cameraY, this.cameraZ);
 
+    // Render the scene
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -86,13 +103,21 @@ export default class HomeScene extends Scene {
       this.cube.geometry.dispose();
       (this.cube.material as THREE.Material).dispose();
     }
+    
+    if (this.ambientLight) {
+      this.scene.remove(this.ambientLight);
+    }
+
+    if (this.directionalLight) {
+      this.scene.remove(this.directionalLight);
+    }
   }
 
   onEnter(): void {
-    console.log('Entered home scene');
+    console.log('🎬 Entered home scene');
   }
 
   onExit(): void {
-    console.log('Exited home scene');
+    console.log('🎬 Exited home scene');
   }
 }

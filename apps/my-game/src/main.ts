@@ -1,5 +1,6 @@
 import { RendererManager, GameRouter } from '@game.js/core';
 import './routes.generated';
+import './editor-demo'; // Import editor demo for development
 
 class GameEngine {
   private router: GameRouter;
