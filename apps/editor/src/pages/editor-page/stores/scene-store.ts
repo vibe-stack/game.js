@@ -104,7 +104,7 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
 
       // Fallback: Try to fetch .editor.json from dev server
       // The scenePath is relative to src directory, so we need to prepend src/
-      const editorJsonUrl = `${serverInfo.url}/src/${scenePath.replace(/\.(ts|js)$/, '.editor.json')}`;
+      const editorJsonUrl = `${serverInfo.url}/${scenePath.replace(/\.(ts|js)$/, '.editor.json')}`;
       
       try {
         console.log('Fetching editor data from:', editorJsonUrl);

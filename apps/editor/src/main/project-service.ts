@@ -641,9 +641,17 @@ class ProjectService {
           const routePath = this.convertFilePathToRoute(relativePath);
           const sceneName = this.generateSceneName(routePath);
           
+          // Ensure filePath always starts with src/ for consistency
+          let normalizedFilePath = relativePath;
+          if (!normalizedFilePath.startsWith('src/') && !normalizedFilePath.startsWith('src\\')) {
+            normalizedFilePath = path.join('src', relativePath).replace(/\\/g, '/');
+          } else {
+            normalizedFilePath = normalizedFilePath.replace(/\\/g, '/');
+          }
+          
           routes.push({
             path: routePath,
-            filePath: relativePath,
+            filePath: normalizedFilePath,
             name: sceneName
           });
         }

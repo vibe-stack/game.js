@@ -1,12 +1,12 @@
 import React, { useEffect } from "react";
 import { useSearch } from "@tanstack/react-router";
 import { TopBar } from "./components/top-bar";
-import { DevServerControls } from "./components/dev-server-controls";
 import { SceneFrame } from "./components/scene-frame";
-import { ScenePanel } from "./components/scene-panel";
 import { useProjectStore } from "./stores/project-store";
 import { useDevServerStore } from "./stores/dev-server-store";
 import { useSceneStore } from "./stores/scene-store";
+import { LeftPanel } from "./components/left-panel";
+import { RightPanel } from "./components/right-panel";
 
 export default function EditorPage() {
   const search = useSearch({ from: "/editor" });
@@ -44,17 +44,15 @@ export default function EditorPage() {
   }, [projectName]);
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-screen flex-col bg-gray-950 text-white">
       <TopBar projectName={projectName} />
       
       <div className="flex-1 relative">
         <SceneFrame projectName={projectName} />
-        <ScenePanel projectName={projectName} />
-        
-        <div className="absolute bottom-12 right-4">
-          <DevServerControls projectName={projectName} />
-        </div>
+        <LeftPanel />
+        <RightPanel />
       </div>
     </div>
   );
 }
+
