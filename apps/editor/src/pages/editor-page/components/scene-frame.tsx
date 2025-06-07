@@ -19,12 +19,9 @@ export function SceneFrame({ projectName }: SceneFrameProps) {
 
   if (!isRunning || !serverInfo?.url) {
     return (
-      <div className="bg-muted/50 flex flex-1 items-center justify-center">
+      <div className="bg-muted/50 flex flex-1 items-center justify-center h-full">
         <div className="text-center">
           <h2 className="mb-2 text-2xl font-semibold">Game Editor</h2>
-          <p className="text-muted-foreground mb-4">
-            The visual editor for {projectName} will be implemented here
-          </p>
           <p className="text-muted-foreground text-sm">
             Start the dev server to begin editing your game
           </p>

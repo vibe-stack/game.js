@@ -154,6 +154,7 @@ export default function gameJSPlugin(
       apply: "serve", // Only apply during dev server
       configureServer(server) {
         let debounceTimers = new Map();
+        let watcher: any | null = null;
 
         // Pre-populate the cache for hot-reloading
         const watchPattern = path.join(appPath, "**/*.editor.json");
@@ -253,7 +254,7 @@ export default function gameJSPlugin(
           console.error("🚨 WebSocket Server error:", error);
         });
 
-        // Watch for .editor.json file changes
+        // Watch for .editor.json file changes using @parcel/watcher
         console.log("🔍 Setting up file watcher for pattern:", watchPattern);
 
         let watcherSubscription: any = null;
@@ -268,19 +269,36 @@ export default function gameJSPlugin(
                 }
                 for (const event of events) {
                   if (!event.path.endsWith(".editor.json")) continue;
-                  const absPath = path.isAbsolute(event.path) ? event.path : path.resolve(appPath, event.path);
+                  
+                  // Ensure we have the absolute path
+                  const absolutePath = path.isAbsolute(event.path) ? event.path : path.resolve(appPath, event.path);
+                  console.log("🔍 Using absolute path:", absolutePath);
+                  
                   if (event.type === "create") {
-                    console.log("🔍 New editor JSON file added:", absPath);
+                    console.log("🔍 New editor JSON file added:", absolutePath);
+                    
+                    // Add new files to cache to prevent false diffs
+                    try {
+                      const content = fs.readFileSync(absolutePath, "utf-8");
+                      const jsonData = JSON.parse(content);
+                      editorFileCache.set(absolutePath, jsonData);
+                      console.log(`📝 Added ${path.basename(absolutePath)} to cache.`);
+                    } catch (e) {
+                      console.error(`Error adding ${absolutePath} to cache:`, e);
+                    }
                   } else if (event.type === "update") {
-                    console.log("🔍 Editor JSON file changed:", absPath);
+                    console.log("🔍 Editor JSON file changed:", absolutePath);
                     console.log("🔍 Connected clients count:", connectedClients.size);
                     handleEditorJsonChange(
-                      path.resolve(absPath),
+                      absolutePath,
                       server,
                       connectedClients
                     );
                   } else if (event.type === "delete") {
-                    console.log("🔍 Editor JSON file removed:", absPath);
+                    console.log("🔍 Editor JSON file removed:", absolutePath);
+                    // Remove from cache
+                    editorFileCache.delete(absolutePath);
+                    console.log(`🗑️ Removed ${path.basename(absolutePath)} from cache.`);
                   }
                 }
               },
@@ -289,6 +307,24 @@ export default function gameJSPlugin(
               }
             );
             console.log("🔍 File watcher is ready and watching for changes");
+            
+            // After watcher is ready, ensure cache is properly populated
+            const existingFiles = fg.sync(path.join(appPath, "**/*.editor.json"));
+            console.log(`🔍 Post-ready cache check: Found ${existingFiles.length} existing .editor.json files`);
+            
+            for (const file of existingFiles) {
+              const absolutePath = path.resolve(file);
+              if (!editorFileCache.has(absolutePath)) {
+                try {
+                  const content = fs.readFileSync(absolutePath, "utf-8");
+                  const jsonData = JSON.parse(content);
+                  editorFileCache.set(absolutePath, jsonData);
+                  console.log(`📝 Added missing ${path.basename(file)} to cache during ready phase.`);
+                } catch (e) {
+                  console.error(`Error caching ${file} during ready:`, e);
+                }
+              }
+            }
           } catch (error) {
             console.error("🚨 Failed to start file watcher:", error);
           }
@@ -297,6 +333,14 @@ export default function gameJSPlugin(
         console.log(
           "🎨 Editor WebSocket server running on ws://localhost:3001"
         );
+
+        // Cleanup function
+        server.httpServer?.on('close', () => {
+          if (watcherSubscription) {
+            watcherSubscription.unsubscribe();
+          }
+          wss.close();
+        });
       },
     });
   }

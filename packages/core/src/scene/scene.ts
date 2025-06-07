@@ -91,40 +91,40 @@ export abstract class Scene {
       });
       
       console.log('🎨 Scene connected to Vite WebSocket for live updates');
-    } else {
-      // Fallback: try direct WebSocket connection for non-Vite environments
-      try {
-        this._wsConnection = new WebSocket('ws://localhost:3001');
-        
-        this._wsConnection.onopen = () => {
-          console.log('🎨 Scene connected to editor WebSocket');
-        };
-        
-        this._wsConnection.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            // Handle different message types from the editor
-            if (data.type === 'property-update' || (data.type === 'custom' && data.event === 'property-update')) {
-              const update = data.data || data; // Support both formats
-              console.log('🔥 Received property update:', update);
-              this.applyEditorUpdate(update);
-            } else if (data.type === 'request-scene-state') {
-              console.log('📡 Received scene state request');
-              this.sendSceneStateToEditor();
-            }
-          } catch (error) {
-            console.error('Failed to parse editor update:', error);
+    }
+    
+    // Always try direct WebSocket connection as well for editor communication
+    try {
+      this._wsConnection = new WebSocket('ws://localhost:3001');
+      
+      this._wsConnection.onopen = () => {
+        console.log('🎨 Scene connected to editor WebSocket');
+      };
+      
+      this._wsConnection.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          // Handle different message types from the editor
+          if (data.type === 'property-update' || (data.type === 'custom' && data.event === 'property-update')) {
+            const update = data.data || data; // Support both formats
+            console.log('🔥 Received property update:', update);
+            this.applyEditorUpdate(update);
+          } else if (data.type === 'request-scene-state') {
+            console.log('📡 Received scene state request');
+            this.sendSceneStateToEditor();
           }
-        };
+        } catch (error) {
+          console.error('Failed to parse editor update:', error);
+        }
+      };
 
-        this._wsConnection.onclose = () => {
-          console.log('🔌 Editor WebSocket disconnected');
-          // Attempt to reconnect in development
-          setTimeout(() => this.setupEditorIntegration(), 2000);
-        };
-      } catch (error) {
-        console.log('⚠️ No editor WebSocket available');
-      }
+      this._wsConnection.onclose = () => {
+        console.log('🔌 Editor WebSocket disconnected');
+        // Attempt to reconnect in development
+        setTimeout(() => this.setupEditorIntegration(), 2000);
+      };
+    } catch (error) {
+      console.log('⚠️ No editor WebSocket available');
     }
   }
 

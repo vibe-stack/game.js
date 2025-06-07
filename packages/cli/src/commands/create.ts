@@ -164,13 +164,18 @@ export default class HomeScene extends Scene {
     const material = new THREE.MeshPhongMaterial({ color: this.cubeColor });
     this.cube = new THREE.Mesh(geometry, material);
     this.scene.add(this.cube);
+    
+    // Register the cube for editor manipulation
+    this.registerObject('cube', this.cube);
 
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     this.scene.add(ambientLight);
+    this.registerObject('ambientLight', ambientLight);
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(1, 1, 1);
     this.scene.add(directionalLight);
+    this.registerObject('directionalLight', directionalLight);
   }
 
   update(deltaTime: number): void {
