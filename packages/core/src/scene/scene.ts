@@ -30,6 +30,7 @@ export abstract class Scene {
   private _editorOverrides: any = {};
   private _sceneObjects: Map<string, THREE.Object3D> = new Map();
   private _wsConnection: WebSocket | null = null;
+  private _routePath: string = '/';
 
   constructor() {
     this.scene = new THREE.Scene();
@@ -55,8 +56,33 @@ export abstract class Scene {
   onExit?(): void;
   onResize?(width: number, height: number): void;
 
+  // Clear the object registry - called internally during scene switching
+  clearObjectRegistry(): void {
+    if (!isDevelopment()) return;
+    
+    const objectCount = this._sceneObjects.size;
+    const overrideKeys = Object.keys(this._editorOverrides);
+    
+    console.log('🧹 Clearing object registry for scene switch');
+    console.log(`  📦 Clearing ${objectCount} registered objects:`, Array.from(this._sceneObjects.keys()));
+    console.log(`  ⚙️ Clearing ${overrideKeys.length} editor overrides:`, overrideKeys);
+    
+    this._sceneObjects.clear();
+    this._editorOverrides = {};
+    
+    console.log('✅ Object registry cleared successfully');
+  }
+
   setParams(params: SceneParams): void {
     this.params = params;
+  }
+
+  setRoutePath(routePath: string): void {
+    this._routePath = routePath;
+  }
+
+  getRoutePath(): string {
+    return this._routePath;
   }
 
   setMetadata(metadata: SceneMetadata): void {
@@ -503,9 +529,12 @@ export abstract class Scene {
   }
 
   protected applyMetadata(): void {
+    console.log('🎯 Applying metadata:', this.metadata);
+    
     // Apply @Editable property overrides
     for (const [key, value] of Object.entries(this.metadata)) {
       if (key !== 'objects' && this.hasOwnProperty(key)) {
+        console.log(`  ⚙️ Setting scene property ${key} = ${value}`);
         (this as any)[key] = value;
       }
     }

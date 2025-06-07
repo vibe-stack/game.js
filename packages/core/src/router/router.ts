@@ -34,6 +34,7 @@ export class GameRouter {
 
     if (this.currentScene) {
       this.currentScene.onExit?.();
+      this.currentScene.clearObjectRegistry();
       this.currentScene.cleanup();
     }
 
@@ -48,6 +49,24 @@ export class GameRouter {
     this.currentScene = scene;
     this.currentPath = path;
     this.hideLoading();
+
+    // Notify editor that scene switch is complete (development only)
+    if (typeof window !== 'undefined' && (window as any).__vite_ws) {
+      try {
+        const message = {
+          type: 'custom',
+          event: 'scene-switch-complete',
+          data: { 
+            path,
+            timestamp: Date.now()
+          }
+        };
+        (window as any).__vite_ws.send(JSON.stringify(message));
+        console.log('🎬 Notified editor that scene switch is complete:', path);
+      } catch (error) {
+        console.warn('Failed to notify editor of scene switch:', error);
+      }
+    }
 
     if (!replace) {
       window.history.pushState({ path }, '', path);
@@ -101,12 +120,22 @@ export class GameRouter {
 
   private async loadScene(route: RouteConfig, path: string): Promise<Scene> {
     if (this.sceneCache.has(path)) {
-      return this.sceneCache.get(path)!;
+      const cachedScene = this.sceneCache.get(path)!;
+      console.log(`♻️ Reusing cached scene instance for path: ${path}`);
+      // Clear any stale editor state from previous use
+      cachedScene.clearObjectRegistry();
+      // Update route path for cached scenes
+      cachedScene.setRoutePath(path);
+      return cachedScene;
     }
 
+    console.log(`🏗️ Creating new scene instance for path: ${path}`);
     const module = await route.component();
     const SceneClass = module.default;
     const scene = new SceneClass();
+
+    // Set the route path for metadata loading
+    scene.setRoutePath(path);
 
     this.sceneCache.set(path, scene);
 

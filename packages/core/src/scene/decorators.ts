@@ -26,18 +26,38 @@ export function SceneMetadata(metadataPath: string) {
     return class extends constructor {
       constructor(...args: any[]) {
         super(...args);
-        this.loadMetadata(metadataPath);
+        setTimeout(() => this.loadMetadata(metadataPath), 0);
       }
 
-      async loadMetadata(path: string) {
+      async loadMetadata(metadataPath: string) {
         try {
-          const response = await fetch(path);
+          const routePath = (this as any).getRoutePath ? (this as any).getRoutePath() : '/';
+          
+          let actualMetadataPath: string;
+          if (routePath === '/') {
+            actualMetadataPath = `src/app/${metadataPath}`;
+          } else {
+            const routeSegments = routePath.split('/').filter((segment: string) => segment);
+            actualMetadataPath = `src/app/${routeSegments.join('/')}/${metadataPath}`;
+          }
+          
+          console.log(`🔍 Scene attempting to load metadata from: ${actualMetadataPath}`);
+          console.log(`🌐 Current window location: ${window.location.href}`);
+          console.log(`🛣️ Route path: ${routePath}`);
+          console.log(`📂 Resolved fetch URL will be: ${new URL(actualMetadataPath, window.location.href).href}`);
+          
+          const response = await fetch(actualMetadataPath);
+          console.log(`📡 Fetch response status: ${response.status} for ${actualMetadataPath}`);
+          
           if (response.ok) {
             const metadata = await response.json();
+            console.log(`✅ Successfully loaded metadata:`, metadata);
             (this as any).setMetadata(metadata);
+          } else {
+            console.warn(`❌ Failed to fetch metadata from ${actualMetadataPath}: HTTP ${response.status}`);
           }
         } catch (error) {
-          console.warn(`Could not load metadata from ${path}:`, error);
+          console.warn(`Could not load metadata from ${metadataPath}:`, error);
         }
       }
     };

@@ -67,7 +67,7 @@ function ObjectTreeItem({
         onClick={() => onSelect(object.id)}
       >
         <ObjectIcon size={16} className="flex-shrink-0 text-gray-400" />
-        <span className="flex-1 truncate text-sm font-medium">{object.name}</span>
+        <span className="flex-1 truncate text-xs">{object.name}</span>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"

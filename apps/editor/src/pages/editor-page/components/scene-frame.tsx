@@ -8,7 +8,7 @@ interface SceneFrameProps {
 
 export function SceneFrame({ projectName }: SceneFrameProps) {
   const { isRunning, serverInfo } = useDevServerStore();
-  const { currentRoute } = useSceneStore();
+  const { currentRoute, requestSceneState } = useSceneStore();
 
   console.log(`SceneFrame render - isRunning: ${isRunning}, serverInfo:`, serverInfo);
 
@@ -37,15 +37,23 @@ export function SceneFrame({ projectName }: SceneFrameProps) {
 
   console.log(`SceneFrame loading URL: ${sceneUrl}`);
 
+  const handleIframeLoad = async () => {
+    console.log(`SceneFrame iframe loaded successfully: ${sceneUrl}`);
+    
+    // Wait a bit for the scene to fully initialize in the game
+    setTimeout(async () => {
+      console.log('🔄 Requesting fresh scene state after route switch...');
+      await requestSceneState();
+    }, 1000); // Give the game time to complete scene switching and initialization
+  };
+
   return (
     <div className="relative flex-1 h-full w-full">
       <iframe
         src={sceneUrl}
         className="h-full w-full border-0"
         title="Game Scene"
-        onLoad={(e) => {
-          console.log(`SceneFrame iframe loaded successfully: ${sceneUrl}`, e);
-        }}
+        onLoad={handleIframeLoad}
         onError={(e) => {
           console.error(`SceneFrame iframe failed to load: ${sceneUrl}`, e);
         }}

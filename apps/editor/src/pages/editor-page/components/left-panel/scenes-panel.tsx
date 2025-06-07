@@ -5,7 +5,7 @@ import { useSceneStore } from "../../stores/scene-store";
 import { SceneRoute } from "../../types";
 
 export function ScenesPanel() {
-  const { routes, currentRoute, setCurrentRoute, loadSceneObjects, loadSceneRoutes } = useSceneStore();
+  const { routes, currentRoute, setCurrentRoute, loadSceneRoutes } = useSceneStore();
 
   React.useEffect(() => {
     // Assuming project name is available somehow, or the store handles it.
@@ -15,7 +15,7 @@ export function ScenesPanel() {
 
   const handleSceneSelect = (route: string, filePath: string) => {
     setCurrentRoute(route, filePath);
-    loadSceneObjects(filePath);
+    // Note: SceneFrame will handle requesting scene state after the iframe loads
   };
 
   return (

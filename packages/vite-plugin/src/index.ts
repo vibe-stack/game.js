@@ -77,8 +77,14 @@ export default function gameJSPlugin(
             jsonPath = path.join(process.cwd(), requestPath);
           } else {
             // Otherwise, assume it's relative to appPath
-            jsonPath = path.join(process.cwd(), appPath, requestPath);
+            // Remove leading slash to avoid double slashes in path.join
+            const relativePath = requestPath.startsWith('/') ? requestPath.slice(1) : requestPath;
+            jsonPath = path.join(process.cwd(), appPath, relativePath);
           }
+          
+          console.log(`🔍 .editor.json request: ${requestPath}`);
+          console.log(`📂 Resolved to file path: ${jsonPath}`);
+          console.log(`📁 File exists: ${fs.existsSync(jsonPath)}`);
           
           if (fs.existsSync(jsonPath)) {
             res.setHeader("Content-Type", "application/json");
