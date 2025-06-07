@@ -16,6 +16,7 @@
   "dependencies": {
     "chokidar": "^4.0.3",
     "fast-glob": "^3.3.0",
+    "microdiff": "^1.4.0",
     "ws": "^8.14.2"
   },
   "devDependencies": {

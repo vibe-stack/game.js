@@ -1,4 +1,6 @@
-import * as THREE from 'three';
+import * as THREE from "three";
+import { PropertyUpdater } from "./property-updater";
+import { ObjectFactory } from "./object-factory";
 
 export interface SceneParams {
   [key: string]: string;
@@ -11,9 +13,11 @@ export interface SceneMetadata {
 // Helper function to safely check if we're in development
 function isDevelopment(): boolean {
   try {
-    return typeof import.meta !== 'undefined' && 
-           import.meta.env !== undefined && 
-           import.meta.env.DEV === true;
+    return (
+      typeof import.meta !== "undefined" &&
+      import.meta.env !== undefined &&
+      import.meta.env.DEV === true
+    );
   } catch {
     return false;
   }
@@ -25,23 +29,23 @@ export abstract class Scene {
   protected renderer: THREE.WebGLRenderer;
   protected params: SceneParams = {};
   protected metadata: SceneMetadata = {};
-  
+
   // Editor integration (development only)
   private _editorOverrides: any = {};
   private _sceneObjects: Map<string, THREE.Object3D> = new Map();
   private _wsConnection: WebSocket | null = null;
-  private _routePath: string = '/';
+  private _routePath: string = "/";
 
   constructor() {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(
-      75, 
-      window.innerWidth / window.innerHeight, 
-      0.1, 
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
       1000
     );
     this.renderer = this.getRenderer();
-    
+
     // Only setup editor features in development
     if (isDevelopment()) {
       this.setupEditorIntegration();
@@ -52,6 +56,20 @@ export abstract class Scene {
   abstract update(deltaTime: number): void;
   abstract cleanup(): void;
 
+  // Internal init method that handles metadata loading before user's init
+  async internalInit(): Promise<void> {
+    // Load metadata if decorator was used
+    if ((this as any).getMetadataPath && typeof (this as any).loadMetadata === 'function') {
+      const metadataPath = (this as any).getMetadataPath();
+      if (metadataPath) {
+        await (this as any).loadMetadata(metadataPath);
+      }
+    }
+    
+    // Call user's init method
+    await this.init();
+  }
+
   onEnter?(): void;
   onExit?(): void;
   onResize?(width: number, height: number): void;
@@ -59,18 +77,9 @@ export abstract class Scene {
   // Clear the object registry - called internally during scene switching
   clearObjectRegistry(): void {
     if (!isDevelopment()) return;
-    
-    const objectCount = this._sceneObjects.size;
-    const overrideKeys = Object.keys(this._editorOverrides);
-    
-    console.log('🧹 Clearing object registry for scene switch');
-    console.log(`  📦 Clearing ${objectCount} registered objects:`, Array.from(this._sceneObjects.keys()));
-    console.log(`  ⚙️ Clearing ${overrideKeys.length} editor overrides:`, overrideKeys);
-    
+
     this._sceneObjects.clear();
     this._editorOverrides = {};
-    
-    console.log('✅ Object registry cleared successfully');
   }
 
   setParams(params: SceneParams): void {
@@ -95,68 +104,67 @@ export abstract class Scene {
 
   private setupEditorIntegration(): void {
     if (!isDevelopment()) return;
-    
+
     // Connect to Vite's WebSocket for hot module replacement
-    if (typeof window !== 'undefined' && (window as any).__vite_ws) {
+    if (typeof window !== "undefined" && (window as any).__vite_ws) {
       const viteWs = (window as any).__vite_ws;
-      
+
       // Listen for property updates from the editor
-      viteWs.addEventListener('message', (event: MessageEvent) => {
+      viteWs.addEventListener("message", (event: MessageEvent) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === 'custom' && data.event === 'property-update') {
-            console.log('🔥 Received property update:', data.data);
+          if (data.type === "custom" && data.event === "property-update") {
             this.applyEditorUpdate(data.data);
-          } else if (data.type === 'custom' && data.event === 'request-scene-state') {
-            console.log('📡 Received scene state request via Vite');
+          } else if (data.type === "custom" && data.event === "scene-reload") {
+            this.handleSceneReload(data.data);
+          } else if (
+            data.type === "custom" &&
+            data.event === "request-scene-state"
+          ) {
             this.sendSceneStateViaVite();
           }
         } catch (error) {
           // Ignore non-JSON messages
         }
       });
-      
-      console.log('🎨 Scene connected to Vite WebSocket for live updates');
     }
-    
+
     // Always try direct WebSocket connection as well for editor communication
     try {
-      this._wsConnection = new WebSocket('ws://localhost:3001');
-      
-      this._wsConnection.onopen = () => {
-        console.log('🎨 Scene connected to editor WebSocket');
-      };
-      
+      this._wsConnection = new WebSocket("ws://localhost:3001");
+
       this._wsConnection.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           // Handle different message types from the editor
-          if (data.type === 'property-update' || (data.type === 'custom' && data.event === 'property-update')) {
+          if (
+            data.type === "property-update" ||
+            (data.type === "custom" && data.event === "property-update")
+          ) {
             const update = data.data || data; // Support both formats
-            console.log('🔥 Received property update:', update);
             this.applyEditorUpdate(update);
-          } else if (data.type === 'request-scene-state') {
-            console.log('📡 Received scene state request');
+          } else if (
+            data.type === "scene-reload" ||
+            (data.type === "custom" && data.event === "scene-reload")
+          ) {
+            const reloadData = data.data || data; // Support both formats
+            this.handleSceneReload(reloadData);
+          } else if (data.type === "request-scene-state") {
             this.sendSceneStateToEditor();
           }
-        } catch (error) {
-          console.error('Failed to parse editor update:', error);
-        }
+        } catch (error) {}
       };
 
       this._wsConnection.onclose = () => {
-        console.log('🔌 Editor WebSocket disconnected');
         // Attempt to reconnect in development
         setTimeout(() => this.setupEditorIntegration(), 2000);
       };
-    } catch (error) {
-      console.log('⚠️ No editor WebSocket available');
-    }
+    } catch (error) {}
   }
 
   setEditorOverrides(overrides: any): void {
     if (!isDevelopment()) return;
-    
+
     this._editorOverrides = overrides;
     this.applyEditorOverrides();
   }
@@ -167,7 +175,7 @@ export abstract class Scene {
 
   registerObject(name: string, object: THREE.Object3D): void {
     if (!isDevelopment()) return;
-    
+
     this._sceneObjects.set(name, object);
     object.name = name;
   }
@@ -180,121 +188,52 @@ export abstract class Scene {
     return isDevelopment() ? new Map(this._sceneObjects) : new Map();
   }
 
-  updateObjectProperty(objectName: string, propertyPath: string, value: any): void {
+  updateObjectProperty(
+    objectName: string,
+    propertyPath: string,
+    value: any
+  ): void {
     if (!isDevelopment()) return;
-    
+
     const obj = this.getObject(objectName);
     if (!obj) return;
 
-    this.setNestedProperty(obj, propertyPath, value);
+    PropertyUpdater.applyObjectPropertyUpdate(obj, propertyPath.split("."), value);
   }
 
   private applyEditorUpdate(update: any): void {
     if (!isDevelopment()) return;
-    
-    console.log(`🎛️ Applying update: ${update.property} = ${JSON.stringify(update.value)}`);
-    
-    if (update.property.startsWith('objects.')) {
-      const pathParts = update.property.split('.');
+
+    if (update.property.startsWith("objects.")) {
+      const pathParts = update.property.split(".");
       const objectName = pathParts[1];
       const propertyPath = pathParts.slice(2);
-      
+
       const obj = this.getObject(objectName);
       if (!obj) {
-        console.warn(`Object ${objectName} not found`);
         return;
       }
-      
-      // Handle specific property updates with smart application
-      this.applyObjectPropertyUpdate(obj, propertyPath, update.value);
+
+      // Use PropertyUpdater for all object property updates
+      PropertyUpdater.applyObjectPropertyUpdate(obj, propertyPath, update.value);
     } else if (this.hasOwnProperty(update.property)) {
       // Handle scene-level property updates
       (this as any)[update.property] = update.value;
     }
   }
 
-  private applyObjectPropertyUpdate(obj: THREE.Object3D, propertyPath: string[], value: any): void {
-    const property = propertyPath.join('.');
-    
-    switch (property) {
-      case 'position':
-        if (Array.isArray(value) && value.length === 3) {
-          obj.position.fromArray(value);
-          console.log(`  📍 Updated ${obj.name} position:`, value);
-        }
-        break;
-        
-      case 'rotation':
-        if (Array.isArray(value) && value.length === 3) {
-          obj.rotation.set(value[0], value[1], value[2]);
-          console.log(`  🔄 Updated ${obj.name} rotation:`, value);
-        }
-        break;
-        
-      case 'scale':
-        if (Array.isArray(value) && value.length === 3) {
-          obj.scale.fromArray(value);
-          console.log(`  📏 Updated ${obj.name} scale:`, value);
-        }
-        break;
-        
-      case 'visible':
-        obj.visible = Boolean(value);
-        console.log(`  👁️ Updated ${obj.name} visibility:`, value);
-        break;
-        
-      case 'material.color':
-        if (obj instanceof THREE.Mesh && obj.material instanceof THREE.Material) {
-          const material = obj.material as any;
-          if (material.color) {
-            // Handle hex color strings like "#ff0000" or numeric values
-            const colorValue = typeof value === 'string' ? 
-              parseInt(value.replace('#', ''), 16) : value;
-            material.color.setHex(colorValue);
-            console.log(`  🎨 Updated ${obj.name} material color:`, value);
-          }
-        }
-        break;
-        
-      case 'material.opacity':
-        if (obj instanceof THREE.Mesh && obj.material instanceof THREE.Material) {
-          const material = obj.material as any;
-          if ('opacity' in material) {
-            material.opacity = Number(value);
-            console.log(`  🔍 Updated ${obj.name} material opacity:`, value);
-          }
-        }
-        break;
-        
-      case 'material.transparent':
-        if (obj instanceof THREE.Mesh && obj.material instanceof THREE.Material) {
-          const material = obj.material as any;
-          if ('transparent' in material) {
-            material.transparent = Boolean(value);
-            console.log(`  🫧 Updated ${obj.name} material transparency:`, value);
-          }
-        }
-        break;
-        
-      default:
-        // Fallback to generic nested property setting
-        this.setNestedProperty(obj, property, value);
-        console.log(`  🔧 Updated ${obj.name} ${property}:`, value);
-        break;
-    }
-  }
-
   getEditableProperties(): any {
     if (!isDevelopment()) return {};
-    
+
     const properties: any = {};
     const prototype = Object.getPrototypeOf(this);
-    const editableProps = Reflect.getMetadata?.('editable:properties', prototype) || [];
-    
+    const editableProps =
+      Reflect.getMetadata?.("editable:properties", prototype) || [];
+
     editableProps.forEach((prop: any) => {
       properties[prop.property] = {
         value: (this as any)[prop.property],
-        options: prop.options
+        options: prop.options,
       };
     });
 
@@ -303,23 +242,30 @@ export abstract class Scene {
 
   getEditableObjects(): any {
     if (!isDevelopment()) return {};
-    
+
     const objects: any = {};
-    
+
     this._sceneObjects.forEach((obj, name) => {
       objects[name] = {
         type: obj.type,
-        position: obj.position.toArray(),
-        rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
-        scale: obj.scale.toArray(),
+        position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
+        rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
+        scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z },
         visible: obj.visible,
+        matrix: obj.matrix.toArray(),
         ...(obj instanceof THREE.Mesh && {
-          material: obj.material instanceof THREE.Material ? {
-            color: obj.material instanceof THREE.MeshBasicMaterial ? obj.material.color.getHex() : undefined,
-            opacity: obj.material.opacity,
-            transparent: obj.material.transparent
-          } : undefined
-        })
+          material:
+            obj.material instanceof THREE.Material
+              ? {
+                  color:
+                    obj.material instanceof THREE.MeshBasicMaterial
+                      ? obj.material.color.getHex()
+                      : undefined,
+                  opacity: obj.material.opacity,
+                  transparent: obj.material.transparent,
+                }
+              : undefined,
+        }),
       };
     });
 
@@ -328,7 +274,7 @@ export abstract class Scene {
 
   serialize(): any {
     const sceneData = this.scene.toJSON();
-    
+
     return {
       scene: sceneData,
       camera: this.camera.toJSON(),
@@ -337,218 +283,111 @@ export abstract class Scene {
       ...(isDevelopment() && {
         editorOverrides: this._editorOverrides,
         editableProperties: this.getEditableProperties(),
-        registeredObjects: Array.from(this._sceneObjects.keys())
-      })
+        registeredObjects: Array.from(this._sceneObjects.keys()),
+      }),
     };
   }
 
   // === AUTOMATIC OBJECT CREATION FROM METADATA ===
-  
+
   protected async createObjectsFromMetadata(): Promise<void> {
+    // Safety check: ensure the scene is properly initialized before creating objects
+    if (!this.scene || typeof this.scene.add !== 'function') {
+      console.warn('Scene not properly initialized, skipping object creation from metadata');
+      return;
+    }
+
+    // Handle new Three.js JSON format
+    if (this.metadata.scene) {
+      try {
+        const obj = ObjectFactory.createObject(this.metadata.scene);
+        if (obj) {
+          // Mark this object as being created from metadata
+          obj.userData = obj.userData || {};
+          obj.userData.fromMetadata = true;
+          
+          // Add the entire loaded object structure to our scene
+          this.scene.add(obj);
+          
+          // Register the root object
+          this.registerObject(obj.name || obj.uuid || 'loaded-scene', obj);
+          
+          // If it's a Group, register all named children recursively
+          if (obj.type === 'Group') {
+            this.registerChildrenRecursively(obj);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to create objects from Three.js metadata:', error);
+      }
+    }
+    
+    // Legacy support for old simplified format
     if (this.metadata.objects) {
       for (const [name, objectData] of Object.entries(this.metadata.objects)) {
         try {
-          const obj = this.createThreeJSObject(objectData as any);
-          
+          const obj = ObjectFactory.createObject(objectData as any);
+
           if (obj) {
+            // Mark this object as being created from metadata
+            obj.userData = obj.userData || {};
+            obj.userData.fromMetadata = true;
+            
             this.scene.add(obj);
             this.registerObject(name, obj);
-            console.log(`🎮 Auto-created object: ${name}`);
           }
         } catch (error) {
-          console.error(`🚨 Failed to create object ${name}:`, error);
+          console.warn(`Failed to create object ${name}:`, error);
         }
       }
     }
   }
 
-  // Create Three.js objects directly instead of using ObjectLoader
-  private createThreeJSObject(data: any): THREE.Object3D | null {
-    if (data.type === 'Mesh' && data.geometry && data.material) {
-      // Create geometry
-      const geometry = this.createGeometry(data.geometry);
-      if (!geometry) return null;
-
-      // Create material
-      const material = this.createMaterial(data.material);
-      if (!material) return null;
-
-      // Create mesh
-      const mesh = new THREE.Mesh(geometry, material);
-      
-      // Apply transform
-      if (data.position) {
-        mesh.position.fromArray(data.position);
-      }
-      if (data.rotation) {
-        mesh.rotation.set(data.rotation[0], data.rotation[1], data.rotation[2]);
-      }
-      if (data.scale) {
-        mesh.scale.fromArray(data.scale);
-      }
-      
-      return mesh;
-    }
+  private registerChildrenRecursively(parent: THREE.Object3D): void {
+    if (!isDevelopment()) return;
     
-    return null;
-  }
-
-  private createGeometry(geometryData: any): THREE.BufferGeometry | null {
-    switch (geometryData.type) {
-      case 'BoxGeometry':
-        return new THREE.BoxGeometry(
-          geometryData.width || 1,
-          geometryData.height || 1,
-          geometryData.depth || 1,
-          geometryData.widthSegments,
-          geometryData.heightSegments,
-          geometryData.depthSegments
-        );
+    parent.children.forEach((child) => {
+      // Mark child as being from metadata
+      child.userData = child.userData || {};
+      child.userData.fromMetadata = true;
       
-      case 'SphereGeometry':
-        return new THREE.SphereGeometry(
-          geometryData.radius || 1,
-          geometryData.widthSegments || 32,
-          geometryData.heightSegments || 16,
-          geometryData.phiStart,
-          geometryData.phiLength,
-          geometryData.thetaStart,
-          geometryData.thetaLength
-        );
+      if (child.name) {
+        this.registerObject(child.name, child);
+      }
       
-      case 'CylinderGeometry':
-        return new THREE.CylinderGeometry(
-          geometryData.radiusTop || 1,
-          geometryData.radiusBottom || 1,
-          geometryData.height || 1,
-          geometryData.radialSegments || 8,
-          geometryData.heightSegments,
-          geometryData.openEnded,
-          geometryData.thetaStart,
-          geometryData.thetaLength
-        );
-      
-      case 'PlaneGeometry':
-        return new THREE.PlaneGeometry(
-          geometryData.width || 1,
-          geometryData.height || 1,
-          geometryData.widthSegments,
-          geometryData.heightSegments
-        );
-      
-      case 'TorusGeometry':
-        return new THREE.TorusGeometry(
-          geometryData.radius || 1,
-          geometryData.tube || 0.4,
-          geometryData.radialSegments || 8,
-          geometryData.tubularSegments || 6,
-          geometryData.arc
-        );
-      
-      default:
-        console.warn(`Unknown geometry type: ${geometryData.type}`);
-        return null;
-    }
-  }
-
-  private createMaterial(materialData: any): THREE.Material | null {
-    switch (materialData.type) {
-      case 'MeshBasicMaterial':
-        return new THREE.MeshBasicMaterial({
-          color: materialData.color || 0xffffff,
-          transparent: materialData.transparent,
-          opacity: materialData.opacity,
-          wireframe: materialData.wireframe,
-          side: materialData.side
-        });
-      
-      case 'MeshPhongMaterial':
-        return new THREE.MeshPhongMaterial({
-          color: materialData.color || 0xffffff,
-          emissive: materialData.emissive,
-          specular: materialData.specular,
-          shininess: materialData.shininess,
-          transparent: materialData.transparent,
-          opacity: materialData.opacity,
-          wireframe: materialData.wireframe,
-          side: materialData.side
-        });
-      
-      case 'MeshStandardMaterial':
-        return new THREE.MeshStandardMaterial({
-          color: materialData.color || 0xffffff,
-          emissive: materialData.emissive,
-          roughness: materialData.roughness || 1,
-          metalness: materialData.metalness || 0,
-          transparent: materialData.transparent,
-          opacity: materialData.opacity,
-          wireframe: materialData.wireframe,
-          side: materialData.side
-        });
-      
-      case 'MeshLambertMaterial':
-        return new THREE.MeshLambertMaterial({
-          color: materialData.color || 0xffffff,
-          emissive: materialData.emissive,
-          transparent: materialData.transparent,
-          opacity: materialData.opacity,
-          wireframe: materialData.wireframe,
-          side: materialData.side
-        });
-      
-      default:
-        console.warn(`Unknown material type: ${materialData.type}`);
-        return new THREE.MeshBasicMaterial({ color: materialData.color || 0xffffff });
-    }
+      // Recursively register children of children
+      if (child.children.length > 0) {
+        this.registerChildrenRecursively(child);
+      }
+    });
   }
 
   // === END DEVELOPMENT-ONLY METHODS ===
 
-  private setNestedProperty(obj: any, path: string, value: any): void {
-    const keys = path.split('.');
-    let current = obj;
-    
-    for (let i = 0; i < keys.length - 1; i++) {
-      current = current[keys[i]];
-      if (!current) return;
-    }
-    
-    const finalKey = keys[keys.length - 1];
-    
-    if (current[finalKey] && typeof current[finalKey].set === 'function') {
-      if (Array.isArray(value)) {
-        current[finalKey].set(...value);
-      } else {
-        current[finalKey].set(value);
-      }
-    } else if (current[finalKey] && typeof current[finalKey].copy === 'function') {
-      current[finalKey].copy(value);
-    } else {
-      current[finalKey] = value;
-    }
-  }
-
   protected applyMetadata(): void {
-    console.log('🎯 Applying metadata:', this.metadata);
-    
     // Apply @Editable property overrides
     for (const [key, value] of Object.entries(this.metadata)) {
-      if (key !== 'objects' && this.hasOwnProperty(key)) {
-        console.log(`  ⚙️ Setting scene property ${key} = ${value}`);
+      if (key !== "objects" && key !== "scene" && this.hasOwnProperty(key)) {
         (this as any)[key] = value;
       }
     }
 
     // Automatically create objects from metadata
-    this.createObjectsFromMetadata();
+    // Only create objects if the scene is properly initialized
+    if (this.scene && typeof this.scene.add === 'function') {
+      this.createObjectsFromMetadata();
+    } else {
+      // If scene isn't ready, we'll defer object creation until init() is called
+      console.warn('Scene not ready, deferring object creation from metadata');
+    }
   }
 
   private applyEditorOverrides(): void {
     if (!isDevelopment()) return;
-    
+
     for (const [key, value] of Object.entries(this._editorOverrides)) {
-      if (key === 'objects') {
-        if (typeof value === 'object' && value !== null) {
+      if (key === "objects") {
+        if (typeof value === "object" && value !== null) {
           for (const [objName, objOverrides] of Object.entries(value)) {
             const obj = this.getObject(objName);
             if (obj && objOverrides) {
@@ -564,19 +403,28 @@ export abstract class Scene {
 
   private applyThreeJSOverrides(object: THREE.Object3D, overrides: any): void {
     for (const [key, value] of Object.entries(overrides)) {
-      if (key === 'position' && object.position) {
-        object.position.fromArray(value as number[]);
-      } else if (key === 'rotation' && object.rotation) {
-        if (Array.isArray(value)) {
-          object.rotation.set(value[0], value[1], value[2]);
+      if (key === "position" && object.position) {
+        if (value && typeof value === 'object' && 'x' in value && 'y' in value && 'z' in value) {
+          object.position.set(Number(value.x), Number(value.y), Number(value.z));
         }
-      } else if (key === 'scale' && object.scale) {
-        object.scale.fromArray(value as number[]);
-      } else if (key === 'visible') {
+      } else if (key === "rotation" && object.rotation) {
+        if (value && typeof value === 'object' && 'x' in value && 'y' in value && 'z' in value) {
+          object.rotation.set(Number(value.x), Number(value.y), Number(value.z));
+        }
+      } else if (key === "scale" && object.scale) {
+        if (value && typeof value === 'object' && 'x' in value && 'y' in value && 'z' in value) {
+          object.scale.set(Number(value.x), Number(value.y), Number(value.z));
+        }
+      } else if (key === "matrix") {
+        if (Array.isArray(value) && value.length === 16) {
+          object.matrix.fromArray(value);
+          object.matrix.decompose(object.position, object.quaternion, object.scale);
+        }
+      } else if (key === "visible") {
         object.visible = value as boolean;
-      } else if (key === 'material' && 'material' in object) {
+      } else if (key === "material" && "material" in object) {
         const material = (object as any).material;
-        if (material && typeof value === 'object') {
+        if (material && typeof value === "object") {
           Object.assign(material, value);
         }
       } else {
@@ -598,52 +446,86 @@ export abstract class Scene {
   }
 
   private sendSceneStateToEditor(): void {
-    if (!isDevelopment() || !this._wsConnection || this._wsConnection.readyState !== WebSocket.OPEN) {
+    if (
+      !isDevelopment() ||
+      !this._wsConnection ||
+      this._wsConnection.readyState !== WebSocket.OPEN
+    ) {
       return;
     }
 
     const sceneState = {
-      type: 'scene-state-response',
+      type: "scene-state-response",
       timestamp: Date.now(),
       editorState: {
         properties: this.getEditableProperties(),
         objects: this.getEditableObjects(),
-        overrides: this.getEditorOverrides()
-      }
+        overrides: this.getEditorOverrides(),
+      },
     };
 
     try {
       this._wsConnection.send(JSON.stringify(sceneState));
-      console.log('📤 Sent scene state to editor:', sceneState);
-    } catch (error) {
-      console.error('Failed to send scene state to editor:', error);
-    }
+    } catch (error) {}
   }
 
   private sendSceneStateViaVite(): void {
-    if (!isDevelopment() || typeof window === 'undefined' || !(window as any).__vite_ws) {
+    if (
+      !isDevelopment() ||
+      typeof window === "undefined" ||
+      !(window as any).__vite_ws
+    ) {
       return;
     }
 
     const viteWs = (window as any).__vite_ws;
     const sceneState = {
-      type: 'custom',
-      event: 'scene-state-response', 
+      type: "custom",
+      event: "scene-state-response",
       data: {
         timestamp: Date.now(),
         editorState: {
           properties: this.getEditableProperties(),
           objects: this.getEditableObjects(),
-          overrides: this.getEditorOverrides()
-        }
-      }
+          overrides: this.getEditorOverrides(),
+        },
+      },
     };
 
     try {
       viteWs.send(JSON.stringify(sceneState));
-      console.log('📤 Sent scene state via Vite:', sceneState);
+    } catch (error) {}
+  }
+
+  private handleSceneReload(data: any): void {
+    if (!isDevelopment() || !data.sceneData) return;
+
+    try {
+      // Find and remove all auto-generated objects (those created from metadata)
+      const objectsToRemove: string[] = [];
+      
+      this._sceneObjects.forEach((obj, name) => {
+        // Remove objects that were created from metadata (loaded scene objects)
+        if (name.startsWith('loaded-') || name === 'loaded-scene' || obj.userData?.fromMetadata) {
+          this.scene.remove(obj);
+          objectsToRemove.push(name);
+        }
+      });
+
+      // Clear them from the registry
+      objectsToRemove.forEach(name => {
+        this._sceneObjects.delete(name);
+      });
+
+      // Update metadata with new scene data
+      this.metadata.scene = data.sceneData;
+
+      // Recreate objects from the updated metadata
+      this.createObjectsFromMetadata();
+
+      console.log(`🔄 Scene reloaded with updated Three.js objects (removed ${objectsToRemove.length} old objects)`);
     } catch (error) {
-      console.error('Failed to send scene state via Vite:', error);
+      console.error('Failed to reload scene:', error);
     }
   }
-} 
+}

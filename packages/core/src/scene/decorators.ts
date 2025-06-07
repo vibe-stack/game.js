@@ -24,9 +24,16 @@ export function Editable(options: EditableOptions = {}) {
 export function SceneMetadata(metadataPath: string) {
   return function <T extends { new(...args: any[]): {} }>(constructor: T) {
     return class extends constructor {
+      _metadataPath: string = metadataPath;
+      
       constructor(...args: any[]) {
         super(...args);
-        setTimeout(() => this.loadMetadata(metadataPath), 0);
+        // Store the metadata path - loading will happen during init phase
+        (this as any)._metadataPath = metadataPath;
+      }
+
+      getMetadataPath(): string {
+        return this._metadataPath;
       }
 
       async loadMetadata(metadataPath: string) {
@@ -41,25 +48,17 @@ export function SceneMetadata(metadataPath: string) {
             actualMetadataPath = `src/app/${routeSegments.join('/')}/${metadataPath}`;
           }
           
-          console.log(`🔍 Scene attempting to load metadata from: ${actualMetadataPath}`);
-          console.log(`🌐 Current window location: ${window.location.href}`);
-          console.log(`🛣️ Route path: ${routePath}`);
-          console.log(`📂 Resolved fetch URL will be: ${new URL(actualMetadataPath, window.location.href).href}`);
-          
           const response = await fetch(actualMetadataPath);
-          console.log(`📡 Fetch response status: ${response.status} for ${actualMetadataPath}`);
           
           if (response.ok) {
             const metadata = await response.json();
-            console.log(`✅ Successfully loaded metadata:`, metadata);
             (this as any).setMetadata(metadata);
           } else {
-            console.warn(`❌ Failed to fetch metadata from ${actualMetadataPath}: HTTP ${response.status}`);
+            const errorText = await response.text();
           }
         } catch (error) {
-          console.warn(`Could not load metadata from ${metadataPath}:`, error);
         }
       }
     };
   };
-} 
+}

@@ -132,11 +132,20 @@ export function ObjectsPanel() {
   const {
     sceneObjects,
     selectedObjectId,
+    currentFilePath,
     setSelectedObjectId,
     updateObject,
     duplicateObject,
     removeObject,
+    loadSceneObjects,
   } = useSceneStore();
+
+  // Load scene objects when the current scene changes
+  React.useEffect(() => {
+    if (currentFilePath) {
+      loadSceneObjects(currentFilePath);
+    }
+  }, [currentFilePath, loadSceneObjects]);
 
   const findObjectById = (objects: SceneObject[], id: string): SceneObject | null => {
     for (const obj of objects) {
@@ -155,8 +164,6 @@ export function ObjectsPanel() {
       updateObject(id, { visible: !object.visible });
     }
   };
-
-  console.log(sceneObjects);
 
   return (
     <div className="space-y-1">

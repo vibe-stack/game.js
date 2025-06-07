@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { WebSocketServer } from "ws";
 import { subscribe } from "@parcel/watcher";
+import diff, { Difference } from "microdiff";
 
 /**
  * Game.js Vite Plugin with Real-time Editor Communication
@@ -68,7 +69,7 @@ export default function gameJSPlugin(
             return;
           }
           
-          // Handle requests with full path like '/src/app/scene.editor.json'
+          // Handle requests with full path like '/src/app/tt/scene.editor.json'
           const requestPath = req.url;
           let jsonPath: string;
           
@@ -82,14 +83,13 @@ export default function gameJSPlugin(
             jsonPath = path.join(process.cwd(), appPath, relativePath);
           }
           
-          console.log(`🔍 .editor.json request: ${requestPath}`);
-          console.log(`📂 Resolved to file path: ${jsonPath}`);
-          console.log(`📁 File exists: ${fs.existsSync(jsonPath)}`);
-          
           if (fs.existsSync(jsonPath)) {
             res.setHeader("Content-Type", "application/json");
             res.end(fs.readFileSync(jsonPath, "utf-8"));
             return;
+          } else {
+            console.warn(`❌ Middleware: File not found: ${jsonPath}`);
+            console.warn(`❌ Middleware: Directory contents:`, fs.existsSync(path.dirname(jsonPath)) ? fs.readdirSync(path.dirname(jsonPath)) : 'Directory does not exist');
           }
         }
         next();
@@ -121,8 +121,6 @@ export default function gameJSPlugin(
 
         let sentCount = 0;
         if (enableEditor && connectedClients.size > 0) {
-          console.log("🧪 Test endpoint triggered - sending to", connectedClients.size, "editor clients");
-          
           connectedClients.forEach((ws) => {
             if (ws.readyState === 1) { // WebSocket.OPEN
               try {
@@ -164,15 +162,12 @@ export default function gameJSPlugin(
 
         // Pre-populate the cache for hot-reloading
         const watchPattern = path.join(appPath, "**/*.editor.json");
-        console.log('🔍 Absolute watch pattern:', path.resolve(watchPattern));
         const initialFiles = fg.sync(watchPattern);
-        console.log(`🔍 Found ${initialFiles.length} .editor.json files to watch:`, initialFiles);
         for (const file of initialFiles) {
           try {
             const content = fs.readFileSync(file, "utf-8");
             const jsonData = JSON.parse(content);
             editorFileCache.set(path.resolve(file), jsonData);
-            console.log(`📝 Cached ${path.basename(file)} for diffing.`);
           } catch (e) {
             console.error(`Error processing ${file}:`, e);
           }
@@ -180,10 +175,8 @@ export default function gameJSPlugin(
 
         // Create WebSocket server for editor communication
         const wss = new WebSocketServer({ port: 3001 });
-        console.log("🚀 Starting WebSocket server on port 3001");
 
         wss.on("connection", (ws: any) => {
-          console.log("🎨 Editor connected. Total clients:", connectedClients.size + 1);
           connectedClients.add(ws);
 
           // Send initial connection confirmation
@@ -207,35 +200,42 @@ export default function gameJSPlugin(
                 connectedClients.delete(ws);
               }
             } else {
-              console.log("💓 WebSocket not ready, clearing heartbeat");
               clearInterval(heartbeatInterval);
               connectedClients.delete(ws);
             }
           }, 10000);
 
           ws.on("message", (data: Buffer) => {
-            console.log("📨 Received message from editor:", data.toString());
             try {
               const update = JSON.parse(data.toString());
-              console.log("📨 Parsed update:", update);
 
               // Only process property-update messages, ignore connection-test and other message types
               if (update.type !== 'property-update' && !update.property) {
-                console.log("📨 Ignoring non-property-update message:", update.type);
                 return;
               }
 
-              // Broadcast to game immediately via Vite's WebSocket
+              // Add route path if not present
+              if (!update.routePath && update.scenePath) {
+                update.routePath = getRoutePathFromScenePath(update.scenePath);
+              }
+
+              // Broadcast to active scene immediately via Vite's WebSocket
               server.ws.send({
                 type: "custom",
                 event: "property-update",
                 data: update
               });
-              console.log("📤 Sent update to game via Vite WebSocket");
+
+              // Temporarily disable cached scene update
+              // Send cached scene update for non-active scenes
+              // server.ws.send({
+              //   type: "custom",
+              //   event: "cached-scene-update",
+              //   data: update
+              // });
 
               // Handle debounced file saving - only for property updates with scenePath
               if (!update.temporary && update.scenePath && update.property) {
-                console.log("💾 Scheduling debounced save for:", update.property);
                 debouncedSave(update, debounceTimers);
               }
             } catch (error) {
@@ -244,7 +244,6 @@ export default function gameJSPlugin(
           });
 
           ws.on("close", () => {
-            console.log("🎨 Editor disconnected. Remaining clients:", connectedClients.size - 1);
             clearInterval(heartbeatInterval);
             connectedClients.delete(ws);
           });
@@ -261,8 +260,6 @@ export default function gameJSPlugin(
         });
 
         // Watch for .editor.json file changes using @parcel/watcher
-        console.log("🔍 Setting up file watcher for pattern:", watchPattern);
-
         let watcherSubscription: any = null;
         (async () => {
           try {
@@ -278,33 +275,25 @@ export default function gameJSPlugin(
                   
                   // Ensure we have the absolute path
                   const absolutePath = path.isAbsolute(event.path) ? event.path : path.resolve(appPath, event.path);
-                  console.log("🔍 Using absolute path:", absolutePath);
                   
                   if (event.type === "create") {
-                    console.log("🔍 New editor JSON file added:", absolutePath);
-                    
                     // Add new files to cache to prevent false diffs
                     try {
                       const content = fs.readFileSync(absolutePath, "utf-8");
                       const jsonData = JSON.parse(content);
                       editorFileCache.set(absolutePath, jsonData);
-                      console.log(`📝 Added ${path.basename(absolutePath)} to cache.`);
                     } catch (e) {
                       console.error(`Error adding ${absolutePath} to cache:`, e);
                     }
                   } else if (event.type === "update") {
-                    console.log("🔍 Editor JSON file changed:", absolutePath);
-                    console.log("🔍 Connected clients count:", connectedClients.size);
                     handleEditorJsonChange(
                       absolutePath,
                       server,
                       connectedClients
                     );
                   } else if (event.type === "delete") {
-                    console.log("🔍 Editor JSON file removed:", absolutePath);
                     // Remove from cache
                     editorFileCache.delete(absolutePath);
-                    console.log(`🗑️ Removed ${path.basename(absolutePath)} from cache.`);
                   }
                 }
               },
@@ -312,11 +301,9 @@ export default function gameJSPlugin(
                 ignore: ["**/node_modules/**"]
               }
             );
-            console.log("🔍 File watcher is ready and watching for changes");
             
             // After watcher is ready, ensure cache is properly populated
             const existingFiles = fg.sync(path.join(appPath, "**/*.editor.json"));
-            console.log(`🔍 Post-ready cache check: Found ${existingFiles.length} existing .editor.json files`);
             
             for (const file of existingFiles) {
               const absolutePath = path.resolve(file);
@@ -325,7 +312,6 @@ export default function gameJSPlugin(
                   const content = fs.readFileSync(absolutePath, "utf-8");
                   const jsonData = JSON.parse(content);
                   editorFileCache.set(absolutePath, jsonData);
-                  console.log(`📝 Added missing ${path.basename(file)} to cache during ready phase.`);
                 } catch (e) {
                   console.error(`Error caching ${file} during ready:`, e);
                 }
@@ -335,10 +321,6 @@ export default function gameJSPlugin(
             console.error("🚨 Failed to start file watcher:", error);
           }
         })();
-
-        console.log(
-          "🎨 Editor WebSocket server running on ws://localhost:3001"
-        );
 
         // Cleanup function
         server.httpServer?.on('close', () => {
@@ -356,45 +338,49 @@ export default function gameJSPlugin(
     server: any,
     connectedClients: Set<any>
   ) {
-    console.log("🔄 Processing editor JSON change for:", filePath);
-    console.log("🔄 Number of connected clients:", connectedClients.size);
-    
     try {
       const content = fs.readFileSync(filePath, "utf-8");
       const newData = JSON.parse(content);
       const relativePath = path.relative(process.cwd(), filePath);
 
-      console.log("🔄 File content read successfully");
-      console.log("🔄 Relative path:", relativePath);
-
       // Get cached version for diffing
       const cachedData = editorFileCache.get(filePath) || {};
-      console.log("🔄 Cached data exists:", Object.keys(cachedData).length > 0);
 
-      // Find differences
-      const diffs = findObjectDifferences(cachedData, newData);
-      console.log(`🔄 Found ${diffs.length} differences`);
+      // Find differences using microdiff
+      const diffs = diff(cachedData, newData);
 
       if (diffs.length > 0) {
-        console.log(
-          `🔄 Detected ${diffs.length} changes in ${path.basename(filePath)}`
-        );
+        // Determine the route path from the file path
+        const routePath = getRoutePathFromFilePath(filePath);
 
-        // Send each diff as a property update
-        diffs.forEach((diff, index) => {
+        // Group diffs by type to handle them differently
+        const simpleDiffs: Difference[] = [];
+        const sceneDiffs: Difference[] = [];
+
+        diffs.forEach((diffItem: Difference) => {
+          const path = diffItem.path.join('.');
+          if (path.startsWith('scene.')) {
+            sceneDiffs.push(diffItem);
+          } else {
+            simpleDiffs.push(diffItem);
+          }
+        });
+
+        // Handle simple property updates (e.g., @Editable properties)
+        simpleDiffs.forEach((diffItem: Difference) => {
+          // Only handle CREATE and CHANGE operations, skip REMOVE for now
+          if (diffItem.type === 'REMOVE') return;
+
           const update = {
             type: "property-update",
             scenePath: relativePath.replace(".editor.json", ".ts"),
-            property: diff.path,
-            value: diff.newValue,
+            routePath: routePath,
+            property: diffItem.path.join('.'),
+            value: diffItem.type === 'CREATE' ? diffItem.value : (diffItem as any).value,
             temporary: false,
           };
 
-          console.log(
-            `  📤 Broadcasting diff ${index + 1}: ${diff.path} = ${JSON.stringify(diff.newValue)}`
-          );
-
-          // Broadcast to game via Vite's WebSocket
+          // Broadcast to active scene via Vite's WebSocket
           server.ws.send({
             type: "custom",
             event: "property-update", 
@@ -404,78 +390,97 @@ export default function gameJSPlugin(
           // Also broadcast to editor clients
           let sentCount = 0;
           connectedClients.forEach((ws) => {
-            console.log("📤 Checking client readyState:", ws.readyState);
             if (ws.readyState === 1) {
               // WebSocket.OPEN
               try {
                 ws.send(JSON.stringify(update));
                 sentCount++;
-                console.log("📤 Successfully sent update to editor client");
               } catch (error) {
                 console.error("📤 Failed to send to client:", error);
               }
-            } else {
-              console.log("📤 Client not ready, readyState:", ws.readyState);
             }
           });
-          console.log(`📤 Sent update to ${sentCount} editor clients`);
         });
-      } else {
-        console.log("🔄 No differences found, skipping broadcast");
+
+        // Handle scene object updates by sending a scene reload event
+        if (sceneDiffs.length > 0) {
+          const sceneReloadUpdate = {
+            type: "scene-reload",
+            scenePath: relativePath.replace(".editor.json", ".ts"),
+            routePath: routePath,
+            sceneData: newData.scene,
+            temporary: false,
+          };
+
+          // Broadcast scene reload to active scene via Vite's WebSocket
+          server.ws.send({
+            type: "custom",
+            event: "scene-reload", 
+            data: sceneReloadUpdate
+          });
+
+          // Also broadcast to editor clients
+          let sentCount = 0;
+          connectedClients.forEach((ws) => {
+            if (ws.readyState === 1) {
+              // WebSocket.OPEN
+              try {
+                ws.send(JSON.stringify(sceneReloadUpdate));
+                sentCount++;
+              } catch (error) {
+                console.error("📤 Failed to send scene reload to client:", error);
+              }
+            }
+          });
+
+          console.log(`🔄 Scene reload triggered for ${sceneDiffs.length} Three.js object changes`);
+        }
       }
 
       // Update cache
       editorFileCache.set(filePath, newData);
-      console.log("🔄 Cache updated for:", filePath);
     } catch (error) {
       console.error("Failed to process .editor.json change:", error);
     }
   }
 
-  function findObjectDifferences(
-    oldData: any,
-    newData: any,
-    basePath = ""
-  ): Array<{ path: string; oldValue: any; newValue: any }> {
-    const diffs: Array<{ path: string; oldValue: any; newValue: any }> = [];
-
-    function compareObjects(old: any, current: any, path: string) {
-      if (old === current) return;
-
-      // Handle primitive values
-      if (typeof current !== "object" || current === null) {
-        if (old !== current) {
-          diffs.push({ path, oldValue: old, newValue: current });
-        }
-        return;
-      }
-
-      // Handle arrays
-      if (Array.isArray(current)) {
-        if (
-          !Array.isArray(old) ||
-          old.length !== current.length ||
-          !old.every((val, i) => val === current[i])
-        ) {
-          diffs.push({ path, oldValue: old, newValue: current });
-        }
-        return;
-      }
-
-      // Handle objects
-      const allKeys = new Set([
-        ...Object.keys(old || {}),
-        ...Object.keys(current || {}),
-      ]);
-
-      for (const key of allKeys) {
-        const newPath = path ? `${path}.${key}` : key;
-        compareObjects(old?.[key], current?.[key], newPath);
-      }
+  function getRoutePathFromScenePath(scenePath: string): string {
+    // Convert scene path to route path
+    // Example: src/app/tt/scene.ts -> /tt
+    // Example: src/app/scene.ts -> /
+    
+    const withoutExtension = scenePath.replace(/\.(ts|js)$/, '');
+    const relativePath = path.relative(`${srcDir}/${appDir}`, withoutExtension);
+    const parts = relativePath.split(path.sep);
+    
+    // Remove 'scene' filename
+    if (parts[parts.length - 1] === 'scene') {
+      parts.pop();
     }
+    
+    if (parts.length === 0 || (parts.length === 1 && parts[0] === '')) {
+      return '/';
+    }
+    
+    return '/' + parts.join('/');
+  }
 
-    compareObjects(oldData, newData, basePath);
-    return diffs;
+  function getRoutePathFromFilePath(filePath: string): string {
+    // Convert file path to route path
+    // Example: src/app/tt/scene.editor.json -> /tt
+    // Example: src/app/scene.editor.json -> /
+    
+    const relativePath = path.relative(path.join(process.cwd(), appPath), filePath);
+    const parts = relativePath.split(path.sep);
+    
+    // Remove the filename (scene.editor.json)
+    parts.pop();
+    
+    if (parts.length === 0 || (parts.length === 1 && parts[0] === '')) {
+      return '/';
+    }
+    
+    return '/' + parts.join('/');
   }
 
   function generateRoutes() {
@@ -546,7 +551,6 @@ export default router;
   function savePropertyToFile(update: any) {
     // Safety check for required properties
     if (!update.scenePath || !update.property) {
-      console.log(`💾 Skipping save - missing required properties. scenePath: ${update.scenePath}, property: ${update.property}`);
       return;
     }
 
@@ -554,10 +558,6 @@ export default router;
       /\.(ts|js)$/,
       ".editor.json"
     );
-
-    console.log(`💾 Attempting to save to: ${editorJsonPath}`);
-    console.log(`💾 Property: ${update.property}`);
-    console.log(`💾 Value:`, update.value);
 
     let editorData: any = {};
     if (fs.existsSync(editorJsonPath) && fs.statSync(editorJsonPath).isFile()) {
@@ -584,9 +584,6 @@ export default router;
     // Write to file
     try {
       fs.writeFileSync(editorJsonPath, JSON.stringify(editorData, null, 2));
-      console.log(
-        `💾 Saved ${update.property} to ${path.basename(editorJsonPath)}`
-      );
 
       // Update cache to prevent circular updates
       editorFileCache.set(path.resolve(editorJsonPath), editorData);

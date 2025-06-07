@@ -49,7 +49,7 @@ export default function EditorPage() {
       
       <div className="flex-1 relative">
         <SceneFrame projectName={projectName} />
-        <LeftPanel />
+        <LeftPanel projectName={projectName} />
         <RightPanel />
       </div>
     </div>

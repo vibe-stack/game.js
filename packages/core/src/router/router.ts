@@ -1,4 +1,5 @@
 import { Scene, SceneParams } from '../scene/scene.js';
+import * as THREE from 'three';
 
 interface RouteConfig {
   path: string;
@@ -13,12 +14,155 @@ export class GameRouter {
   private currentPath: string = '/';
   private sceneCache: Map<string, Scene> = new Map();
 
+  private constructor() {
+    // Listen for property updates for cached scenes in development
+    if (this.isDevelopment()) {
+      this.setupCachedSceneUpdates();
+    }
+  }
+
   static getInstance(): GameRouter {
     if (!GameRouter.instance) {
       GameRouter.instance = new GameRouter();
     }
     return GameRouter.instance;
   }
+
+  // === DEVELOPMENT-ONLY CACHED SCENE UPDATES ===
+  
+  private isDevelopment(): boolean {
+    try {
+      return typeof import.meta !== 'undefined' && 
+             import.meta.env !== undefined && 
+             import.meta.env.DEV === true;
+    } catch {
+      return false;
+    }
+  }
+
+  private setupCachedSceneUpdates(): void {
+    if (typeof window !== 'undefined' && (window as any).__vite_ws) {
+      const viteWs = (window as any).__vite_ws;
+      
+      viteWs.addEventListener('message', (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'custom' && data.event === 'cached-scene-update') {
+            console.log('🔄 Received cached scene update:', data.data);
+            this.applyCachedSceneUpdate(data.data);
+          }
+        } catch (error) {
+          // Ignore non-JSON messages
+        }
+      });
+    }
+  }
+
+  private applyCachedSceneUpdate(update: any): void {
+    if (!update.routePath || !update.property) {
+      console.warn('🔄 Invalid cached scene update:', update);
+      return;
+    }
+
+    // Find the cached scene for this route
+    const cachedScene = this.sceneCache.get(update.routePath);
+    if (!cachedScene) {
+      console.log(`🔄 No cached scene found for route: ${update.routePath}`);
+      return;
+    }
+
+    console.log(`🔄 Applying update to cached scene ${update.routePath}: ${update.property} = ${JSON.stringify(update.value)}`);
+
+    // Apply the update to the cached scene
+    if (update.property.startsWith('objects.')) {
+      const pathParts = update.property.split('.');
+      const objectName = pathParts[1];
+      const propertyPath = pathParts.slice(2);
+      
+      const obj = cachedScene.getObject?.(objectName);
+      if (obj) {
+        this.applyObjectPropertyUpdate(obj, propertyPath, update.value);
+      }
+    } else if (cachedScene.hasOwnProperty(update.property)) {
+      // Handle scene-level property updates
+      (cachedScene as any)[update.property] = update.value;
+    }
+
+    // Also update the scene's editor overrides for persistence
+    if (typeof cachedScene.setEditorOverrides === 'function') {
+      const currentOverrides = cachedScene.getEditorOverrides?.() || {};
+      const newOverrides = { ...currentOverrides };
+      this.setNestedProperty(newOverrides, update.property, update.value);
+      cachedScene.setEditorOverrides(newOverrides);
+    }
+  }
+
+  private applyObjectPropertyUpdate(obj: any, propertyPath: string[], value: any): void {
+    const property = propertyPath.join('.');
+    
+    switch (property) {
+      case 'position':
+        if (value && typeof value === 'object' && 'x' in value && 'y' in value && 'z' in value) {
+          obj.position.set(value.x, value.y, value.z);
+        }
+        break;
+        
+      case 'rotation':
+        if (value && typeof value === 'object' && 'x' in value && 'y' in value && 'z' in value) {
+          obj.rotation.set(value.x, value.y, value.z);
+        }
+        break;
+        
+      case 'scale':
+        if (value && typeof value === 'object' && 'x' in value && 'y' in value && 'z' in value) {
+          obj.scale.set(value.x, value.y, value.z);
+        }
+        break;
+        
+      case 'matrix':
+        if (Array.isArray(value) && value.length === 16) {
+          obj.matrix.fromArray(value);
+          obj.matrix.decompose(obj.position, obj.quaternion, obj.scale);
+        }
+        break;
+        
+      case 'visible':
+        obj.visible = Boolean(value);
+        break;
+        
+      case 'material.color':
+        if (obj instanceof THREE?.Mesh && obj.material) {
+          const material = obj.material as any;
+          if (material.color) {
+            const colorValue = typeof value === 'string' ? 
+              parseInt(value.replace('#', ''), 16) : value;
+            material.color.setHex(colorValue);
+          }
+        }
+        break;
+        
+      default:
+        this.setNestedProperty(obj, property, value);
+        break;
+    }
+  }
+
+  private setNestedProperty(obj: any, path: string, value: any): void {
+    const keys = path.split('.');
+    let current = obj;
+    
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (!current[keys[i]]) {
+        current[keys[i]] = {};
+      }
+      current = current[keys[i]];
+    }
+    
+    const finalKey = keys[keys.length - 1];
+    current[finalKey] = value;
+  }
+
+  // === END DEVELOPMENT-ONLY METHODS ===
 
   registerRoute(path: string, component: () => Promise<{ default: new() => Scene }>) {
     this.routes.set(path, { path, component });
@@ -43,7 +187,7 @@ export class GameRouter {
     const params = this.extractParams(route.path, path);
     scene.setParams(params);
 
-    await scene.init();
+    await scene.internalInit();
     scene.onEnter?.();
 
     this.currentScene = scene;

@@ -4,14 +4,16 @@ import { FileText, ChevronRight } from "lucide-react";
 import { useSceneStore } from "../../stores/scene-store";
 import { SceneRoute } from "../../types";
 
-export function ScenesPanel() {
+interface ScenesPanelProps {
+  projectName: string;
+}
+
+export function ScenesPanel({ projectName }: ScenesPanelProps) {
   const { routes, currentRoute, setCurrentRoute, loadSceneRoutes } = useSceneStore();
 
   React.useEffect(() => {
-    // Assuming project name is available somehow, or the store handles it.
-    // For now, let's just trigger a load.
-    loadSceneRoutes('test'); // HACK: Using a hardcoded project name
-  }, [loadSceneRoutes]);
+    loadSceneRoutes(projectName);
+  }, [loadSceneRoutes, projectName]);
 
   const handleSceneSelect = (route: string, filePath: string) => {
     setCurrentRoute(route, filePath);
