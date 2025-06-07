@@ -601,7 +601,6 @@ class ProjectService {
       
       // Look for scene files in the project
       const routes = await this.findSceneFiles(projectPath);
-      console.log(`Found ${routes.length} scene routes:`, routes);
       
       return { routes };
     } catch (error) {

@@ -14,7 +14,7 @@ export default function EditorPage() {
 
   const { loadProjects, setCurrentProject, projects } = useProjectStore();
   const { checkServerStatus } = useDevServerStore();
-  const { setupEditorConnection } = useSceneStore();
+  const { initializeScene } = useSceneStore();
 
   useEffect(() => {
     loadProjects();
@@ -27,21 +27,18 @@ export default function EditorPage() {
 
   useEffect(() => {
     const initializeServerConnection = async () => {
-      // First check server status
       await checkServerStatus(projectName);
       
-      // If server is running, setup editor connection
       const { isRunning: serverIsRunning } = useDevServerStore.getState();
       if (serverIsRunning) {
-        // Give the WebSocket server a moment to fully start
-        setTimeout(() => {
-          setupEditorConnection(projectName);
+        setTimeout(async () => {
+          await initializeScene(projectName);
         }, 1000);
       }
     };
     
     initializeServerConnection();
-  }, [projectName]);
+  }, [projectName, initializeScene]);
 
   return (
     <div className="flex h-screen flex-col bg-gray-950 text-white">

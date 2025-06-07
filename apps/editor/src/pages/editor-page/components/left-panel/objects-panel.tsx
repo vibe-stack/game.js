@@ -10,7 +10,7 @@ import {
   Copy,
   Trash2,
 } from "lucide-react";
-import { useSceneStore } from "../../stores/scene-store";
+import { useSceneObjectsStore, useSceneRoutesStore, useSceneSyncStore } from "../../stores/scene-store";
 import { SceneObject } from "../../types";
 import { cn } from "../../../../utils/tailwind";
 
@@ -132,15 +132,15 @@ export function ObjectsPanel() {
   const {
     sceneObjects,
     selectedObjectId,
-    currentFilePath,
     setSelectedObjectId,
     updateObject,
     duplicateObject,
     removeObject,
-    loadSceneObjects,
-  } = useSceneStore();
+  } = useSceneObjectsStore();
+  
+  const { currentFilePath } = useSceneRoutesStore();
+  const { loadSceneObjects } = useSceneSyncStore();
 
-  // Load scene objects when the current scene changes
   React.useEffect(() => {
     if (currentFilePath) {
       loadSceneObjects(currentFilePath);
@@ -158,10 +158,10 @@ export function ObjectsPanel() {
     return null;
   }
 
-  const handleToggleVisibility = (id: string) => {
+  const handleToggleVisibility = async (id: string) => {
     const object = findObjectById(sceneObjects, id);
     if (object) {
-      updateObject(id, { visible: !object.visible });
+      await updateObject(id, { visible: !object.visible });
     }
   };
 

@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { useDevServerStore } from "../stores/dev-server-store";
-import { useSceneStore } from "../stores/scene-store";
+import { useSceneRoutesStore, useSceneSyncStore } from "../stores/scene-store";
 
 interface SceneFrameProps {
   projectName: string;
@@ -8,7 +8,8 @@ interface SceneFrameProps {
 
 export function SceneFrame({ projectName }: SceneFrameProps) {
   const { isRunning, serverInfo } = useDevServerStore();
-  const { currentRoute, requestSceneState } = useSceneStore();
+  const { currentRoute } = useSceneRoutesStore();
+  const { requestSceneState } = useSceneSyncStore();
 
   console.log(`SceneFrame render - isRunning: ${isRunning}, serverInfo:`, serverInfo);
 

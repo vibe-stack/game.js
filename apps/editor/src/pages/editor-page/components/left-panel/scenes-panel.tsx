@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "../../../../components/ui/button";
 import { FileText, ChevronRight } from "lucide-react";
-import { useSceneStore } from "../../stores/scene-store";
+import { useSceneRoutesStore } from "../../stores/scene-store";
 import { SceneRoute } from "../../types";
 
 interface ScenesPanelProps {
@@ -9,7 +9,7 @@ interface ScenesPanelProps {
 }
 
 export function ScenesPanel({ projectName }: ScenesPanelProps) {
-  const { routes, currentRoute, setCurrentRoute, loadSceneRoutes } = useSceneStore();
+  const { routes, currentRoute, setCurrentRoute, loadSceneRoutes } = useSceneRoutesStore();
 
   React.useEffect(() => {
     loadSceneRoutes(projectName);

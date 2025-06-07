@@ -432,8 +432,6 @@ export default function gameJSPlugin(
               }
             }
           });
-
-          console.log(`🔄 Scene reload triggered for ${sceneDiffs.length} Three.js object changes`);
         }
       }
 
