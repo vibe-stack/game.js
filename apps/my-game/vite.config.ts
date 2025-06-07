@@ -10,6 +10,10 @@ export default defineConfig({
     })
   ],
   server: {
-    port: 3000
+    port: 3000,
+    cors: {
+      origin: "*", // Allow all origins for development
+      credentials: false
+    }
   }
 });

@@ -81,6 +81,9 @@ export abstract class Scene {
           if (data.type === 'custom' && data.event === 'property-update') {
             console.log('🔥 Received property update:', data.data);
             this.applyEditorUpdate(data.data);
+          } else if (data.type === 'custom' && data.event === 'request-scene-state') {
+            console.log('📡 Received scene state request via Vite');
+            this.sendSceneStateViaVite();
           }
         } catch (error) {
           // Ignore non-JSON messages
@@ -100,11 +103,14 @@ export abstract class Scene {
         this._wsConnection.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            // Only handle property-update messages
+            // Handle different message types from the editor
             if (data.type === 'property-update' || (data.type === 'custom' && data.event === 'property-update')) {
               const update = data.data || data; // Support both formats
               console.log('🔥 Received property update:', update);
               this.applyEditorUpdate(update);
+            } else if (data.type === 'request-scene-state') {
+              console.log('📡 Received scene state request');
+              this.sendSceneStateToEditor();
             }
           } catch (error) {
             console.error('Failed to parse editor update:', error);
@@ -560,5 +566,55 @@ export abstract class Scene {
 
   protected getScene(): THREE.Scene {
     return this.scene;
+  }
+
+  private sendSceneStateToEditor(): void {
+    if (!isDevelopment() || !this._wsConnection || this._wsConnection.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const sceneState = {
+      type: 'scene-state-response',
+      timestamp: Date.now(),
+      editorState: {
+        properties: this.getEditableProperties(),
+        objects: this.getEditableObjects(),
+        overrides: this.getEditorOverrides()
+      }
+    };
+
+    try {
+      this._wsConnection.send(JSON.stringify(sceneState));
+      console.log('📤 Sent scene state to editor:', sceneState);
+    } catch (error) {
+      console.error('Failed to send scene state to editor:', error);
+    }
+  }
+
+  private sendSceneStateViaVite(): void {
+    if (!isDevelopment() || typeof window === 'undefined' || !(window as any).__vite_ws) {
+      return;
+    }
+
+    const viteWs = (window as any).__vite_ws;
+    const sceneState = {
+      type: 'custom',
+      event: 'scene-state-response', 
+      data: {
+        timestamp: Date.now(),
+        editorState: {
+          properties: this.getEditableProperties(),
+          objects: this.getEditableObjects(),
+          overrides: this.getEditorOverrides()
+        }
+      }
+    };
+
+    try {
+      viteWs.send(JSON.stringify(sceneState));
+      console.log('📤 Sent scene state via Vite:', sceneState);
+    } catch (error) {
+      console.error('Failed to send scene state via Vite:', error);
+    }
   }
 } 

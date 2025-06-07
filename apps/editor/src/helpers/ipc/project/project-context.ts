@@ -22,10 +22,10 @@ export function exposeProjectContext() {
     // Editor integration methods
     connectToEditor: (projectName: string) =>
       ipcRenderer.invoke(PROJECT_CHANNELS.CONNECT_TO_EDITOR, projectName),
-    sendPropertyUpdate: (projectName: string, property: string, value: any, temporary?: boolean) =>
+    sendPropertyUpdate: (projectName: string, property: string, value: unknown, temporary?: boolean) =>
       ipcRenderer.invoke(PROJECT_CHANNELS.SEND_PROPERTY_UPDATE, projectName, property, value, temporary),
-    getSceneInfo: (projectName: string, scenePath: string) =>
-      ipcRenderer.invoke(PROJECT_CHANNELS.GET_SCENE_INFO, projectName, scenePath),
+    getSceneInfo: (projectName: string) =>
+      ipcRenderer.invoke(PROJECT_CHANNELS.GET_SCENE_INFO, projectName),
   };
 
   contextBridge.exposeInMainWorld('projectAPI', projectAPI);

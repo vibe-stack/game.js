@@ -13,7 +13,7 @@ export default function EditorPage() {
   const projectName = search.project || "Unknown Project";
 
   const { loadProjects, setCurrentProject, projects } = useProjectStore();
-  const { checkServerStatus, isRunning } = useDevServerStore();
+  const { checkServerStatus } = useDevServerStore();
   const { setupEditorConnection } = useSceneStore();
 
   useEffect(() => {
@@ -26,15 +26,22 @@ export default function EditorPage() {
   }, [projectName, projects, setCurrentProject]);
 
   useEffect(() => {
-    checkServerStatus(projectName);
-  }, [projectName, checkServerStatus]);
-
-  // Set up editor connection when dev server is running
-  useEffect(() => {
-    if (isRunning) {
-      setupEditorConnection(projectName);
-    }
-  }, [isRunning, projectName, setupEditorConnection]);
+    const initializeServerConnection = async () => {
+      // First check server status
+      await checkServerStatus(projectName);
+      
+      // If server is running, setup editor connection
+      const { isRunning: serverIsRunning } = useDevServerStore.getState();
+      if (serverIsRunning) {
+        // Give the WebSocket server a moment to fully start
+        setTimeout(() => {
+          setupEditorConnection(projectName);
+        }, 1000);
+      }
+    };
+    
+    initializeServerConnection();
+  }, [projectName]);
 
   return (
     <div className="flex h-screen flex-col">

@@ -14,7 +14,7 @@ interface ScenePanelProps {
 }
 
 export function ScenePanel({ projectName }: ScenePanelProps) {
-  const { currentRoute, loadSceneRoutes, loadSceneObjects } = useSceneStore();
+  const { currentRoute, currentFilePath, loadSceneRoutes, loadSceneObjects, requestSceneState } = useSceneStore();
   const { isConnected, connectionStatus } = useEditorConnectionStore();
 
   useEffect(() => {
@@ -22,12 +22,25 @@ export function ScenePanel({ projectName }: ScenePanelProps) {
   }, [projectName, loadSceneRoutes]);
 
   useEffect(() => {
-    if (currentRoute) {
-      loadSceneObjects(currentRoute);
+    if (currentFilePath) {
+      loadSceneObjects(currentFilePath);
     }
-  }, [currentRoute, loadSceneObjects]);
+  }, [currentFilePath, loadSceneObjects]);
 
-  const currentScenePath = currentRoute || '/';
+  // Auto-request scene state when WebSocket connects and we have a scene
+  useEffect(() => {
+    if (isConnected && currentFilePath) {
+      console.log('WebSocket connected and scene selected, requesting scene state...');
+      // Use a longer delay and only request once per connection + file path combo
+      const timeoutId = setTimeout(() => {
+        requestSceneState();
+      }, 2000); // Longer delay to ensure game is fully ready
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isConnected, currentFilePath]); // Removed requestSceneState from deps to prevent reruns
+
+  const currentScenePath = currentFilePath || '';
 
   const getConnectionStatusColor = () => {
     switch (connectionStatus) {
@@ -39,7 +52,7 @@ export function ScenePanel({ projectName }: ScenePanelProps) {
   };
 
   return (
-    <Card className="fixed left-4 top-20 bottom-4 w-80 z-50 overflow-hidden flex flex-col">
+    <Card className="fixed left-8 top-32 bottom-4 w-80 max-h-[70vh] z-50 overflow-hidden flex flex-col">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Layers size={16} />
@@ -65,7 +78,7 @@ export function ScenePanel({ projectName }: ScenePanelProps) {
       <CardContent className="flex-1 overflow-auto space-y-4">
         <SceneSelector />
         
-        {currentRoute && (
+        {currentRoute && currentFilePath && (
           <>
             <Separator />
             <AddObjectMenu scenePath={currentScenePath} />

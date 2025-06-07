@@ -39,7 +39,7 @@ export const useDevServerStore = create<DevServerStore>((set) => ({
 
       if (isRunning) {
         const info = await window.projectAPI.getServerInfo(projectName);
-        set({ serverInfo: info });
+        set({ serverInfo: info, errorMessage: null });
       } else {
         set({ serverInfo: undefined });
       }

@@ -74,4 +74,31 @@ export function addProjectEventListeners() {
       throw error;
     }
   });
+
+  ipcMain.handle(PROJECT_CHANNELS.GET_SCENE_INFO, async (_, projectName: string) => {
+    try {
+      return await projectService.getSceneInfo(projectName);
+    } catch (error) {
+      console.error('Failed to get scene info:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle(PROJECT_CHANNELS.CONNECT_TO_EDITOR, async (_, projectName: string) => {
+    try {
+      return await projectService.connectToEditor(projectName);
+    } catch (error) {
+      console.error('Failed to connect to editor:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle(PROJECT_CHANNELS.SEND_PROPERTY_UPDATE, async (_, projectName: string, property: string, value: unknown, temporary?: boolean) => {
+    try {
+      return await projectService.sendPropertyUpdate(projectName, property, value, temporary);
+    } catch (error) {
+      console.error('Failed to send property update:', error);
+      throw error;
+    }
+  });
 } 

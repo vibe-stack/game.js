@@ -8,7 +8,7 @@ export function SceneSelector() {
   const { routes, currentRoute, setCurrentRoute, loadSceneObjects } = useSceneStore();
 
   const handleSceneSelect = (route: string, filePath: string) => {
-    setCurrentRoute(route);
+    setCurrentRoute(route, filePath);
     loadSceneObjects(filePath);
   };
 

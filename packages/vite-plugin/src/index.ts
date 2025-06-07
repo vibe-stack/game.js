@@ -5,6 +5,29 @@ import fs from "fs";
 import { WebSocketServer } from "ws";
 import { subscribe } from "@parcel/watcher";
 
+/**
+ * Game.js Vite Plugin with Real-time Editor Communication
+ * 
+ * Architecture:
+ * ┌─────────────────┐    WebSocket     ┌─────────────────┐    Vite WS     ┌─────────────────┐
+ * │  Editor App     │◄────port 3001────┤  Vite Plugin    │◄───────────────┤   Game Client   │
+ * │  (Electron)     │                  │  WebSocket      │                │   (Browser)     │
+ * └─────────────────┘                  └─────────────────┘                └─────────────────┘
+ *                                             │
+ *                                             ▼
+ *                                      ┌─────────────────┐
+ *                                      │ .editor.json    │
+ *                                      │ File Watcher    │
+ *                                      └─────────────────┘
+ * 
+ * Flow:
+ * 1. Editor connects to Vite plugin WebSocket (port 3001)
+ * 2. Editor sends property updates via WebSocket
+ * 3. Vite plugin forwards updates to game via Vite's built-in WebSocket
+ * 4. Vite plugin saves non-temporary updates to .editor.json files
+ * 5. File watcher detects changes and broadcasts back to editor
+ */
+
 interface GameJSPluginOptions {
   srcDir?: string;
   appDir?: string;
@@ -33,7 +56,30 @@ export default function gameJSPlugin(
       // Serve .editor.json files from app directory
       server.middlewares.use((req, res, next) => {
         if (req.url?.endsWith(".editor.json")) {
-          const jsonPath = path.join(process.cwd(), appPath, req.url);
+          // Add CORS headers to allow cross-origin requests from Electron editor
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+          res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+          
+          // Handle preflight requests
+          if (req.method === 'OPTIONS') {
+            res.writeHead(200);
+            res.end();
+            return;
+          }
+          
+          // Handle requests with full path like '/src/app/scene.editor.json'
+          const requestPath = req.url;
+          let jsonPath: string;
+          
+          // If the request starts with the srcDir, it's already the full path
+          if (requestPath.startsWith(`/${srcDir}/`)) {
+            jsonPath = path.join(process.cwd(), requestPath);
+          } else {
+            // Otherwise, assume it's relative to appPath
+            jsonPath = path.join(process.cwd(), appPath, requestPath);
+          }
+          
           if (fs.existsSync(jsonPath)) {
             res.setHeader("Content-Type", "application/json");
             res.end(fs.readFileSync(jsonPath, "utf-8"));
@@ -50,6 +96,17 @@ export default function gameJSPlugin(
 
       // Add a test endpoint to manually trigger editor updates
       server.middlewares.use("/test-editor-update", (req, res) => {
+        // Add CORS headers
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        
+        if (req.method === 'OPTIONS') {
+          res.writeHead(200);
+          res.end();
+          return;
+        }
+        
         const testUpdate = {
           type: "test-update",
           message: "This is a test update from the Vite plugin",
@@ -137,7 +194,6 @@ export default function gameJSPlugin(
                   timestamp: Date.now(),
                   message: "Connection is alive"
                 }));
-                console.log("💓 Sent heartbeat to editor");
               } catch (error) {
                 console.error("💓 Failed to send heartbeat:", error);
                 clearInterval(heartbeatInterval);
@@ -156,6 +212,12 @@ export default function gameJSPlugin(
               const update = JSON.parse(data.toString());
               console.log("📨 Parsed update:", update);
 
+              // Only process property-update messages, ignore connection-test and other message types
+              if (update.type !== 'property-update' && !update.property) {
+                console.log("📨 Ignoring non-property-update message:", update.type);
+                return;
+              }
+
               // Broadcast to game immediately via Vite's WebSocket
               server.ws.send({
                 type: "custom",
@@ -164,8 +226,8 @@ export default function gameJSPlugin(
               });
               console.log("📤 Sent update to game via Vite WebSocket");
 
-              // Handle debounced file saving
-              if (!update.temporary) {
+              // Handle debounced file saving - only for property updates with scenePath
+              if (!update.temporary && update.scenePath && update.property) {
                 console.log("💾 Scheduling debounced save for:", update.property);
                 debouncedSave(update, debounceTimers);
               }
@@ -432,27 +494,55 @@ export default router;
   }
 
   function savePropertyToFile(update: any) {
+    // Safety check for required properties
+    if (!update.scenePath || !update.property) {
+      console.log(`💾 Skipping save - missing required properties. scenePath: ${update.scenePath}, property: ${update.property}`);
+      return;
+    }
+
     const editorJsonPath = update.scenePath.replace(
       /\.(ts|js)$/,
       ".editor.json"
     );
 
+    console.log(`💾 Attempting to save to: ${editorJsonPath}`);
+    console.log(`💾 Property: ${update.property}`);
+    console.log(`💾 Value:`, update.value);
+
     let editorData: any = {};
-    if (fs.existsSync(editorJsonPath)) {
-      editorData = JSON.parse(fs.readFileSync(editorJsonPath, "utf-8"));
+    if (fs.existsSync(editorJsonPath) && fs.statSync(editorJsonPath).isFile()) {
+      try {
+        editorData = JSON.parse(fs.readFileSync(editorJsonPath, "utf-8"));
+      } catch (error) {
+        console.error(`Failed to read editor data from ${editorJsonPath}:`, error);
+        editorData = {};
+      }
+    } else if (fs.existsSync(editorJsonPath)) {
+      console.error(`💾 Path exists but is not a file: ${editorJsonPath}`);
+      return;
     }
 
     // Set the property value
     setNestedProperty(editorData, update.property, update.value);
 
-    // Write to file
-    fs.writeFileSync(editorJsonPath, JSON.stringify(editorData, null, 2));
-    console.log(
-      `💾 Saved ${update.property} to ${path.basename(editorJsonPath)}`
-    );
+    // Ensure the directory exists before writing
+    const dir = path.dirname(editorJsonPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
 
-    // Update cache to prevent circular updates
-    editorFileCache.set(path.resolve(editorJsonPath), editorData);
+    // Write to file
+    try {
+      fs.writeFileSync(editorJsonPath, JSON.stringify(editorData, null, 2));
+      console.log(
+        `💾 Saved ${update.property} to ${path.basename(editorJsonPath)}`
+      );
+
+      // Update cache to prevent circular updates
+      editorFileCache.set(path.resolve(editorJsonPath), editorData);
+    } catch (error) {
+      console.error(`Failed to save editor data to ${editorJsonPath}:`, error);
+    }
   }
 
   function setNestedProperty(obj: any, path: string, value: any) {

@@ -44,7 +44,7 @@ interface ProjectAPI {
   getServerInfo: (projectName: string) => Promise<DevServerInfo | undefined>;
   connectToEditor: (projectName: string) => Promise<void>;
   sendPropertyUpdate: (projectName: string, property: string, value: unknown, temporary?: boolean) => Promise<void>;
-  getSceneInfo: (projectName: string, scenePath: string) => Promise<unknown>;
+  getSceneInfo: (projectName: string) => Promise<unknown>;
 }
 
 declare interface Window {

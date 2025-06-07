@@ -9,9 +9,13 @@ import {
   Cylinder, 
   Square, 
   Copy, 
-  Trash2
+  Trash2,
+  RefreshCw,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 import { useSceneStore } from "../../stores/scene-store";
+import { useEditorConnectionStore } from "../../stores/editor-connection-store";
 import { SceneObject } from "../../types";
 
 const getObjectIcon = (type: string) => {
@@ -123,8 +127,13 @@ export function ObjectTree() {
     setSelectedObjectId, 
     updateObject, 
     duplicateObject, 
-    removeObject 
+    removeObject,
+    requestSceneState,
+    currentFilePath,
+    loadSceneObjects
   } = useSceneStore();
+  
+  const { isConnected, connectionStatus } = useEditorConnectionStore();
 
   const handleToggleVisibility = (id: string) => {
     const object = sceneObjects.find(obj => obj.id === id);
@@ -133,13 +142,55 @@ export function ObjectTree() {
     }
   };
 
+  const handleRefreshObjects = async () => {
+    if (currentFilePath) {
+      await loadSceneObjects(currentFilePath);
+    }
+  };
+
+  const handleRequestSceneState = async () => {
+    await requestSceneState();
+  };
+
+  const getConnectionIcon = () => {
+    return isConnected ? <Wifi size={12} /> : <WifiOff size={12} />;
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium">Scene Objects</h3>
-        <Badge variant="secondary" className="text-xs">
-          {sceneObjects.length}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-xs">
+            {sceneObjects.length}
+          </Badge>
+          <div className={`flex items-center gap-1 ${getConnectionIcon()}`}>
+            {getConnectionIcon()}
+            <span className="text-xs">{connectionStatus}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefreshObjects}
+          className="flex-1 text-xs"
+        >
+          <RefreshCw size={12} className="mr-1" />
+          Refresh
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRequestSceneState}
+          disabled={!isConnected}
+          className="flex-1 text-xs"
+        >
+          <Wifi size={12} className="mr-1" />
+          Request Live
+        </Button>
       </div>
 
       <div className="space-y-1">
@@ -160,7 +211,10 @@ export function ObjectTree() {
         <div className="text-center py-8">
           <p className="text-muted-foreground text-sm">No objects in scene</p>
           <p className="text-muted-foreground text-xs mt-1">
-            Use the + button above to add objects
+            {isConnected ? 
+              "Try clicking 'Request Live' to get objects from running game" :
+              "WebSocket not connected - start dev server and refresh"
+            }
           </p>
         </div>
       )}
