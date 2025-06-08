@@ -101,9 +101,9 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
       <PivotControls
         onDrag={handleTransformChange}
         {...controlSettings}
-        scale={0.8}
+        scale={70}
         lineWidth={2}
-        fixed={false}
+        fixed={true}
         annotations
         depthTest={false}
       >
