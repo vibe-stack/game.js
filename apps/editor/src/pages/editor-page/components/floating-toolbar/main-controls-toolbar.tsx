@@ -2,34 +2,32 @@ import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Save,
-  Play,
   FolderOpen,
+  Loader2Icon,
 } from "lucide-react";
+import useEditorStore from "@/stores/editor-store";
 import PhysicsControlsToolbar from "./physics-controls-toolbar";
 
 interface MainControlsToolbarProps {
   isSaving: boolean;
   onSave: () => void;
   onOpenFolder: () => void;
-  onPlay?: () => void;
-  physicsState?: 'stopped' | 'playing' | 'paused';
-  onPhysicsPlay?: () => void;
-  onPhysicsPause?: () => void;
-  onPhysicsStop?: () => void;
-  onPhysicsResume?: () => void;
 }
 
 export default function MainControlsToolbar({
   isSaving,
   onSave,
   onOpenFolder,
-  onPlay,
-  physicsState = 'stopped',
-  onPhysicsPlay,
-  onPhysicsPause,
-  onPhysicsStop,
-  onPhysicsResume,
 }: MainControlsToolbarProps) {
+  const { 
+    physicsState, 
+    playPhysics, 
+    pausePhysics, 
+    stopPhysics, 
+    resumePhysics,
+    setPhysicsState 
+  } = useEditorStore();
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Only handle shortcuts if no input field is focused
@@ -40,9 +38,6 @@ export default function MainControlsToolbar({
       if (event.ctrlKey && event.key.toLowerCase() === 's') {
         event.preventDefault();
         onSave();
-      } else if (event.key === 'F5') {
-        event.preventDefault();
-        handlePlay();
       }
     };
 
@@ -50,18 +45,35 @@ export default function MainControlsToolbar({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onSave]);
 
-  const handlePlay = () => {
-    if (onPlay) {
-      onPlay();
-    } else {
-      // TODO: Implement default play functionality
-      console.log("Play action triggered");
-    }
+  const handlePhysicsPlay = () => {
+    playPhysics();
+    setPhysicsState('playing');
+  };
+
+  const handlePhysicsPause = () => {
+    pausePhysics();
+    setPhysicsState('paused');
+  };
+
+  const handlePhysicsStop = () => {
+    stopPhysics();
+    setPhysicsState('stopped');
+  };
+
+  const handlePhysicsResume = () => {
+    resumePhysics();
+    setPhysicsState('playing');
   };
 
   return (
     <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1 px-2 py-2 rounded-lg border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-lg">
+      <div 
+        className={`flex items-center gap-1 px-2 py-2 rounded-lg border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-lg transition-all duration-300 ease-in-out ${
+          physicsState === 'playing' 
+            ? 'opacity-0 translate-x-5 pointer-events-none' 
+            : 'opacity-100 translate-x-0'
+        }`}
+      >
         <Button
           size="sm"
           variant="outline"
@@ -78,31 +90,18 @@ export default function MainControlsToolbar({
           className="gap-2 h-8"
           title="Save Scene (Ctrl+S)"
         >
-          <Save size={16} />
-          {isSaving ? "..." : "Save"}
-        </Button>
-        <Button 
-          size="sm" 
-          variant="outline" 
-          className="gap-2 h-8"
-          onClick={handlePlay}
-          title="Play Scene (F5)"
-        >
-          <Play size={16} />
-          Play
+          {isSaving ? <Loader2Icon size={16} className="animate-spin" /> : <Save size={16} />}
         </Button>
       </div>
 
       {/* Physics Controls */}
-      {onPhysicsPlay && onPhysicsPause && onPhysicsStop && onPhysicsResume && (
-        <PhysicsControlsToolbar
-          physicsState={physicsState}
-          onPlay={onPhysicsPlay}
-          onPause={onPhysicsPause}
-          onStop={onPhysicsStop}
-          onResume={onPhysicsResume}
-        />
-      )}
+      <PhysicsControlsToolbar
+        physicsState={physicsState}
+        onPlay={handlePhysicsPlay}
+        onPause={handlePhysicsPause}
+        onStop={handlePhysicsStop}
+        onResume={handlePhysicsResume}
+      />
     </div>
   );
 } 

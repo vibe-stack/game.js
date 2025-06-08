@@ -163,11 +163,12 @@ function PhysicsInnerProvider({
         try {
           rigidBody.setTranslation(transform.position, true);
           
-          // Convert euler to quaternion
+          // Convert euler to quaternion with consistent rotation order
           const euler = new THREE.Euler(
             transform.rotation.x,
             transform.rotation.y,
-            transform.rotation.z
+            transform.rotation.z,
+            'XYZ' // Specify rotation order for consistency
           );
           const quaternion = new THREE.Quaternion().setFromEuler(euler);
           rigidBody.setRotation(quaternion, true);

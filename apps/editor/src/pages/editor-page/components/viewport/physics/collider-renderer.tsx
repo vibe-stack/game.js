@@ -4,6 +4,7 @@ import { CuboidCollider, BallCollider, CapsuleCollider, CylinderCollider, Convex
 interface ColliderRendererProps {
   colliderComponent: ColliderComponent;
   children: React.ReactNode;
+  transform?: Transform; // Add transform prop for standalone colliders
 }
 
 // Map combine rules to rapier constants
@@ -17,13 +18,29 @@ const mapCombineRule = (rule: string) => {
   }
 };
 
-export default function ColliderRenderer({ colliderComponent, children }: ColliderRendererProps) {
+// Helper function to pack collision groups (membership and filter) into a single number
+// Following Rapier's format: 16 left-most bits = membership, 16 right-most bits = filter
+const packCollisionGroups = (membership: number, filter: number): number => {
+  return (membership << 16) | (filter & 0xFFFF);
+};
+
+export default function ColliderRenderer({ colliderComponent, children, transform }: ColliderRendererProps) {
   if (!colliderComponent.enabled) {
     return <>{children}</>;
   }
 
   const props = colliderComponent.properties;
   const shape = props.shape;
+
+  // Pack collision groups properly
+  const packedCollisionGroups = packCollisionGroups(
+    props.collisionGroups.membership, 
+    props.collisionGroups.filter
+  );
+  const packedSolverGroups = packCollisionGroups(
+    props.solverGroups.membership, 
+    props.solverGroups.filter
+  );
 
   // Common props for all colliders
   const commonProps = {
@@ -33,9 +50,14 @@ export default function ColliderRenderer({ colliderComponent, children }: Collid
     restitution: props.material.restitution,
     frictionCombineRule: mapCombineRule(props.material.frictionCombineRule),
     restitutionCombineRule: mapCombineRule(props.material.restitutionCombineRule),
-    collisionGroups: props.collisionGroups.membership,
-    solverGroups: props.solverGroups.membership,
-    contactForceEventThreshold: props.contactForceEventThreshold
+    collisionGroups: packedCollisionGroups,
+    solverGroups: packedSolverGroups,
+    contactForceEventThreshold: props.contactForceEventThreshold,
+    // Apply transform to standalone colliders (when not part of a rigid body)
+    ...(transform && {
+      position: [transform.position.x, transform.position.y, transform.position.z] as [number, number, number],
+      rotation: [transform.rotation.x, transform.rotation.y, transform.rotation.z] as [number, number, number],
+    })
   };
 
   // Render different collider types based on shape

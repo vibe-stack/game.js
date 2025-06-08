@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "@tanstack/react-router";
 import useEditorStore from "@/stores/editor-store";
@@ -12,13 +12,6 @@ export default function EditorPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [physicsState, setPhysicsState] = useState<'stopped' | 'playing' | 'paused'>('stopped');
-  const physicsCallbacksRef = useRef<{
-    play?: () => void;
-    pause?: () => void;
-    stop?: () => void;
-    resume?: () => void;
-  }>({});
 
   const {
     currentProject,
@@ -26,6 +19,7 @@ export default function EditorPage() {
     selectedObjects,
     setCurrentScene,
     selectObject,
+    setPhysicsCallbacks,
   } = useEditorStore();
 
   useEffect(() => {
@@ -89,40 +83,6 @@ export default function EditorPage() {
     selectObject(objectId);
   };
 
-  // Physics control handlers
-  const handlePhysicsPlay = () => {
-    if (physicsCallbacksRef.current.play) {
-      physicsCallbacksRef.current.play();
-      setPhysicsState('playing');
-    }
-  };
-
-  const handlePhysicsPause = () => {
-    if (physicsCallbacksRef.current.pause) {
-      physicsCallbacksRef.current.pause();
-      setPhysicsState('paused');
-    }
-  };
-
-  const handlePhysicsStop = () => {
-    if (physicsCallbacksRef.current.stop) {
-      physicsCallbacksRef.current.stop();
-      setPhysicsState('stopped');
-    }
-  };
-
-  const handlePhysicsResume = () => {
-    if (physicsCallbacksRef.current.resume) {
-      physicsCallbacksRef.current.resume();
-      setPhysicsState('playing');
-    }
-  };
-
-  // Callback to receive physics functions from viewport
-  const setPhysicsCallbacks = (callbacks: typeof physicsCallbacksRef.current) => {
-    physicsCallbacksRef.current = callbacks;
-  };
-
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -150,6 +110,7 @@ export default function EditorPage() {
 
   return (
     <div className="relative h-screen overflow-hidden">
+
       {/* Full-width Viewport */}
       <Viewport
         scene={currentScene}
@@ -164,11 +125,6 @@ export default function EditorPage() {
         onSave={saveScene}
         onHome={goHome}
         onOpenFolder={openProjectFolder}
-        physicsState={physicsState}
-        onPhysicsPlay={handlePhysicsPlay}
-        onPhysicsPause={handlePhysicsPause}
-        onPhysicsStop={handlePhysicsStop}
-        onPhysicsResume={handlePhysicsResume}
       />
 
       {/* Floating Left Panel */}

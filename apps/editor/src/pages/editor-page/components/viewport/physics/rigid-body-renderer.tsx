@@ -40,6 +40,7 @@ export default function RigidBodyRenderer({
         transform.rotation.x,
         transform.rotation.y,
         transform.rotation.z,
+        'XYZ' // Specify rotation order for consistency
       );
       const quaternion = new THREE.Quaternion().setFromEuler(euler);
       rigidBody.setRotation(quaternion, true);
@@ -83,6 +84,7 @@ export default function RigidBodyRenderer({
         transform.rotation.x,
         transform.rotation.y,
         transform.rotation.z,
+        'XYZ' // Specify rotation order for consistency
       );
       const quaternion = new THREE.Quaternion().setFromEuler(euler);
       rigidBody.setRotation(quaternion, true);
@@ -100,6 +102,9 @@ export default function RigidBodyRenderer({
     transform.rotation.x,
     transform.rotation.y,
     transform.rotation.z,
+    transform.scale.x, // Include scale in dependencies
+    transform.scale.y,
+    transform.scale.z,
     physicsState,
     isRegistered,
     objectId,
@@ -121,9 +126,10 @@ export default function RigidBodyRenderer({
         z: translation.z,
       };
 
-      // Convert quaternion to euler angles
+      // Convert quaternion to euler angles with consistent rotation order
       const euler = new THREE.Euler().setFromQuaternion(
         new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
+        'XYZ' // Specify rotation order for consistency
       );
 
       const rotationEuler: Vector3 = {

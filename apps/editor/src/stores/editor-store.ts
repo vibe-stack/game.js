@@ -18,6 +18,15 @@ interface EditorState {
     target: Vector3;
   };
   
+  // Physics State
+  physicsState: 'stopped' | 'playing' | 'paused';
+  physicsCallbacks: {
+    play?: () => void;
+    pause?: () => void;
+    stop?: () => void;
+    resume?: () => void;
+  };
+  
   // Actions
   setCurrentProject: (project: GameProject | null) => void;
   setProjects: (projects: GameProject[]) => void;
@@ -26,6 +35,14 @@ interface EditorState {
   selectObject: (objectId: string, additive?: boolean) => void;
   deselectAll: () => void;
   setEditorMode: (mode: 'select' | 'move' | 'rotate' | 'scale') => void;
+  
+  // Physics Actions
+  setPhysicsState: (state: 'stopped' | 'playing' | 'paused') => void;
+  setPhysicsCallbacks: (callbacks: EditorState['physicsCallbacks']) => void;
+  playPhysics: () => void;
+  pausePhysics: () => void;
+  stopPhysics: () => void;
+  resumePhysics: () => void;
   
   // Scene Manipulation
   addObject: (object: GameObject, parentId?: string) => void;
@@ -60,6 +77,8 @@ const useEditorStore = create<EditorState>()(
       rotation: { x: -0.2, y: 0, z: 0 },
       target: { x: 0, y: 0, z: 0 }
     },
+    physicsState: 'stopped',
+    physicsCallbacks: {},
 
     // Project Actions
     setCurrentProject: (project) => set({ currentProject: project }),
@@ -296,6 +315,34 @@ const useEditorStore = create<EditorState>()(
     setViewportCamera: (camera) => set((state) => ({
       viewportCamera: { ...state.viewportCamera, ...camera }
     })),
+
+    // Physics Actions
+    setPhysicsState: (state) => set({ physicsState: state }),
+    setPhysicsCallbacks: (callbacks) => set({ physicsCallbacks: callbacks }),
+    playPhysics: () => {
+      const { physicsState, physicsCallbacks } = useEditorStore.getState();
+      if (physicsState === 'stopped' && physicsCallbacks.play) {
+        physicsCallbacks.play();
+      }
+    },
+    pausePhysics: () => {
+      const { physicsState, physicsCallbacks } = useEditorStore.getState();
+      if (physicsState === 'playing' && physicsCallbacks.pause) {
+        physicsCallbacks.pause();
+      }
+    },
+    stopPhysics: () => {
+      const { physicsState, physicsCallbacks } = useEditorStore.getState();
+      if (physicsState === 'playing' && physicsCallbacks.stop) {
+        physicsCallbacks.stop();
+      }
+    },
+    resumePhysics: () => {
+      const { physicsState, physicsCallbacks } = useEditorStore.getState();
+      if (physicsState === 'paused' && physicsCallbacks.resume) {
+        physicsCallbacks.resume();
+      }
+    },
   }))
 );
 

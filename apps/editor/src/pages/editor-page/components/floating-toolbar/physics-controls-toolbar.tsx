@@ -2,6 +2,7 @@ import React from "react";
 import { Play, Pause, Square, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/utils/tailwind";
 
 type PhysicsState = 'stopped' | 'playing' | 'paused';
 
@@ -70,21 +71,7 @@ export default function PhysicsControlsToolbar({
         <Square className="h-4 w-4" />
       </Button>
 
-      <Separator orientation="vertical" className="h-4" />
-
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onStop}
-        className="h-8 w-8 p-0"
-        disabled={physicsState === 'stopped'}
-        title="Reset to Initial State"
-      >
-        <RotateCcw className="h-4 w-4" />
-      </Button>
-
-      <div className="px-2 text-xs text-muted-foreground">
-        {physicsState.charAt(0).toUpperCase() + physicsState.slice(1)}
+      <div className={cn("mx-2 w-2 h-2 rounded-full", physicsState === 'stopped' ? 'bg-red-500' : physicsState === 'playing' ? 'bg-green-500' : 'bg-yellow-500')}>
       </div>
     </div>
   );

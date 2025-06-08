@@ -57,7 +57,7 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
   const initialMatrix = useMemo(() => {
     const matrix = new THREE.Matrix4();
     const pos = new THREE.Vector3(position.x, position.y, position.z);
-    const rot = new THREE.Euler(rotation.x, rotation.y, rotation.z);
+    const rot = new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ');
     const scl = new THREE.Vector3(scale.x, scale.y, scale.z);
     const quaternion = new THREE.Quaternion().setFromEuler(rot);
     
@@ -72,8 +72,8 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
     const scale = new THREE.Vector3();
     local.decompose(position, quaternion, scale);
     
-    // Convert quaternion to euler rotation
-    const euler = new THREE.Euler().setFromQuaternion(quaternion);
+    // Convert quaternion to euler rotation with consistent rotation order
+    const euler = new THREE.Euler().setFromQuaternion(quaternion, 'XYZ');
     
     // Update the object's transform - this will flow through to physics if applicable
     updateObjectTransform(obj.id, {
@@ -120,10 +120,10 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
   const groupProps = {
     ref: isSelected ? ref || groupRef : groupRef,
     onClick: handleClick,
-    // Only apply transforms when:
-    // 1. PivotControls are not active AND
-    // 2. Object doesn't have a rigid body (physics will handle transform)
-    ...(!(isSelected && editorMode !== "select") && !hasRigidBody && {
+    // Apply transforms to group only when:
+    // 1. Object doesn't have a rigid body (non-physics objects need group transforms)
+    // Note: PivotControls handle their own positioning via the matrix prop
+    ...(!hasRigidBody && {
       position: [position.x, position.y, position.z] as [number, number, number],
       rotation: [rotation.x, rotation.y, rotation.z] as [number, number, number],
       scale: [scale.x, scale.y, scale.z] as [number, number, number],
@@ -251,7 +251,10 @@ function renderComponents(
   // (This case is for static colliders without rigid bodies)
   colliderComponents.forEach(colliderComponent => {
     visualContent = (
-      <ColliderRenderer colliderComponent={colliderComponent}>
+      <ColliderRenderer 
+        colliderComponent={colliderComponent}
+        transform={!rigidBodyComp ? transform : undefined}
+      >
         {visualContent}
       </ColliderRenderer>
     );
