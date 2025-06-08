@@ -22,12 +22,28 @@ export default function Viewport({
     );
   }
 
+  const getShadowType = (shadowType: string) => {
+    switch (shadowType) {
+      case 'pcf': return 'percentage';
+      case 'pcfsoft': return 'soft';
+      case 'vsm': return 'variance';
+      default: return 'basic';
+    }
+  };
+
+  const shadowConfig = scene.runtimeConfig.shadowsEnabled 
+    ? getShadowType(scene.runtimeConfig.shadowType)
+    : false;
+
   return (
     <div
       className="h-screen"
       style={{ backgroundColor: scene.editorConfig.backgroundColor }}
     >
-      <Canvas camera={{ position: [0, 5, 10], fov: 75 }}>
+      <Canvas 
+        camera={{ position: [0, 5, 10], fov: 75 }}
+        shadows={shadowConfig}
+      >
         {scene.objects.map((obj) => (
           <SceneObject
             key={obj.id}

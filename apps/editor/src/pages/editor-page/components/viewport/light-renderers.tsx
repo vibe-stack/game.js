@@ -18,6 +18,13 @@ export function DirectionalLightRenderer({
     color = "#ffffff",
     intensity = 1,
     castShadow = false,
+    shadowMapSize = 1024,
+    shadowCameraNear = 0.5,
+    shadowCameraFar = 50,
+    shadowCameraLeft = -10,
+    shadowCameraRight = 10,
+    shadowCameraTop = 10,
+    shadowCameraBottom = -10,
   } = component.properties;
 
   if (!component.enabled) return <>{children}</>;
@@ -27,6 +34,13 @@ export function DirectionalLightRenderer({
       color={color}
       intensity={intensity}
       castShadow={castShadow}
+      shadow-mapSize={[shadowMapSize, shadowMapSize]}
+      shadow-camera-near={shadowCameraNear}
+      shadow-camera-far={shadowCameraFar}
+      shadow-camera-left={shadowCameraLeft}
+      shadow-camera-right={shadowCameraRight}
+      shadow-camera-top={shadowCameraTop}
+      shadow-camera-bottom={shadowCameraBottom}
     >
       {showHelpers && (
         <Helper type={DirectionalLightHelper} args={[intensity, "#00ff00"]} />
@@ -47,6 +61,7 @@ export function PointLightRenderer({
     distance = 0,
     decay = 2,
     castShadow = false,
+    shadowMapSize = 512,
   } = component.properties;
 
   if (!component.enabled) return <>{children}</>;
@@ -58,6 +73,7 @@ export function PointLightRenderer({
       distance={distance}
       decay={decay}
       castShadow={castShadow}
+      shadow-mapSize={[shadowMapSize, shadowMapSize]}
     >
       {showHelpers && (
         <Helper type={PointLightHelper} args={[intensity, "#00ff00"]} />
@@ -80,6 +96,7 @@ export function SpotLightRenderer({
     penumbra = 0,
     decay = 2,
     castShadow = false,
+    shadowMapSize = 1024,
   } = component.properties;
 
   if (!component.enabled) return <>{children}</>;
@@ -93,6 +110,7 @@ export function SpotLightRenderer({
       penumbra={penumbra}
       decay={decay}
       castShadow={castShadow}
+      shadow-mapSize={[shadowMapSize, shadowMapSize]}
     >
       {showHelpers && (
         <Helper type={SpotLightHelper} args={[]} />

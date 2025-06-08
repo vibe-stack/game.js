@@ -238,7 +238,14 @@ export class ProjectService {
               properties: {
                 color: '#ffffff',
                 intensity: 1,
-                castShadow: true
+                castShadow: true,
+                shadowMapSize: 1024,
+                shadowCameraNear: 0.5,
+                shadowCameraFar: 50,
+                shadowCameraLeft: -10,
+                shadowCameraRight: 10,
+                shadowCameraTop: 10,
+                shadowCameraBottom: -10
               }
             }
           ],
