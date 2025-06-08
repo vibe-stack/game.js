@@ -2,45 +2,49 @@ import React from "react";
 import MeshComponent from "./component-renderers/mesh-component";
 import LightComponent from "./component-renderers/light-component";
 import CameraComponent from "./component-renderers/camera-component";
+import RigidBodyComponent from "./component-renderers/rigid-body-component";
+import ColliderComponent from "./component-renderers/collider-component";
+import AddComponentMenu from "./add-component-menu";
 
 interface ComponentsListProps {
-  components: GameObjectComponent[];
-  onUpdate: (componentId: string, updates: Partial<GameObjectComponent>) => void;
+  components: (GameObjectComponent | PhysicsComponent)[];
+  onUpdate: (componentId: string, updates: Partial<GameObjectComponent | PhysicsComponent>) => void;
+  onAddComponent: (component: GameObjectComponent | PhysicsComponent) => void;
 }
 
-export default function ComponentsList({ components, onUpdate }: ComponentsListProps) {
-  if (components.length === 0) {
-    return (
-      <div className="space-y-4">
-        <div className="border-b border-muted pb-2">
-          <h4 className="text-sm font-medium text-muted-foreground">Components</h4>
-        </div>
-        <div className="text-xs text-muted-foreground text-center py-4">
-          No components attached
-        </div>
-      </div>
-    );
-  }
-
-  const renderComponent = (component: GameObjectComponent) => {
+export default function ComponentsList({ components, onUpdate, onAddComponent }: ComponentsListProps) {
+  const renderComponent = (component: GameObjectComponent | PhysicsComponent) => {
     const commonProps = {
       component,
-      onUpdate: (updates: Partial<GameObjectComponent>) => onUpdate(component.id, updates)
+      onUpdate: (updates: Partial<GameObjectComponent | PhysicsComponent>) => onUpdate(component.id, updates)
     };
 
     switch (component.type) {
       case 'Mesh':
-        return <MeshComponent key={component.id} {...commonProps} />;
+        return <MeshComponent key={component.id} {...commonProps} component={component as GameObjectComponent} />;
       case 'DirectionalLight':
       case 'PointLight':
       case 'SpotLight':
       case 'AmbientLight':
       case 'HemisphereLight':
       case 'RectAreaLight':
-        return <LightComponent key={component.id} {...commonProps} />;
+        return <LightComponent key={component.id} {...commonProps} component={component as GameObjectComponent} />;
       case 'PerspectiveCamera':
       case 'OrthographicCamera':
-        return <CameraComponent key={component.id} {...commonProps} />;
+        return <CameraComponent key={component.id} {...commonProps} component={component as GameObjectComponent} />;
+      case 'rigidBody':
+        return <RigidBodyComponent key={component.id} {...commonProps} component={component as RigidBodyComponent} />;
+      case 'collider':
+        return <ColliderComponent key={component.id} {...commonProps} component={component as ColliderComponent} />;
+      case 'joint':
+        return (
+          <div key={component.id} className="p-3 border border-muted rounded-md">
+            <div className="text-sm font-medium mb-2">Joint</div>
+            <div className="text-xs text-muted-foreground">
+              Joint component renderer coming soon
+            </div>
+          </div>
+        );
       default:
         return (
           <div key={component.id} className="p-3 border border-muted rounded-md">
@@ -55,13 +59,20 @@ export default function ComponentsList({ components, onUpdate }: ComponentsListP
 
   return (
     <div className="">
-      <div className="border-b pb-0">
+      <div className="border-b pb-2 flex items-center justify-between">
         <h4 className="text-sm font-medium text-muted-foreground">Components</h4>
+        <AddComponentMenu onAddComponent={onAddComponent} />
       </div>
       
-      <div className="space-y-1">
-        {components.map(renderComponent)}
-      </div>
+      {components.length === 0 ? (
+        <div className="text-xs text-muted-foreground text-center py-4">
+          No components attached
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {components.map(renderComponent)}
+        </div>
+      )}
     </div>
   );
 } 

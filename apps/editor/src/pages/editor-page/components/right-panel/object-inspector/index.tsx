@@ -10,7 +10,7 @@ interface ObjectInspectorProps {
 }
 
 export default function ObjectInspector({ scene, selectedObjects }: ObjectInspectorProps) {
-  const { updateObject, updateObjectTransform, updateObjectComponent } = useEditorStore();
+  const { updateObject, updateObjectTransform, updateObjectComponent, addObjectComponent } = useEditorStore();
 
   if (selectedObjects.length === 0) {
     return (
@@ -43,8 +43,12 @@ export default function ObjectInspector({ scene, selectedObjects }: ObjectInspec
     updateObjectTransform(objectId, transform);
   };
 
-  const handleComponentUpdate = (objectId: string, componentId: string, updates: Partial<GameObjectComponent>) => {
+  const handleComponentUpdate = (objectId: string, componentId: string, updates: Partial<GameObjectComponent | PhysicsComponent>) => {
     updateObjectComponent(objectId, componentId, updates);
+  };
+
+  const handleAddComponent = (objectId: string, component: GameObjectComponent | PhysicsComponent) => {
+    addObjectComponent(objectId, component);
   };
 
   if (selectedObjects.length === 1) {
@@ -52,7 +56,7 @@ export default function ObjectInspector({ scene, selectedObjects }: ObjectInspec
     if (!obj) return null;
 
     return (
-      <div className="p-4 space-y-6">
+      <div className="p-4 space-y-6 max-h-[calc(90vh-10rem)] overflow-y-auto">
         <ObjectHeader 
           object={obj} 
           onUpdate={(updates) => handleObjectUpdate(obj.id, updates)}
@@ -66,6 +70,7 @@ export default function ObjectInspector({ scene, selectedObjects }: ObjectInspec
         <ComponentsList 
           components={obj.components}
           onUpdate={(componentId, updates) => handleComponentUpdate(obj.id, componentId, updates)}
+          onAddComponent={(component) => handleAddComponent(obj.id, component)}
         />
       </div>
     );

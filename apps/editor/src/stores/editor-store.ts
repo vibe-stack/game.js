@@ -33,6 +33,7 @@ interface EditorState {
   updateObject: (objectId: string, updates: Partial<GameObject>) => void;
   updateObjectTransform: (objectId: string, transform: Partial<Transform>) => void;
   updateObjectComponent: (objectId: string, componentId: string, updates: Partial<GameObjectComponent>) => void;
+  addObjectComponent: (objectId: string, component: GameObjectComponent | PhysicsComponent) => void;
   
   // Scene Configuration
   updateSceneEditorConfig: (config: Partial<SceneEditorConfig>) => void;
@@ -217,6 +218,31 @@ const useEditorStore = create<EditorState>()(
                   ? { ...comp, ...updates }
                   : comp
               )
+            };
+          }
+          return {
+            ...obj,
+            children: updateInObjects(obj.children)
+          };
+        });
+      };
+      
+      scene.objects = updateInObjects(scene.objects);
+      
+      return { currentScene: scene };
+    }),
+
+    addObjectComponent: (objectId, component) => set((state) => {
+      if (!state.currentScene) return state;
+      
+      const scene = { ...state.currentScene };
+      
+      const updateInObjects = (objects: GameObject[]): GameObject[] => {
+        return objects.map(obj => {
+          if (obj.id === objectId) {
+            return {
+              ...obj,
+              components: [...obj.components, component]
             };
           }
           return {
