@@ -100,7 +100,7 @@ export default function SceneTree({
                     />
                     <span>{category.name}</span>
                   </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="w-64">
+                  <DropdownMenuSubContent className="w-64 max-h-[300px] overflow-y-auto">
                     <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
                       {category.description}
                     </DropdownMenuLabel>

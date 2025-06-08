@@ -20,10 +20,73 @@ export default function CameraComponent({ component, onUpdate }: CameraComponent
     });
   };
 
+  const renderCameraSpecificControls = () => {
+    switch (component.type) {
+      case 'PerspectiveCamera':
+        return (
+          <div className="space-y-3">
+            <DragInput
+              label="FOV"
+              value={props.fov || 75}
+              onChange={(value) => updateProperty('fov', value)}
+              step={1}
+              precision={0}
+              min={1}
+              max={179}
+              suffix="°"
+            />
+            <DragInput
+              label="Aspect"
+              value={props.aspect || 16/9}
+              onChange={(value) => updateProperty('aspect', value)}
+              step={0.1}
+              precision={2}
+              min={0.1}
+            />
+          </div>
+        );
+      case 'OrthographicCamera':
+        return (
+          <div className="space-y-3">
+            <DragInput
+              label="Left"
+              value={props.left || -10}
+              onChange={(value) => updateProperty('left', value)}
+              step={1}
+              precision={0}
+            />
+            <DragInput
+              label="Right"
+              value={props.right || 10}
+              onChange={(value) => updateProperty('right', value)}
+              step={1}
+              precision={0}
+            />
+            <DragInput
+              label="Top"
+              value={props.top || 10}
+              onChange={(value) => updateProperty('top', value)}
+              step={1}
+              precision={0}
+            />
+            <DragInput
+              label="Bottom"
+              value={props.bottom || -10}
+              onChange={(value) => updateProperty('bottom', value)}
+              step={1}
+              precision={0}
+            />
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="p-3 border border-muted rounded-md space-y-4">
       <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Camera</div>
+        <div className="text-sm font-medium">{component.type}</div>
         <Switch
           checked={component.enabled}
           onCheckedChange={(enabled) => onUpdate({ enabled })}
@@ -31,16 +94,7 @@ export default function CameraComponent({ component, onUpdate }: CameraComponent
       </div>
 
       <div className="space-y-3">
-        <DragInput
-          label="FOV"
-          value={props.fov || 75}
-          onChange={(value) => updateProperty('fov', value)}
-          step={1}
-          precision={0}
-          min={1}
-          max={179}
-          suffix="°"
-        />
+        {renderCameraSpecificControls()}
 
         <DragInput
           label="Near"

@@ -33,8 +33,13 @@ export default function ComponentsList({ components, onUpdate }: ComponentsListP
         return <MeshComponent key={component.id} {...commonProps} />;
       case 'DirectionalLight':
       case 'PointLight':
+      case 'SpotLight':
+      case 'AmbientLight':
+      case 'HemisphereLight':
+      case 'RectAreaLight':
         return <LightComponent key={component.id} {...commonProps} />;
       case 'PerspectiveCamera':
+      case 'OrthographicCamera':
         return <CameraComponent key={component.id} {...commonProps} />;
       default:
         return (

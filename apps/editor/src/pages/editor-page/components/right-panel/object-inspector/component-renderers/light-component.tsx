@@ -23,6 +23,9 @@ export default function LightComponent({ component, onUpdate }: LightComponentPr
 
   const renderLightSpecificControls = () => {
     switch (component.type) {
+      case 'AmbientLight':
+        return null; // AmbientLight only has color and intensity
+      
       case 'PointLight':
         return (
           <div className="space-y-2">
@@ -43,10 +46,161 @@ export default function LightComponent({ component, onUpdate }: LightComponentPr
               min={0}
               max={10}
             />
+            <DragInput
+              label="Shadow Map Size"
+              value={props.shadowMapSize || 512}
+              onChange={(value) => updateProperty('shadowMapSize', Math.round(value))}
+              step={128}
+              precision={0}
+              min={64}
+              max={4096}
+            />
           </div>
         );
+      
       case 'DirectionalLight':
-        return null; // DirectionalLight doesn't have additional properties
+        return (
+          <div className="space-y-2">
+            <DragInput
+              label="Shadow Map Size"
+              value={props.shadowMapSize || 1024}
+              onChange={(value) => updateProperty('shadowMapSize', Math.round(value))}
+              step={128}
+              precision={0}
+              min={64}
+              max={4096}
+            />
+            <DragInput
+              label="Shadow Camera Near"
+              value={props.shadowCameraNear || 0.5}
+              onChange={(value) => updateProperty('shadowCameraNear', value)}
+              step={0.1}
+              precision={1}
+              min={0.1}
+            />
+            <DragInput
+              label="Shadow Camera Far"
+              value={props.shadowCameraFar || 50}
+              onChange={(value) => updateProperty('shadowCameraFar', value)}
+              step={1}
+              precision={0}
+              min={1}
+            />
+            <DragInput
+              label="Shadow Camera Left"
+              value={props.shadowCameraLeft || -10}
+              onChange={(value) => updateProperty('shadowCameraLeft', value)}
+              step={1}
+              precision={0}
+            />
+            <DragInput
+              label="Shadow Camera Right"
+              value={props.shadowCameraRight || 10}
+              onChange={(value) => updateProperty('shadowCameraRight', value)}
+              step={1}
+              precision={0}
+            />
+            <DragInput
+              label="Shadow Camera Top"
+              value={props.shadowCameraTop || 10}
+              onChange={(value) => updateProperty('shadowCameraTop', value)}
+              step={1}
+              precision={0}
+            />
+            <DragInput
+              label="Shadow Camera Bottom"
+              value={props.shadowCameraBottom || -10}
+              onChange={(value) => updateProperty('shadowCameraBottom', value)}
+              step={1}
+              precision={0}
+            />
+          </div>
+        );
+      
+      case 'SpotLight':
+        return (
+          <div className="space-y-2">
+            <DragInput
+              label="Distance"
+              value={props.distance || 100}
+              onChange={(value) => updateProperty('distance', value)}
+              step={1}
+              precision={0}
+              min={0}
+            />
+            <DragInput
+              label="Angle"
+              value={props.angle || Math.PI / 3}
+              onChange={(value) => updateProperty('angle', value)}
+              step={0.1}
+              precision={2}
+              min={0}
+              max={Math.PI / 2}
+              suffix="rad"
+            />
+            <DragInput
+              label="Penumbra"
+              value={props.penumbra || 0}
+              onChange={(value) => updateProperty('penumbra', value)}
+              step={0.1}
+              precision={1}
+              min={0}
+              max={1}
+            />
+            <DragInput
+              label="Decay"
+              value={props.decay || 2}
+              onChange={(value) => updateProperty('decay', value)}
+              step={0.1}
+              precision={1}
+              min={0}
+              max={10}
+            />
+            <DragInput
+              label="Shadow Map Size"
+              value={props.shadowMapSize || 1024}
+              onChange={(value) => updateProperty('shadowMapSize', Math.round(value))}
+              step={128}
+              precision={0}
+              min={64}
+              max={4096}
+            />
+          </div>
+        );
+      
+      case 'HemisphereLight':
+        return (
+          <div className="space-y-2">
+            <ColorInput
+              label="Ground Color"
+              value={props.groundColor || '#444444'}
+              onChange={(value) => updateProperty('groundColor', value)}
+            />
+          </div>
+        );
+      
+      case 'RectAreaLight':
+        return (
+          <div className="space-y-2">
+            <DragInput
+              label="Width"
+              value={props.width || 10}
+              onChange={(value) => updateProperty('width', value)}
+              step={1}
+              precision={0}
+              min={0.1}
+            />
+            <DragInput
+              label="Height"
+              value={props.height || 10}
+              onChange={(value) => updateProperty('height', value)}
+              step={1}
+              precision={0}
+              min={0.1}
+            />
+          </div>
+        );
+      
       default:
         return null;
     }
@@ -63,11 +217,19 @@ export default function LightComponent({ component, onUpdate }: LightComponentPr
       </div>
 
       <div className="space-y-3">
-        <ColorInput
-          label="Color"
-          value={props.color || '#ffffff'}
-          onChange={(value) => updateProperty('color', value)}
-        />
+        {component.type === 'HemisphereLight' ? (
+          <ColorInput
+            label="Sky Color"
+            value={props.skyColor || '#ffffff'}
+            onChange={(value) => updateProperty('skyColor', value)}
+          />
+        ) : (
+          <ColorInput
+            label="Color"
+            value={props.color || '#ffffff'}
+            onChange={(value) => updateProperty('color', value)}
+          />
+        )}
 
         <DragInput
           label="Intensity"
@@ -81,14 +243,16 @@ export default function LightComponent({ component, onUpdate }: LightComponentPr
 
         {renderLightSpecificControls()}
 
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="castShadow"
-            checked={props.castShadow || false}
-            onCheckedChange={(value: boolean) => updateProperty('castShadow', value)}
-          />
-          <Label htmlFor="castShadow" className="text-xs">Cast Shadow</Label>
-        </div>
+        {component.type !== 'AmbientLight' && component.type !== 'HemisphereLight' && component.type !== 'RectAreaLight' && (
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="castShadow"
+              checked={props.castShadow || false}
+              onCheckedChange={(value: boolean) => updateProperty('castShadow', value)}
+            />
+            <Label htmlFor="castShadow" className="text-xs">Cast Shadow</Label>
+          </div>
+        )}
       </div>
     </div>
   );

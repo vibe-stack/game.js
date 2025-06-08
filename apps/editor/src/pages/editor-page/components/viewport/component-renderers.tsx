@@ -168,6 +168,50 @@ export function AmbientLightRenderer({
   );
 }
 
+export function HemisphereLightRenderer({
+  component,
+  children,
+}: ComponentRendererProps) {
+  const { 
+    skyColor = "#ffffff", 
+    groundColor = "#444444", 
+    intensity = 0.6 
+  } = component.properties;
+
+  if (!component.enabled) return <>{children}</>;
+
+  return (
+    <hemisphereLight args={[skyColor, groundColor, intensity]}>
+      {children}
+    </hemisphereLight>
+  );
+}
+
+export function RectAreaLightRenderer({
+  component,
+  children,
+}: ComponentRendererProps) {
+  const {
+    color = "#ffffff",
+    intensity = 1,
+    width = 10,
+    height = 10,
+  } = component.properties;
+
+  if (!component.enabled) return <>{children}</>;
+
+  return (
+    <rectAreaLight
+      color={color}
+      intensity={intensity}
+      width={width}
+      height={height}
+    >
+      {children}
+    </rectAreaLight>
+  );
+}
+
 export function MeshRenderer({ 
   component, 
   children, 
@@ -202,18 +246,30 @@ export function MeshRenderer({
 function getGeometryComponent(type: string) {
   switch (type) {
     case "box":
-      return ({ width = 1, height = 1, depth = 1, ...props }) => (
-        <boxGeometry args={[width, height, depth]} {...props} />
+      return ({ 
+        width = 1, 
+        height = 1, 
+        depth = 1, 
+        widthSegments = 1,
+        heightSegments = 1,
+        depthSegments = 1,
+        ...props 
+      }) => (
+        <boxGeometry args={[width, height, depth, widthSegments, heightSegments, depthSegments]} {...props} />
       );
     case "sphere":
       return ({
         radius = 1,
         widthSegments = 32,
         heightSegments = 16,
+        phiStart = 0,
+        phiLength = Math.PI * 2,
+        thetaStart = 0,
+        thetaLength = Math.PI,
         ...props
       }) => (
         <sphereGeometry
-          args={[radius, widthSegments, heightSegments]}
+          args={[radius, widthSegments, heightSegments, phiStart, phiLength, thetaStart, thetaLength]}
           {...props}
         />
       );
@@ -236,16 +292,29 @@ function getGeometryComponent(type: string) {
         radiusBottom = 1,
         height = 1,
         radialSegments = 32,
+        heightSegments = 1,
+        openEnded = false,
+        thetaStart = 0,
+        thetaLength = Math.PI * 2,
         ...props
       }) => (
         <cylinderGeometry
-          args={[radiusTop, radiusBottom, height, radialSegments]}
+          args={[radiusTop, radiusBottom, height, radialSegments, heightSegments, openEnded, thetaStart, thetaLength]}
           {...props}
         />
       );
     case "cone":
-      return ({ radius = 1, height = 1, radialSegments = 32, ...props }) => (
-        <coneGeometry args={[radius, height, radialSegments]} {...props} />
+      return ({ 
+        radius = 1, 
+        height = 1, 
+        radialSegments = 32,
+        heightSegments = 1,
+        openEnded = false,
+        thetaStart = 0,
+        thetaLength = Math.PI * 2,
+        ...props 
+      }) => (
+        <coneGeometry args={[radius, height, radialSegments, heightSegments, openEnded, thetaStart, thetaLength]} {...props} />
       );
     case "torus":
       return ({
@@ -253,10 +322,111 @@ function getGeometryComponent(type: string) {
         tube = 0.4,
         radialSegments = 16,
         tubularSegments = 100,
+        arc = Math.PI * 2,
         ...props
       }) => (
         <torusGeometry
-          args={[radius, tube, radialSegments, tubularSegments]}
+          args={[radius, tube, radialSegments, tubularSegments, arc]}
+          {...props}
+        />
+      );
+    case "torusKnot":
+      return ({
+        radius = 1,
+        tube = 0.4,
+        tubularSegments = 64,
+        radialSegments = 8,
+        p = 2,
+        q = 3,
+        ...props
+      }) => (
+        <torusKnotGeometry
+          args={[radius, tube, tubularSegments, radialSegments, p, q]}
+          {...props}
+        />
+      );
+    case "capsule":
+      return ({
+        radius = 1,
+        length = 1,
+        capSegments = 4,
+        radialSegments = 8,
+        ...props
+      }) => (
+        <capsuleGeometry
+          args={[radius, length, capSegments, radialSegments]}
+          {...props}
+        />
+      );
+    case "circle":
+      return ({
+        radius = 1,
+        segments = 32,
+        thetaStart = 0,
+        thetaLength = Math.PI * 2,
+        ...props
+      }) => (
+        <circleGeometry
+          args={[radius, segments, thetaStart, thetaLength]}
+          {...props}
+        />
+      );
+    case "ring":
+      return ({
+        innerRadius = 0.5,
+        outerRadius = 1,
+        thetaSegments = 32,
+        phiSegments = 1,
+        thetaStart = 0,
+        thetaLength = Math.PI * 2,
+        ...props
+      }) => (
+        <ringGeometry
+          args={[innerRadius, outerRadius, thetaSegments, phiSegments, thetaStart, thetaLength]}
+          {...props}
+        />
+      );
+    case "dodecahedron":
+      return ({
+        radius = 1,
+        detail = 0,
+        ...props
+      }) => (
+        <dodecahedronGeometry
+          args={[radius, detail]}
+          {...props}
+        />
+      );
+    case "icosahedron":
+      return ({
+        radius = 1,
+        detail = 0,
+        ...props
+      }) => (
+        <icosahedronGeometry
+          args={[radius, detail]}
+          {...props}
+        />
+      );
+    case "octahedron":
+      return ({
+        radius = 1,
+        detail = 0,
+        ...props
+      }) => (
+        <octahedronGeometry
+          args={[radius, detail]}
+          {...props}
+        />
+      );
+    case "tetrahedron":
+      return ({
+        radius = 1,
+        detail = 0,
+        ...props
+      }) => (
+        <tetrahedronGeometry
+          args={[radius, detail]}
           {...props}
         />
       );
@@ -321,6 +491,8 @@ export const COMPONENT_RENDERERS = {
   PointLight: PointLightRenderer,
   SpotLight: SpotLightRenderer,
   AmbientLight: AmbientLightRenderer,
+  HemisphereLight: HemisphereLightRenderer,
+  RectAreaLight: RectAreaLightRenderer,
   Mesh: MeshRenderer,
 };
 
