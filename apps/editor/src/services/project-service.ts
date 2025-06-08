@@ -277,6 +277,40 @@ export class ProjectService {
         toneMapping: 'aces',
         exposure: 1
       },
+      physicsWorld: {
+        gravity: { x: 0, y: -9.81, z: 0 },
+        integrationParameters: {
+          dt: 1/60,
+          minCcdDt: 1/60/100,
+          erp: 0.8,
+          damping: 0.99,
+          jointErp: 1.0,
+          jointDamping: 1.0,
+          allowedLinearError: 0.001,
+          allowedAngularError: 0.0087,
+          maxVelocityIterations: 4,
+          maxVelocityFrictionIterations: 8,
+          maxStabilizationIterations: 1,
+          interleaveRestitutionAndFrictionResolution: true,
+          minIslandSize: 128,
+          maxCcdSubsteps: 1
+        },
+        collisionDetection: {
+          predictionDistance: 0.002,
+          allowedLinearError: 0.001
+        },
+        debugRender: {
+          enabled: false,
+          renderBodies: true,
+          renderShapes: true,
+          renderJoints: true,
+          renderMultibodyJoints: false,
+          renderContacts: false,
+          renderCollisionEvents: false,
+          contactPointLength: 0.1,
+          contactNormalLength: 0.1
+        }
+      },
       assets: [],
       activeCamera: 'main-camera',
       lightingSetup: {},
@@ -441,6 +475,40 @@ export class ProjectService {
         physicallyCorrectLights: true,
         toneMapping: 'aces',
         exposure: 1
+      },
+      physicsWorld: {
+        gravity: { x: 0, y: -9.81, z: 0 },
+        integrationParameters: {
+          dt: 1/60,
+          minCcdDt: 1/60/100,
+          erp: 0.8,
+          damping: 0.99,
+          jointErp: 1.0,
+          jointDamping: 1.0,
+          allowedLinearError: 0.001,
+          allowedAngularError: 0.0087,
+          maxVelocityIterations: 4,
+          maxVelocityFrictionIterations: 8,
+          maxStabilizationIterations: 1,
+          interleaveRestitutionAndFrictionResolution: true,
+          minIslandSize: 128,
+          maxCcdSubsteps: 1
+        },
+        collisionDetection: {
+          predictionDistance: 0.002,
+          allowedLinearError: 0.001
+        },
+        debugRender: {
+          enabled: false,
+          renderBodies: true,
+          renderShapes: true,
+          renderJoints: true,
+          renderMultibodyJoints: false,
+          renderContacts: false,
+          renderCollisionEvents: false,
+          contactPointLength: 0.1,
+          contactNormalLength: 0.1
+        }
       },
       assets: [],
       activeCamera: 'main-camera',

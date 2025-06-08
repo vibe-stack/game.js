@@ -10,6 +10,11 @@ interface FloatingToolbarProps {
   onHome: () => void;
   onOpenFolder: () => void;
   onPlay?: () => void;
+  physicsState?: 'stopped' | 'playing' | 'paused';
+  onPhysicsPlay?: () => void;
+  onPhysicsPause?: () => void;
+  onPhysicsStop?: () => void;
+  onPhysicsResume?: () => void;
 }
 
 export default function FloatingToolbar({
@@ -18,6 +23,11 @@ export default function FloatingToolbar({
   onHome,
   onOpenFolder,
   onPlay,
+  physicsState,
+  onPhysicsPlay,
+  onPhysicsPause,
+  onPhysicsStop,
+  onPhysicsResume,
 }: FloatingToolbarProps) {
   const { currentProject } = useEditorStore();
 
@@ -35,6 +45,11 @@ export default function FloatingToolbar({
         onSave={onSave}
         onOpenFolder={onOpenFolder}
         onPlay={onPlay}
+        physicsState={physicsState}
+        onPhysicsPlay={onPhysicsPlay}
+        onPhysicsPause={onPhysicsPause}
+        onPhysicsStop={onPhysicsStop}
+        onPhysicsResume={onPhysicsResume}
       />
     </div>
   );

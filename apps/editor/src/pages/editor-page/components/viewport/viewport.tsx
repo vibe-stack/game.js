@@ -3,11 +3,19 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Grid, Environment } from "@react-three/drei";
 import { ACESFilmicToneMapping, LinearToneMapping, ReinhardToneMapping, CineonToneMapping, NoToneMapping } from "three";
 import SceneObject from "./scene-object";
+import { PhysicsProvider, usePhysics } from "./physics/physics-context";
+import useEditorStore from "@/stores/editor-store";
 
 interface ViewportProps {
   scene: GameScene | null;
   selectedObjects: string[];
   onSelectObject: (id: string) => void;
+  onPhysicsCallbacks?: (callbacks: {
+    play?: () => void;
+    pause?: () => void;
+    stop?: () => void;
+    resume?: () => void;
+  }) => void;
 }
 
 function SceneEffects({ scene }: { scene: GameScene }) {
@@ -22,11 +30,26 @@ function SceneEffects({ scene }: { scene: GameScene }) {
   return null;
 }
 
+function PhysicsCallbackProvider({ onPhysicsCallbacks }: { onPhysicsCallbacks?: ViewportProps['onPhysicsCallbacks'] }) {
+  const { play, pause, stop, resume } = usePhysics();
+  
+  useEffect(() => {
+    if (onPhysicsCallbacks) {
+      onPhysicsCallbacks({ play, pause, stop, resume });
+    }
+  }, [play, pause, stop, resume, onPhysicsCallbacks]);
+  
+  return null;
+}
+
 export default function Viewport({
   scene,
   selectedObjects,
   onSelectObject,
+  onPhysicsCallbacks,
 }: ViewportProps) {
+  const { updateObjectTransform } = useEditorStore();
+
   if (!scene) {
     return (
       <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
@@ -131,56 +154,59 @@ export default function Viewport({
           toneMappingExposure: scene.runtimeConfig.exposure,
         }}
       >
-        <SceneEffects scene={scene} />
-        
-        {/* Fog */}
-        {scene.editorConfig.enableFog && (
-          <fog
-            attach="fog"
-            args={[scene.editorConfig.fogColor, scene.editorConfig.fogNear, scene.editorConfig.fogFar]}
-          />
-        )}
-
-        {/* Environment */}
-        {scene.runtimeConfig.environment !== 'none' && (
-          <Environment preset={scene.runtimeConfig.environment as any} />
-        )}
-
-        {/* Scene Objects */}
-        <group>
-          {scene.objects.map((obj) => (
-            <SceneObject
-              key={obj.id}
-              obj={obj}
-              selectedObjects={selectedObjects}
-              onSelect={onSelectObject}
-              renderType={scene.editorConfig.renderType}
+        <PhysicsProvider scene={scene} onObjectTransformUpdate={updateObjectTransform}>
+          <PhysicsCallbackProvider onPhysicsCallbacks={onPhysicsCallbacks} />
+          <SceneEffects scene={scene} />
+          
+          {/* Fog */}
+          {scene.editorConfig.enableFog && (
+            <fog
+              attach="fog"
+              args={[scene.editorConfig.fogColor, scene.editorConfig.fogNear, scene.editorConfig.fogFar]}
             />
-          ))}
-        </group>
+          )}
 
-        {/* Light Helpers */}
-        {renderLightHelpers()}
+          {/* Environment */}
+          {scene.runtimeConfig.environment !== 'none' && (
+            <Environment preset={scene.runtimeConfig.environment as any} />
+          )}
 
-        {/* Camera Helpers */}
-        {renderCameraHelpers()}
+          {/* Scene Objects */}
+          <group>
+            {scene.objects.map((obj) => (
+              <SceneObject
+                key={obj.id}
+                obj={obj}
+                selectedObjects={selectedObjects}
+                onSelect={onSelectObject}
+                renderType={scene.editorConfig.renderType}
+              />
+            ))}
+          </group>
 
-        {/* Grid */}
-        {scene.editorConfig.showHelperGrid && (
-          <Grid
-            args={[
-              scene.editorConfig.gridSize * 20,
-              scene.editorConfig.gridSize * 20,
-            ]}
-            cellSize={scene.editorConfig.gridSize}
-            cellColor="#666666"
-            sectionColor="#999999"
-            fadeDistance={100}
-            fadeStrength={1}
-          />
-        )}
+          {/* Light Helpers */}
+          {renderLightHelpers()}
 
-        <OrbitControls enablePan enableZoom enableRotate makeDefault />
+          {/* Camera Helpers */}
+          {renderCameraHelpers()}
+
+          {/* Grid */}
+          {scene.editorConfig.showHelperGrid && (
+            <Grid
+              args={[
+                scene.editorConfig.gridSize * 20,
+                scene.editorConfig.gridSize * 20,
+              ]}
+              cellSize={scene.editorConfig.gridSize}
+              cellColor="#666666"
+              sectionColor="#999999"
+              fadeDistance={100}
+              fadeStrength={1}
+            />
+          )}
+
+          <OrbitControls enablePan enableZoom enableRotate makeDefault />
+        </PhysicsProvider>
       </Canvas>
     </div>
   );

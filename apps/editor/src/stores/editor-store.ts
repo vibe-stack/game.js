@@ -38,6 +38,7 @@ interface EditorState {
   // Scene Configuration
   updateSceneEditorConfig: (config: Partial<SceneEditorConfig>) => void;
   updateSceneRuntimeConfig: (config: Partial<SceneRuntimeConfig>) => void;
+  updateScenePhysicsConfig: (config: Partial<PhysicsWorldConfig>) => void;
   
   // Viewport
   setViewportCamera: (camera: Partial<EditorState['viewportCamera']>) => void;
@@ -276,6 +277,17 @@ const useEditorStore = create<EditorState>()(
         currentScene: {
           ...state.currentScene,
           runtimeConfig: { ...state.currentScene.runtimeConfig, ...config }
+        }
+      };
+    }),
+    
+    updateScenePhysicsConfig: (config) => set((state) => {
+      if (!state.currentScene) return state;
+      
+      return {
+        currentScene: {
+          ...state.currentScene,
+          physicsWorld: { ...state.currentScene.physicsWorld, ...config }
         }
       };
     }),

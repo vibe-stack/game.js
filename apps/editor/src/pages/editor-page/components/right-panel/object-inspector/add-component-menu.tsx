@@ -179,7 +179,7 @@ export default function AddComponentMenu({ onAddComponent }: AddComponentMenuPro
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel className="text-xs">Rendering</DropdownMenuLabel>
+        {/* <DropdownMenuLabel className="text-xs">Rendering</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => handleAddComponent('Mesh')}>
           <Box className="h-4 w-4 mr-2" />
           Mesh Renderer
@@ -195,9 +195,9 @@ export default function AddComponentMenu({ onAddComponent }: AddComponentMenuPro
         <DropdownMenuItem onClick={() => handleAddComponent('PointLight')}>
           <Lightbulb className="h-4 w-4 mr-2" />
           Point Light
-        </DropdownMenuItem>
+        </DropdownMenuItem> */}
         
-        <DropdownMenuSeparator />
+        {/* <DropdownMenuSeparator />
         
         <DropdownMenuLabel className="text-xs">Camera</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => handleAddComponent('PerspectiveCamera')}>
@@ -205,7 +205,7 @@ export default function AddComponentMenu({ onAddComponent }: AddComponentMenuPro
           Perspective Camera
         </DropdownMenuItem>
         
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator /> */}
         
         <DropdownMenuLabel className="text-xs">Physics</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => handleAddComponent('rigidBody')}>
