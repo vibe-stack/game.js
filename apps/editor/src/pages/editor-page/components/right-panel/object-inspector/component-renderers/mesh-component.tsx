@@ -4,6 +4,17 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ColorInput from "../color-input";
+import BoxGeometry from "./geometry-controls/box-geometry";
+import SphereGeometry from "./geometry-controls/sphere-geometry";
+import PlaneGeometry from "./geometry-controls/plane-geometry";
+import CylinderGeometry from "./geometry-controls/cylinder-geometry";
+import ConeGeometry from "./geometry-controls/cone-geometry";
+import TorusGeometry from "./geometry-controls/torus-geometry";
+import TorusKnotGeometry from "./geometry-controls/torus-knot-geometry";
+import CapsuleGeometry from "./geometry-controls/capsule-geometry";
+import CircleGeometry from "./geometry-controls/circle-geometry";
+import RingGeometry from "./geometry-controls/ring-geometry";
+import PolyhedronGeometry from "./geometry-controls/polyhedron-geometry";
 
 interface MeshComponentProps {
   component: GameObjectComponent;
@@ -49,521 +60,37 @@ export default function MeshComponent({ component, onUpdate }: MeshComponentProp
   };
 
   const renderGeometryControls = () => {
+    const controlProps = {
+      geometryProps,
+      onUpdate: updateGeometryProp
+    };
+
     switch (props.geometry) {
       case 'box':
-        return (
-          <div className="space-y-2">
-            <DragInput
-              label="Width"
-              value={geometryProps.width || 1}
-              onChange={(value) => updateGeometryProp('width', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Height"
-              value={geometryProps.height || 1}
-              onChange={(value) => updateGeometryProp('height', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Depth"
-              value={geometryProps.depth || 1}
-              onChange={(value) => updateGeometryProp('depth', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Width Segments"
-              value={geometryProps.widthSegments || 1}
-              onChange={(value) => updateGeometryProp('widthSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={1}
-              max={20}
-            />
-            <DragInput
-              label="Height Segments"
-              value={geometryProps.heightSegments || 1}
-              onChange={(value) => updateGeometryProp('heightSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={1}
-              max={20}
-            />
-            <DragInput
-              label="Depth Segments"
-              value={geometryProps.depthSegments || 1}
-              onChange={(value) => updateGeometryProp('depthSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={1}
-              max={20}
-            />
-          </div>
-        );
+        return <BoxGeometry {...controlProps} />;
       case 'sphere':
-        return (
-          <div className="space-y-2">
-            <DragInput
-              label="Radius"
-              value={geometryProps.radius || 0.5}
-              onChange={(value) => updateGeometryProp('radius', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Width Segments"
-              value={geometryProps.widthSegments || 32}
-              onChange={(value) => updateGeometryProp('widthSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={3}
-              max={64}
-            />
-            <DragInput
-              label="Height Segments"
-              value={geometryProps.heightSegments || 16}
-              onChange={(value) => updateGeometryProp('heightSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={2}
-              max={32}
-            />
-            <DragInput
-              label="Phi Start"
-              value={geometryProps.phiStart || 0}
-              onChange={(value) => updateGeometryProp('phiStart', value)}
-              step={0.1}
-              precision={2}
-              min={0}
-              max={Math.PI * 2}
-            />
-            <DragInput
-              label="Phi Length"
-              value={geometryProps.phiLength || Math.PI * 2}
-              onChange={(value) => updateGeometryProp('phiLength', value)}
-              step={0.1}
-              precision={2}
-              min={0}
-              max={Math.PI * 2}
-            />
-            <DragInput
-              label="Theta Start"
-              value={geometryProps.thetaStart || 0}
-              onChange={(value) => updateGeometryProp('thetaStart', value)}
-              step={0.1}
-              precision={2}
-              min={0}
-              max={Math.PI}
-            />
-            <DragInput
-              label="Theta Length"
-              value={geometryProps.thetaLength || Math.PI}
-              onChange={(value) => updateGeometryProp('thetaLength', value)}
-              step={0.1}
-              precision={2}
-              min={0}
-              max={Math.PI}
-            />
-          </div>
-        );
+        return <SphereGeometry {...controlProps} />;
       case 'plane':
-        return (
-          <div className="space-y-2">
-            <DragInput
-              label="Width"
-              value={geometryProps.width || 2}
-              onChange={(value) => updateGeometryProp('width', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Height"
-              value={geometryProps.height || 2}
-              onChange={(value) => updateGeometryProp('height', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Width Segments"
-              value={geometryProps.widthSegments || 1}
-              onChange={(value) => updateGeometryProp('widthSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={1}
-              max={20}
-            />
-            <DragInput
-              label="Height Segments"
-              value={geometryProps.heightSegments || 1}
-              onChange={(value) => updateGeometryProp('heightSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={1}
-              max={20}
-            />
-          </div>
-        );
+        return <PlaneGeometry {...controlProps} />;
       case 'cylinder':
-        return (
-          <div className="space-y-2">
-            <DragInput
-              label="Radius Top"
-              value={geometryProps.radiusTop || 0.5}
-              onChange={(value) => updateGeometryProp('radiusTop', value)}
-              step={0.1}
-              precision={2}
-              min={0}
-            />
-            <DragInput
-              label="Radius Bottom"
-              value={geometryProps.radiusBottom || 0.5}
-              onChange={(value) => updateGeometryProp('radiusBottom', value)}
-              step={0.1}
-              precision={2}
-              min={0}
-            />
-            <DragInput
-              label="Height"
-              value={geometryProps.height || 1}
-              onChange={(value) => updateGeometryProp('height', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Radial Segments"
-              value={geometryProps.radialSegments || 32}
-              onChange={(value) => updateGeometryProp('radialSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={3}
-              max={64}
-            />
-            <DragInput
-              label="Height Segments"
-              value={geometryProps.heightSegments || 1}
-              onChange={(value) => updateGeometryProp('heightSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={1}
-              max={20}
-            />
-          </div>
-        );
+        return <CylinderGeometry {...controlProps} />;
       case 'cone':
-        return (
-          <div className="space-y-2">
-            <DragInput
-              label="Radius"
-              value={geometryProps.radius || 0.5}
-              onChange={(value) => updateGeometryProp('radius', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Height"
-              value={geometryProps.height || 1}
-              onChange={(value) => updateGeometryProp('height', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Radial Segments"
-              value={geometryProps.radialSegments || 32}
-              onChange={(value) => updateGeometryProp('radialSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={3}
-              max={64}
-            />
-            <DragInput
-              label="Height Segments"
-              value={geometryProps.heightSegments || 1}
-              onChange={(value) => updateGeometryProp('heightSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={1}
-              max={20}
-            />
-          </div>
-        );
+        return <ConeGeometry {...controlProps} />;
       case 'torus':
-        return (
-          <div className="space-y-2">
-            <DragInput
-              label="Radius"
-              value={geometryProps.radius || 0.5}
-              onChange={(value) => updateGeometryProp('radius', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Tube"
-              value={geometryProps.tube || 0.2}
-              onChange={(value) => updateGeometryProp('tube', value)}
-              step={0.01}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Radial Segments"
-              value={geometryProps.radialSegments || 16}
-              onChange={(value) => updateGeometryProp('radialSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={3}
-              max={32}
-            />
-            <DragInput
-              label="Tubular Segments"
-              value={geometryProps.tubularSegments || 100}
-              onChange={(value) => updateGeometryProp('tubularSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={3}
-              max={200}
-            />
-            <DragInput
-              label="Arc"
-              value={geometryProps.arc || Math.PI * 2}
-              onChange={(value) => updateGeometryProp('arc', value)}
-              step={0.1}
-              precision={2}
-              min={0}
-              max={Math.PI * 2}
-            />
-          </div>
-        );
+        return <TorusGeometry {...controlProps} />;
       case 'torusKnot':
-        return (
-          <div className="space-y-2">
-            <DragInput
-              label="Radius"
-              value={geometryProps.radius || 0.5}
-              onChange={(value) => updateGeometryProp('radius', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Tube"
-              value={geometryProps.tube || 0.15}
-              onChange={(value) => updateGeometryProp('tube', value)}
-              step={0.01}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Tubular Segments"
-              value={geometryProps.tubularSegments || 64}
-              onChange={(value) => updateGeometryProp('tubularSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={3}
-              max={200}
-            />
-            <DragInput
-              label="Radial Segments"
-              value={geometryProps.radialSegments || 8}
-              onChange={(value) => updateGeometryProp('radialSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={3}
-              max={32}
-            />
-            <DragInput
-              label="P"
-              value={geometryProps.p || 2}
-              onChange={(value) => updateGeometryProp('p', Math.round(value))}
-              step={1}
-              precision={0}
-              min={1}
-              max={10}
-            />
-            <DragInput
-              label="Q"
-              value={geometryProps.q || 3}
-              onChange={(value) => updateGeometryProp('q', Math.round(value))}
-              step={1}
-              precision={0}
-              min={1}
-              max={10}
-            />
-          </div>
-        );
+        return <TorusKnotGeometry {...controlProps} />;
       case 'capsule':
-        return (
-          <div className="space-y-2">
-            <DragInput
-              label="Radius"
-              value={geometryProps.radius || 0.5}
-              onChange={(value) => updateGeometryProp('radius', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Length"
-              value={geometryProps.length || 1}
-              onChange={(value) => updateGeometryProp('length', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Cap Segments"
-              value={geometryProps.capSegments || 4}
-              onChange={(value) => updateGeometryProp('capSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={1}
-              max={16}
-            />
-            <DragInput
-              label="Radial Segments"
-              value={geometryProps.radialSegments || 8}
-              onChange={(value) => updateGeometryProp('radialSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={3}
-              max={32}
-            />
-          </div>
-        );
+        return <CapsuleGeometry {...controlProps} />;
       case 'circle':
-        return (
-          <div className="space-y-2">
-            <DragInput
-              label="Radius"
-              value={geometryProps.radius || 0.5}
-              onChange={(value) => updateGeometryProp('radius', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Segments"
-              value={geometryProps.segments || 32}
-              onChange={(value) => updateGeometryProp('segments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={3}
-              max={64}
-            />
-            <DragInput
-              label="Theta Start"
-              value={geometryProps.thetaStart || 0}
-              onChange={(value) => updateGeometryProp('thetaStart', value)}
-              step={0.1}
-              precision={2}
-              min={0}
-              max={Math.PI * 2}
-            />
-            <DragInput
-              label="Theta Length"
-              value={geometryProps.thetaLength || Math.PI * 2}
-              onChange={(value) => updateGeometryProp('thetaLength', value)}
-              step={0.1}
-              precision={2}
-              min={0}
-              max={Math.PI * 2}
-            />
-          </div>
-        );
+        return <CircleGeometry {...controlProps} />;
       case 'ring':
-        return (
-          <div className="space-y-2">
-            <DragInput
-              label="Inner Radius"
-              value={geometryProps.innerRadius || 0.3}
-              onChange={(value) => updateGeometryProp('innerRadius', value)}
-              step={0.1}
-              precision={2}
-              min={0}
-            />
-            <DragInput
-              label="Outer Radius"
-              value={geometryProps.outerRadius || 0.6}
-              onChange={(value) => updateGeometryProp('outerRadius', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Theta Segments"
-              value={geometryProps.thetaSegments || 32}
-              onChange={(value) => updateGeometryProp('thetaSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={3}
-              max={64}
-            />
-            <DragInput
-              label="Phi Segments"
-              value={geometryProps.phiSegments || 1}
-              onChange={(value) => updateGeometryProp('phiSegments', Math.round(value))}
-              step={1}
-              precision={0}
-              min={1}
-              max={10}
-            />
-            <DragInput
-              label="Theta Start"
-              value={geometryProps.thetaStart || 0}
-              onChange={(value) => updateGeometryProp('thetaStart', value)}
-              step={0.1}
-              precision={2}
-              min={0}
-              max={Math.PI * 2}
-            />
-            <DragInput
-              label="Theta Length"
-              value={geometryProps.thetaLength || Math.PI * 2}
-              onChange={(value) => updateGeometryProp('thetaLength', value)}
-              step={0.1}
-              precision={2}
-              min={0}
-              max={Math.PI * 2}
-            />
-          </div>
-        );
+        return <RingGeometry {...controlProps} />;
       case 'dodecahedron':
       case 'icosahedron':
       case 'octahedron':
       case 'tetrahedron':
-        return (
-          <div className="space-y-2">
-            <DragInput
-              label="Radius"
-              value={geometryProps.radius || 0.5}
-              onChange={(value) => updateGeometryProp('radius', value)}
-              step={0.1}
-              precision={2}
-              min={0.001}
-            />
-            <DragInput
-              label="Detail"
-              value={geometryProps.detail || 0}
-              onChange={(value) => updateGeometryProp('detail', Math.round(value))}
-              step={1}
-              precision={0}
-              min={0}
-              max={5}
-            />
-          </div>
-        );
+        return <PolyhedronGeometry {...controlProps} />;
       default:
         return null;
     }

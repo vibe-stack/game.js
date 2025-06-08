@@ -1,4 +1,4 @@
-import React, { useRef, forwardRef } from "react";
+import React, { useRef, forwardRef, useMemo } from "react";
 import { PivotControls } from "@react-three/drei";
 import { renderComponent } from "./component-renderers";
 import useEditorStore from "@/stores/editor-store";
@@ -24,8 +24,19 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
     onSelect(obj.id);
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleTransformChange = (local: THREE.Matrix4, deltaLocal: THREE.Matrix4, world: THREE.Matrix4, deltaWorld: THREE.Matrix4) => {
+  // Create initial matrix from current transform values
+  const initialMatrix = useMemo(() => {
+    const matrix = new THREE.Matrix4();
+    const pos = new THREE.Vector3(position.x, position.y, position.z);
+    const rot = new THREE.Euler(rotation.x, rotation.y, rotation.z);
+    const scl = new THREE.Vector3(scale.x, scale.y, scale.z);
+    const quaternion = new THREE.Quaternion().setFromEuler(rot);
+    
+    matrix.compose(pos, quaternion, scl);
+    return matrix;
+  }, [position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, scale.x, scale.y, scale.z]);
+
+  const handleTransformChange = (local: THREE.Matrix4) => {
     // Extract position, rotation, and scale from the local matrix
     const position = new THREE.Vector3();
     const quaternion = new THREE.Quaternion();
@@ -77,10 +88,13 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
 
   const groupProps = {
     ref: isSelected ? ref || groupRef : groupRef,
-    position: [position.x, position.y, position.z] as [number, number, number],
-    rotation: [rotation.x, rotation.y, rotation.z] as [number, number, number],
-    scale: [scale.x, scale.y, scale.z] as [number, number, number],
     onClick: handleClick,
+    // Only apply transforms when PivotControls are not active
+    ...(!(isSelected && editorMode !== "select") && {
+      position: [position.x, position.y, position.z] as [number, number, number],
+      rotation: [rotation.x, rotation.y, rotation.z] as [number, number, number],
+      scale: [scale.x, scale.y, scale.z] as [number, number, number],
+    }),
   };
 
   const effectiveComponents = components.length > 0 
@@ -99,6 +113,8 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
     
     return (
       <PivotControls
+        matrix={initialMatrix}
+        autoTransform={false}
         onDrag={handleTransformChange}
         {...controlSettings}
         scale={70}
