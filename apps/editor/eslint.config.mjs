@@ -26,7 +26,12 @@ export default [
   },
   { languageOptions: { globals: globals.browser } },
   pluginJs.configs.recommended,
-  pluginReact.configs.flat.recommended,
+  {
+    ...pluginReact.configs.flat.recommended,
+    rules: {
+      "react/no-unknown-property": "off",
+    },
+  },
   eslintPluginPrettierRecommended,
   ...tseslint.configs.recommended,
 ];

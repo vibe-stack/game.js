@@ -4,15 +4,118 @@
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
-// IPC interface types for Electron
-// When adding a new context interface, add it to the exposeContexts() function in preload.ts
+// Game Editor Types
+
+interface Vector3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+interface Transform {
+  position: Vector3;
+  rotation: Vector3;
+  scale: Vector3;
+}
+
+interface GameObjectComponent {
+  id: string;
+  type: string;
+  enabled: boolean;
+  properties: Record<string, any>;
+}
+
+interface GameObject {
+  id: string;
+  name: string;
+  transform: Transform;
+  components: GameObjectComponent[];
+  children: GameObject[];
+  visible: boolean;
+  tags: string[];
+  layer: number;
+}
+
+interface AssetReference {
+  id: string;
+  type: 'texture' | 'model' | 'audio' | 'script' | 'shader' | 'material';
+  path: string;
+  name: string;
+}
+
+interface EditorConfig {
+  appTitle: string;
+  shortcuts: Record<string, string>;
+  theme: 'light' | 'dark' | 'system';
+  autoSave: boolean;
+  autoSaveInterval: number;
+  gridSize: number;
+  snapToGrid: boolean;
+  showGrid: boolean;
+  showGizmos: boolean;
+  cameraSpeed: number;
+  viewportBackground: string;
+}
+
+interface SceneEditorConfig {
+  showHelperGrid: boolean;
+  gridSize: number;
+  backgroundColor: string;
+  renderType: 'solid' | 'wireframe' | 'normals' | 'realistic';
+  showLights: boolean;
+  showCameras: boolean;
+  enableFog: boolean;
+  fogColor: string;
+  fogNear: number;
+  fogFar: number;
+}
+
+interface SceneRuntimeConfig {
+  backgroundColor: string;
+  environment: string;
+  shadowsEnabled: boolean;
+  shadowType: 'basic' | 'pcf' | 'pcfsoft' | 'vsm';
+  antialias: boolean;
+  physicallyCorrectLights: boolean;
+  toneMapping: 'none' | 'linear' | 'reinhard' | 'cineon' | 'aces';
+  exposure: number;
+}
+
+interface GameScene {
+  id: string;
+  name: string;
+  objects: GameObject[];
+  editorConfig: SceneEditorConfig;
+  runtimeConfig: SceneRuntimeConfig;
+  assets: AssetReference[];
+  activeCamera?: string;
+  lightingSetup: any;
+  metadata: {
+    created: Date;
+    modified: Date;
+    version: string;
+  };
+}
 
 interface GameProject {
   name: string;
   path: string;
   lastModified: Date;
   isRunning?: boolean;
+  scenes: string[];
+  currentScene?: string;
+  editorConfig: EditorConfig;
+  packageJson: any;
+  metadata: {
+    created: Date;
+    version: string;
+    description?: string;
+    author?: string;
+  };
 }
+
+// IPC interface types for Electron
+// When adding a new context interface, add it to the exposeContexts() function in preload.ts
 
 interface DevServerInfo {
   port?: number;
@@ -34,12 +137,36 @@ interface ElectronWindow {
 }
 
 interface ProjectAPI {
+  // Project Management
   loadProjects: () => Promise<GameProject[]>;
-  createProject: (projectName: string) => Promise<GameProject>;
+  createProject: (projectName: string, projectPath?: string) => Promise<GameProject>;
+  openProject: (projectPath: string) => Promise<GameProject>;
+  saveProject: (project: GameProject) => Promise<void>;
+  deleteProject: (projectPath: string) => Promise<void>;
+  openProjectFolder: (projectPath: string) => Promise<void>;
+  selectProjectDirectory: () => Promise<string | undefined>;
+  
+  // Scene Management
+  loadScene: (projectPath: string, sceneName: string) => Promise<GameScene>;
+  saveScene: (projectPath: string, scene: GameScene) => Promise<void>;
+  createScene: (projectPath: string, sceneName: string) => Promise<GameScene>;
+  deleteScene: (projectPath: string, sceneName: string) => Promise<void>;
+  duplicateScene: (projectPath: string, sceneName: string, newName: string) => Promise<GameScene>;
+  
+  // Asset Management
+  importAsset: (projectPath: string, assetPath: string) => Promise<AssetReference>;
+  deleteAsset: (projectPath: string, assetId: string) => Promise<void>;
+  getAssets: (projectPath: string) => Promise<AssetReference[]>;
+  
+  // File System Operations
+  readFile: (filePath: string) => Promise<string>;
+  writeFile: (filePath: string, content: string) => Promise<void>;
+  fileExists: (filePath: string) => Promise<boolean>;
+  
+  // Legacy - keeping for backward compatibility
   installPackages: (projectName: string) => Promise<void>;
   startDevServer: (projectName: string) => Promise<DevServerInfo>;
   stopDevServer: (projectName: string) => Promise<void>;
-  openProjectFolder: (projectPath: string) => Promise<void>;
   isDevServerRunning: (projectName: string) => Promise<boolean>;
   getServerInfo: (projectName: string) => Promise<DevServerInfo | undefined>;
   connectToEditor: (projectName: string) => Promise<void>;

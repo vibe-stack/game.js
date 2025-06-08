@@ -1,5 +1,4 @@
 import React from "react";
-import NavigationMenu from "@/components/template/NavigationMenu";
 import { useRouter } from "@tanstack/react-router";
 
 export default function BaseLayout({
@@ -15,7 +14,6 @@ export default function BaseLayout({
 
   return (
     <>
-      {showNavigation && <NavigationMenu />}
       <main className={showNavigation ? "h-screen pb-10 p-2" : "h-screen"}>{children}</main>
     </>
   );
