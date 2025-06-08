@@ -22,11 +22,10 @@ export default function ProjectInfoToolbar({
         className="gap-2 h-8"
       >
         <Home size={16} />
-        Home
       </Button>
       <div className="bg-border h-4 w-px" />
       <div className="flex items-center gap-2">
-        <span className="font-medium text-sm">{projectName}</span>
+        <span className="font-medium text-xs">{projectName}</span>
         <span className="text-muted-foreground text-xs">
           {sceneName || "No Scene"}
         </span>

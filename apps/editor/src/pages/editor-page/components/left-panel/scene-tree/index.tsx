@@ -1,19 +1,43 @@
-import React from "react";
-import { Plus, EyeIcon, EyeOffIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  DndContext,
+  DragEndEvent,
+  DragStartEvent,
+  DragMoveEvent,
+  DragOverEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  closestCenter,
+  MeasuringStrategy,
+  defaultDropAnimation,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { createPortal } from "react-dom";
 import useEditorStore from "@/stores/editor-store";
 import { gameObjectTemplates } from "./game-object-templates";
+import CreateObjectMenu from "./components/create-object-menu";
+import SceneTreeNode from "./components/scene-tree-node";
+import SceneTreeSearch from "./components/scene-tree-search";
+import {
+  duplicateGameObject,
+  filterObjectsBySearch,
+} from "./utils/object-utils";
+import {
+  flattenTree,
+  buildTree,
+  removeChildrenOf,
+  getProjection,
+  removeItem,
+  setProperty,
+  FlattenedItem,
+} from "./utils/tree-utils";
 
 interface SceneTreeProps {
   scene: GameScene | null;
@@ -21,44 +45,300 @@ interface SceneTreeProps {
   onSelectObject: (objectId: string) => void;
 }
 
-const menuCategories = [
-  {
-    id: "geometry",
-    name: "Geometry",
-    description: "Basic 3D shapes and meshes",
-    color: "text-blue-500",
+const measuring = {
+  droppable: {
+    strategy: MeasuringStrategy.Always,
   },
-  {
-    id: "light",
-    name: "Lighting",
-    description: "Light sources for illumination",
-    color: "text-yellow-500",
-  },
-  {
-    id: "camera",
-    name: "Cameras",
-    description: "Viewpoint and perspective controls",
-    color: "text-green-500",
-  },
-];
+};
+
+const indentationWidth = 20;
 
 export default function SceneTree({
   scene,
   selectedObjects,
   onSelectObject,
 }: SceneTreeProps) {
-  const { addObject } = useEditorStore();
+  const { addObject, removeObject, setCurrentScene } = useEditorStore();
 
-  const handleAddObject = (template: (typeof gameObjectTemplates)[0]) => {
-    const newObject: GameObject = {
-      id: `${template.id}-${Date.now()}`,
-      name: template.name,
-      children: [],
-      ...template.template,
-    };
+  const [searchQuery, setSearchQuery] = useState("");
+  const [clipboard, setClipboard] = useState<GameObject | null>(null);
+  const [clipboardAction, setClipboardAction] = useState<"copy" | "cut" | null>(
+    null,
+  );
+  const [lockedObjects, setLockedObjects] = useState<Set<string>>(new Set());
 
-    addObject(newObject);
-  };
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [offsetLeft, setOffsetLeft] = useState(0);
+
+  const [collapsedItems, setCollapsedItems] = useState<Set<string>>(new Set());
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { 
+        delay: 100, 
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor),
+  );
+
+  const filteredObjects = useMemo(() => {
+    if (!scene) return [];
+    return filterObjectsBySearch(scene.objects, searchQuery);
+  }, [scene?.objects, searchQuery]);
+
+  const flattenedItems = useMemo(() => {
+    const flattenedTree = flattenTree(filteredObjects);
+    const collapsedIds = Array.from(collapsedItems);
+
+    return removeChildrenOf(
+      flattenedTree,
+      activeId != null ? [activeId, ...collapsedIds] : collapsedIds,
+    );
+  }, [filteredObjects, activeId, collapsedItems]);
+
+  const projected =
+    activeId && overId
+      ? getProjection(
+          flattenedItems,
+          activeId,
+          overId,
+          offsetLeft,
+          indentationWidth,
+        )
+      : null;
+
+  const sortedIds = useMemo(
+    () => flattenedItems.map(({ id }) => id),
+    [flattenedItems],
+  );
+
+  const activeItem = activeId
+    ? flattenedItems.find(({ id }) => id === activeId)
+    : null;
+
+  const handleAddObject = useCallback(
+    (template: (typeof gameObjectTemplates)[0]) => {
+      const newObject: GameObject = {
+        id: `${template.id}-${Date.now()}`,
+        name: template.name,
+        children: [],
+        ...template.template,
+      };
+
+      addObject(newObject);
+    },
+    [addObject],
+  );
+
+  const handleDuplicate = useCallback(
+    (object: GameObject) => {
+      const duplicated = duplicateGameObject(object);
+      addObject(duplicated);
+    },
+    [addObject],
+  );
+
+  const handleCopy = useCallback((object: GameObject) => {
+    setClipboard(object);
+    setClipboardAction("copy");
+  }, []);
+
+  const handleCut = useCallback((object: GameObject) => {
+    setClipboard(object);
+    setClipboardAction("cut");
+  }, []);
+
+  const handlePaste = useCallback(() => {
+    if (!clipboard) return;
+
+    if (clipboardAction === "copy") {
+      const duplicated = duplicateGameObject(clipboard);
+      addObject(duplicated);
+    } else if (clipboardAction === "cut") {
+      removeObject(clipboard.id);
+      addObject(clipboard);
+      setClipboard(null);
+      setClipboardAction(null);
+    }
+  }, [clipboard, clipboardAction, addObject, removeObject]);
+
+  const handleDelete = useCallback(
+    (objectId: string) => {
+      if (!scene) return;
+      const newObjects = removeItem(scene.objects, objectId);
+      setCurrentScene({ ...scene, objects: newObjects });
+    },
+    [scene, setCurrentScene],
+  );
+
+  const handleToggleLock = useCallback((objectId: string) => {
+    setLockedObjects((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(objectId)) {
+        newSet.delete(objectId);
+      } else {
+        newSet.add(objectId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleFocusCamera = useCallback((objectId: string) => {
+    console.log("Focus camera on object:", objectId);
+  }, []);
+
+  const handleToggleVisibility = useCallback(
+    (objectId: string) => {
+      if (!scene) return;
+      const newObjects = setProperty(
+        scene.objects,
+        objectId,
+        "visible",
+        (visible) => !visible,
+      );
+      setCurrentScene({ ...scene, objects: newObjects });
+    },
+    [scene, setCurrentScene],
+  );
+
+  const handleCollapse = useCallback((id: string) => {
+    setCollapsedItems((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleDragStart = useCallback(
+    ({ active: { id: activeId } }: DragStartEvent) => {
+      setActiveId(activeId as string);
+      setOverId(activeId as string);
+
+      document.body.style.setProperty("cursor", "grabbing");
+    },
+    [],
+  );
+
+  const handleDragMove = useCallback(({ delta }: DragMoveEvent) => {
+    setOffsetLeft(delta.x);
+  }, []);
+
+  const handleDragOver = useCallback(({ over }: DragOverEvent) => {
+    setOverId((over?.id as string) ?? null);
+  }, []);
+
+  const handleDragEnd = useCallback(
+    ({ active, over }: DragEndEvent) => {
+      resetState();
+
+      if (projected && over && scene) {
+        const { depth, parentId } = projected;
+        const clonedItems: FlattenedItem[] = JSON.parse(
+          JSON.stringify(flattenTree(scene.objects)),
+        );
+        const overIndex = clonedItems.findIndex(({ id }) => id === over.id);
+        const activeIndex = clonedItems.findIndex(({ id }) => id === active.id);
+        const activeTreeItem = clonedItems[activeIndex];
+
+        clonedItems[activeIndex] = { ...activeTreeItem, depth, parentId };
+
+        const sortedItems = arrayMove(clonedItems, activeIndex, overIndex);
+        const newItems = buildTree(sortedItems);
+
+        setCurrentScene({ ...scene, objects: newItems });
+      }
+    },
+    [projected, scene, setCurrentScene],
+  );
+
+  const handleDragCancel = useCallback(() => {
+    resetState();
+  }, []);
+
+  const resetState = useCallback(() => {
+    setOverId(null);
+    setActiveId(null);
+    setOffsetLeft(0);
+    document.body.style.setProperty("cursor", "");
+  }, []);
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (!selectedObjects.length) return;
+
+      const activeElement = document.activeElement;
+      const isTreeFocused = activeElement?.closest("[data-scene-tree]");
+
+      if (!isTreeFocused) return;
+
+      // Don't handle delete/backspace if user is typing in an input field
+      if (
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          (activeElement as HTMLElement).isContentEditable === true)
+      ) {
+        return;
+      }
+
+      switch (event.key) {
+        case "Delete":
+        case "Backspace":
+          selectedObjects.forEach((id) => handleDelete(id));
+          break;
+        case "c":
+          if (event.ctrlKey || event.metaKey) {
+            const firstObject = flattenedItems.find((item) =>
+              selectedObjects.includes(item.id),
+            );
+            if (firstObject) handleCopy(firstObject.object);
+          }
+          break;
+        case "x":
+          if (event.ctrlKey || event.metaKey) {
+            const firstObject = flattenedItems.find((item) =>
+              selectedObjects.includes(item.id),
+            );
+            if (firstObject) handleCut(firstObject.object);
+          }
+          break;
+        case "v":
+          if (event.ctrlKey || event.metaKey) {
+            handlePaste();
+          }
+          break;
+        case "d":
+          if (event.ctrlKey || event.metaKey) {
+            event.preventDefault();
+            const firstObject = flattenedItems.find((item) =>
+              selectedObjects.includes(item.id),
+            );
+            if (firstObject) handleDuplicate(firstObject.object);
+          }
+          break;
+      }
+    },
+    [
+      selectedObjects,
+      flattenedItems,
+      handleDelete,
+      handleCopy,
+      handleCut,
+      handlePaste,
+      handleDuplicate,
+    ],
+  );
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   if (!scene) {
     return (
@@ -69,90 +349,90 @@ export default function SceneTree({
   }
 
   return (
-    <div className="space-y-1 p-4">
+    <div className="space-y-1 p-4" data-scene-tree tabIndex={0}>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-muted-foreground text-sm font-medium">
           Scene Objects
         </h3>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-              <Plus className="h-4 w-4" />
-              <span className="sr-only">Add object</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Add Object</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-
-            {menuCategories.map((category) => {
-              const categoryTemplates = gameObjectTemplates.filter((t) =>
-                t.template.tags.includes(category.id),
-              );
-
-              if (categoryTemplates.length === 0) return null;
-
-              return (
-                <DropdownMenuSub key={category.id}>
-                  <DropdownMenuSubTrigger className="flex items-center gap-2">
-                    <span
-                      className={`h-2 w-2 rounded-full ${category.color.replace("text-", "bg-")}`}
-                    />
-                    <span>{category.name}</span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="w-64 max-h-[300px] overflow-y-auto">
-                    <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-                      {category.description}
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {categoryTemplates.map((template) => {
-                      const Icon = template.icon;
-                      return (
-                        <DropdownMenuItem
-                          key={template.id}
-                          onClick={() => handleAddObject(template)}
-                          className="flex cursor-pointer flex-col items-start gap-1 p-3"
-                        >
-                          <div className="flex w-full items-center gap-2">
-                            <Icon className={`h-4 w-4 ${category.color}`} />
-                            <span className="font-medium">{template.name}</span>
-                          </div>
-                          <span className="text-muted-foreground text-xs">
-                            {template.description}
-                          </span>
-                        </DropdownMenuItem>
-                      );
-                    })}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <CreateObjectMenu onAddObject={handleAddObject} />
       </div>
 
-      {scene.objects.map((obj) => (
-        <div
-          key={obj.id}
-          className={`cursor-pointer rounded-xl px-3 py-2 text-sm transition-colors ${
-            selectedObjects.includes(obj.id)
-              ? "bg-primary/20 text-white"
-              : "hover:bg-muted"
-          }`}
-          onClick={() => onSelectObject(obj.id)}
+      <SceneTreeSearch
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        measuring={measuring}
+        onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <SortableContext
+          items={sortedIds}
+          strategy={verticalListSortingStrategy}
         >
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-xs">
-              {obj.visible ? (
-                <EyeIcon className="h-4 w-4" />
-              ) : (
-                <EyeOffIcon className="h-4 w-4" />
-              )}
-            </span>
-            <span>{obj.name}</span>
+          <div className="space-y-1 select-none">
+            {flattenedItems.map(({ id, object, depth }) => (
+              <SceneTreeNode
+                key={id}
+                id={id}
+                object={object}
+                depth={depth}
+                selectedObjects={selectedObjects}
+                onSelectObject={onSelectObject}
+                onToggleVisibility={handleToggleVisibility}
+                onDuplicate={handleDuplicate}
+                onCopy={handleCopy}
+                onCut={handleCut}
+                onPaste={handlePaste}
+                onDelete={handleDelete}
+                onToggleLock={handleToggleLock}
+                onFocusCamera={handleFocusCamera}
+                onCollapse={handleCollapse}
+                canPaste={!!clipboard}
+                isLocked={lockedObjects.has(id)}
+                isDragging={activeId === id}
+                isCollapsed={collapsedItems.has(id)}
+                indentationWidth={indentationWidth}
+                projected={projected}
+                isOverParent={projected && projected.parentId === id && projected.depth > depth}
+              />
+            ))}
           </div>
+        </SortableContext>
+
+        {createPortal(
+          <DragOverlay dropAnimation={defaultDropAnimation}>
+            {activeId && activeItem ? (
+              <div className="bg-background pointer-events-none rounded-lg border px-3 py-1.5 text-sm opacity-90 shadow-lg">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{activeItem.object.name}</span>
+                </div>
+              </div>
+            ) : null}
+          </DragOverlay>,
+          document.body,
+        )}
+      </DndContext>
+
+      {flattenedItems.length === 0 && searchQuery && (
+        <div className="text-muted-foreground py-4 text-center text-sm">
+          No objects match "{searchQuery}"
         </div>
-      ))}
+      )}
+
+      {flattenedItems.length === 0 &&
+        !searchQuery &&
+        scene.objects.length === 0 && (
+          <div className="text-muted-foreground py-4 text-center text-sm">
+            No objects in scene. Use the + button to add objects.
+          </div>
+        )}
     </div>
   );
 }

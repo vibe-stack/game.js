@@ -17,7 +17,7 @@ export default function RightPanel({ scene, selectedObjects }: RightPanelProps) 
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="inspector" className="p-0 m-0">
+        <TabsContent value="inspector" className="p-0 m-0 select-none">
           <ObjectInspector 
             scene={scene}
             selectedObjects={selectedObjects}
