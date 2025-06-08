@@ -152,6 +152,7 @@ interface ProjectAPI {
   createScene: (projectPath: string, sceneName: string) => Promise<GameScene>;
   deleteScene: (projectPath: string, sceneName: string) => Promise<void>;
   duplicateScene: (projectPath: string, sceneName: string, newName: string) => Promise<GameScene>;
+  listScenes: (projectPath: string) => Promise<string[]>;
   
   // Asset Management
   importAsset: (projectPath: string, assetPath: string) => Promise<AssetReference>;

@@ -19,13 +19,12 @@ export default function FloatingToolbar({
   onOpenFolder,
   onPlay,
 }: FloatingToolbarProps) {
-  const { currentProject, currentScene } = useEditorStore();
+  const { currentProject } = useEditorStore();
 
   return (
     <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 w-full flex items-center justify-between px-4 gap-2">
       <ProjectInfoToolbar
         projectName={currentProject?.name}
-        sceneName={currentScene?.name}
         onHome={onHome}
       />
 

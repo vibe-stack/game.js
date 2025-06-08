@@ -28,6 +28,8 @@ export function exposeProjectContext() {
       ipcRenderer.invoke("project:delete-scene", projectPath, sceneName),
     duplicateScene: (projectPath: string, sceneName: string, newName: string) => 
       ipcRenderer.invoke("project:duplicate-scene", projectPath, sceneName, newName),
+    listScenes: (projectPath: string) => 
+      ipcRenderer.invoke("project:list-scenes", projectPath),
     
     // Asset Management
     importAsset: (projectPath: string, assetPath: string) => 

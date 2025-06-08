@@ -40,6 +40,9 @@ interface EditorState {
   
   // Viewport
   setViewportCamera: (camera: Partial<EditorState['viewportCamera']>) => void;
+  
+  // Scene switching
+  switchScene: (sceneName: string) => Promise<void>;
 }
 
 const useEditorStore = create<EditorState>()(
@@ -65,6 +68,27 @@ const useEditorStore = create<EditorState>()(
       currentScene: scene,
       selectedObjects: [] // Clear selection when changing scenes
     }),
+    
+    // Scene switching
+    switchScene: async (sceneName: string) => {
+      const { currentProject } = useEditorStore.getState();
+      if (!currentProject) return;
+
+      try {
+        const scene = await window.projectAPI.loadScene(currentProject.path, sceneName);
+        set({ 
+          currentScene: scene,
+          selectedObjects: []
+        });
+        
+        // Update project's current scene
+        const updatedProject = { ...currentProject, currentScene: sceneName };
+        await window.projectAPI.saveProject(updatedProject);
+        set({ currentProject: updatedProject });
+      } catch (error) {
+        console.error('Failed to switch scene:', error);
+      }
+    },
     
     // Selection Actions
     setSelectedObjects: (objectIds) => set({ selectedObjects: objectIds }),
