@@ -77,22 +77,6 @@ export const useSceneSyncStore = create<SceneSyncStore>(() => ({
               }
               
               const convertThreeJSObjectToSceneObject = (obj: ThreeJSObject): SceneObject => {
-                let position: [number, number, number] = [0, 0, 0];
-                let rotation: [number, number, number] = [0, 0, 0];
-                let scale: [number, number, number] = [1, 1, 1];
-                
-                if (obj.matrix && Array.isArray(obj.matrix) && obj.matrix.length === 16) {
-                  const m = obj.matrix;
-                  position = [m[12], m[13], m[14]];
-                  
-                  const sx = Math.sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
-                  const sy = Math.sqrt(m[4] * m[4] + m[5] * m[5] + m[6] * m[6]);
-                  const sz = Math.sqrt(m[8] * m[8] + m[9] * m[9] + m[10] * m[10]);
-                  scale = [sx, sy, sz];
-                  
-                  rotation = [0, 0, 0];
-                }
-                
                 let material: { color?: number; opacity?: number; transparent?: boolean } | undefined;
                 if (obj.material && editorData.scene.materials) {
                   const materialData = (editorData.scene.materials as ThreeJSMaterial[]).find((mat) => mat.uuid === obj.material);
@@ -110,9 +94,7 @@ export const useSceneSyncStore = create<SceneSyncStore>(() => ({
                   name: obj.name || obj.uuid || 'Unnamed',
                   type: obj.type || 'Object3D',
                   visible: obj.visible !== false,
-                  position,
-                  rotation,
-                  scale,
+                  matrix: obj.matrix,
                   material
                 };
                 
@@ -134,9 +116,7 @@ export const useSceneSyncStore = create<SceneSyncStore>(() => ({
                   name: (objectData.name as string) || key,
                   type: (objectData.type as string) || 'Object3D',
                   visible: objectData.visible !== false,
-                  position: (objectData.position as [number, number, number]) || [0, 0, 0],
-                  rotation: (objectData.rotation as [number, number, number]) || [0, 0, 0],
-                  scale: (objectData.scale as [number, number, number]) || [1, 1, 1],
+                  matrix: (objectData.matrix as number[]) || [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
                   material: (objectData.material as { color?: number; opacity?: number; transparent?: boolean }) || undefined
                 });
               });
@@ -144,6 +124,7 @@ export const useSceneSyncStore = create<SceneSyncStore>(() => ({
             
             const { useSceneObjectsStore } = await import('./scene-objects-store');
             useSceneObjectsStore.getState().setSceneObjects(objects);
+            useSceneObjectsStore.getState().setSceneData(editorData);
             return;
           }
         }
@@ -209,9 +190,7 @@ export const useSceneSyncStore = create<SceneSyncStore>(() => ({
                 name: (objectData.name as string) || key,
                 type: (objectData.type as string) || 'Object3D',
                 visible: objectData.visible !== false,
-                position: (objectData.position as [number, number, number]) || [0, 0, 0],
-                rotation: (objectData.rotation as [number, number, number]) || [0, 0, 0],
-                scale: (objectData.scale as [number, number, number]) || [1, 1, 1],
+                matrix: (objectData.matrix as number[]) || [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
                 material: objectData.material as { color?: number; opacity?: number; transparent?: boolean } | undefined
               });
             });

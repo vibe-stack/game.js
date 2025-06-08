@@ -158,6 +158,7 @@ export default function gameJSPlugin(
       apply: "serve", // Only apply during dev server
       configureServer(server) {
         let debounceTimers = new Map();
+        let pendingUpdates = new Map<string, any[]>(); // Store batched updates per scene
         let watcher: any | null = null;
 
         // Pre-populate the cache for hot-reloading
@@ -207,6 +208,7 @@ export default function gameJSPlugin(
 
           ws.on("message", (data: Buffer) => {
             try {
+              const startTime = Date.now();
               const update = JSON.parse(data.toString());
 
               // Only process property-update messages, ignore connection-test and other message types
@@ -225,18 +227,16 @@ export default function gameJSPlugin(
                 event: "property-update",
                 data: update
               });
-
-              // Temporarily disable cached scene update
-              // Send cached scene update for non-active scenes
-              // server.ws.send({
-              //   type: "custom",
-              //   event: "cached-scene-update",
-              //   data: update
-              // });
+              
+              const immediateTime = Date.now() - startTime;
+              console.log(`⚡ Immediate update sent in ${immediateTime}ms for ${update.property}`);
 
               // Handle debounced file saving - only for property updates with scenePath
+              // This creates a dual-path system:
+              // 1. Immediate visual feedback via WebSocket (0-10ms)
+              // 2. Batched file persistence for hot reload (100ms debounced)
               if (!update.temporary && update.scenePath && update.property) {
-                debouncedSave(update, debounceTimers);
+                debouncedSave(update, debounceTimers, pendingUpdates);
               }
             } catch (error) {
               console.error("Invalid WebSocket message:", error);
@@ -359,9 +359,16 @@ export default function gameJSPlugin(
 
         diffs.forEach((diffItem: Difference) => {
           const path = diffItem.path.join('.');
-          if (path.startsWith('scene.')) {
+          // Treat scene object property updates (like matrix changes) as simple property updates
+          // Only treat structural scene changes (adding/removing entire objects) as scene reloads
+          if (path.startsWith('scene.') && (path.includes('.children.') && (path.endsWith('.matrix') || path.endsWith('.name') || path.endsWith('.visible')))) {
+            // Scene object property updates should trigger property-update events
+            simpleDiffs.push(diffItem);
+          } else if (path.startsWith('scene.')) {
+            // Structural scene changes should trigger scene-reload events
             sceneDiffs.push(diffItem);
           } else {
+            // Regular @Editable properties
             simpleDiffs.push(diffItem);
           }
         });
@@ -528,31 +535,59 @@ export default router;
 
   function debouncedSave(
     update: any,
-    debounceTimers: Map<string, NodeJS.Timeout>
+    debounceTimers: Map<string, NodeJS.Timeout>,
+    pendingUpdates: Map<string, any[]>
   ) {
-    const key = `${update.scenePath}-${update.property}`;
+    const sceneKey = update.scenePath;
 
-    // Clear existing timer
-    if (debounceTimers.has(key)) {
-      clearTimeout(debounceTimers.get(key)!);
+    // Add this update to the pending updates for this scene
+    if (!pendingUpdates.has(sceneKey)) {
+      pendingUpdates.set(sceneKey, []);
+    }
+    
+    // Check if this property already exists in pending updates and replace it
+    const existingUpdates = pendingUpdates.get(sceneKey)!;
+    const existingIndex = existingUpdates.findIndex(u => u.property === update.property);
+    
+    if (existingIndex >= 0) {
+      // Check if the value actually changed to avoid unnecessary file writes
+      const existingUpdate = existingUpdates[existingIndex];
+      if (JSON.stringify(existingUpdate.value) === JSON.stringify(update.value)) {
+        // Value hasn't changed, no need to update
+        return;
+      }
+      // Replace existing update for this property
+      existingUpdates[existingIndex] = update;
+    } else {
+      // Add new update
+      existingUpdates.push(update);
     }
 
-    // Set new timer - only save after 500ms of no updates
-    const timer = setTimeout(() => {
-      savePropertyToFile(update);
-      debounceTimers.delete(key);
-    }, 500);
+    // Clear existing timer for this scene
+    if (debounceTimers.has(sceneKey)) {
+      clearTimeout(debounceTimers.get(sceneKey)!);
+    }
 
-    debounceTimers.set(key, timer);
+    // Set new timer - reduced to 100ms for faster updates
+    const timer = setTimeout(() => {
+      const updates = pendingUpdates.get(sceneKey) || [];
+      if (updates.length > 0) {
+        saveBatchedPropertiesToFile(sceneKey, updates);
+        pendingUpdates.delete(sceneKey);
+      }
+      debounceTimers.delete(sceneKey);
+    }, 10);
+
+    debounceTimers.set(sceneKey, timer);
   }
 
-  function savePropertyToFile(update: any) {
+  function saveBatchedPropertiesToFile(scenePath: string, updates: any[]) {
     // Safety check for required properties
-    if (!update.scenePath || !update.property) {
+    if (!scenePath || updates.length === 0) {
       return;
     }
 
-    const editorJsonPath = update.scenePath.replace(
+    const editorJsonPath = scenePath.replace(
       /\.(ts|js)$/,
       ".editor.json"
     );
@@ -570,8 +605,10 @@ export default router;
       return;
     }
 
-    // Set the property value
-    setNestedProperty(editorData, update.property, update.value);
+    // Apply all batched updates
+    updates.forEach((update) => {
+      setNestedProperty(editorData, update.property, update.value);
+    });
 
     // Ensure the directory exists before writing
     const dir = path.dirname(editorJsonPath);
@@ -583,8 +620,11 @@ export default router;
     try {
       fs.writeFileSync(editorJsonPath, JSON.stringify(editorData, null, 2));
 
-      // Update cache to prevent circular updates
-      editorFileCache.set(path.resolve(editorJsonPath), editorData);
+      // DON'T update cache here - let the file watcher handle it
+      // This allows the watcher to detect changes and trigger hot reload properly
+      // editorFileCache.set(path.resolve(editorJsonPath), editorData);
+      
+      console.log(`💾 Saved ${updates.length} batched updates to ${path.basename(editorJsonPath)}`);
     } catch (error) {
       console.error(`Failed to save editor data to ${editorJsonPath}:`, error);
     }
