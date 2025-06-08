@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, ChevronRight, EyeIcon, EyeOffIcon } from "lucide-react";
+import { Plus, EyeIcon, EyeOffIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,

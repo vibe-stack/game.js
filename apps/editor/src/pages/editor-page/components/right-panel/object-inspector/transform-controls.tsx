@@ -12,7 +12,11 @@ export default function TransformControls({ transform, onUpdate }: TransformCont
   };
 
   const handleRotationChange = (rotation: Vector3) => {
-    onUpdate({ rotation });
+    onUpdate({ rotation: {
+      x: d2r(rotation.x),
+      y: d2r(rotation.y),
+      z: d2r(rotation.z),
+    } });
   };
 
   const handleScaleChange = (scale: Vector3) => {
@@ -36,11 +40,16 @@ export default function TransformControls({ transform, onUpdate }: TransformCont
 
         <Vector3Controls
           label="Rotation"
-          value={transform.rotation}
+          value={{
+            // 
+            x: r2d(transform.rotation.x),
+            y: r2d(transform.rotation.y),
+            z: r2d(transform.rotation.z),
+          }}
           onChange={handleRotationChange}
-          step={0.01}
-          precision={3}
-          suffix="rad"
+          step={1}
+          precision={0}
+          suffix="°"
         />
 
         <Vector3Controls
@@ -55,3 +64,11 @@ export default function TransformControls({ transform, onUpdate }: TransformCont
     </div>
   );
 } 
+
+const r2d = (deg: number) => {
+  return (deg * 180) / Math.PI;
+}
+
+const d2r = (rad: number) => {
+  return (rad * Math.PI) / 180;
+}
