@@ -25,6 +25,7 @@ export default function RigidBodyRenderer({
     registerRigidBody,
     unregisterRigidBody,
     updateTransformFromPhysics,
+    forceDebugUpdate,
   } = usePhysics();
   const rigidBodyRef = useRef<RapierRigidBody>(null);
   const [isRegistered, setIsRegistered] = useState(false);
@@ -52,6 +53,9 @@ export default function RigidBodyRenderer({
       registerRigidBody(objectId, rigidBody);
       setIsRegistered(true);
 
+      // Force debug renderer update to show the initial position
+      forceDebugUpdate();
+
       return () => {
         if (isRegistered) {
           unregisterRigidBody(objectId);
@@ -66,6 +70,7 @@ export default function RigidBodyRenderer({
     rigidBodyComponent.enabled,
     transform,
     isRegistered,
+    forceDebugUpdate,
   ]);
 
   // Update transforms when physics is not playing
@@ -92,6 +97,9 @@ export default function RigidBodyRenderer({
       // Reset velocities when manually positioning
       rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
       rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+
+      // Force debug renderer update to show the new position
+      forceDebugUpdate();
     } catch (error) {
       console.warn("Failed to update rigid body transform:", error);
     }
@@ -108,6 +116,7 @@ export default function RigidBodyRenderer({
     physicsState,
     isRegistered,
     objectId,
+    forceDebugUpdate,
   ]);
 
   // Handle physics updates using useFrame

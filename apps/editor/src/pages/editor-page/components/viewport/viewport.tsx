@@ -48,7 +48,7 @@ export default function Viewport({
   onSelectObject,
   onPhysicsCallbacks,
 }: ViewportProps) {
-  const { updateObjectTransform } = useEditorStore();
+  const { updateObjectTransform, physicsState } = useEditorStore();
 
   if (!scene) {
     return (
@@ -81,64 +81,8 @@ export default function Viewport({
     ? getShadowType(scene.runtimeConfig.shadowType)
     : false;
 
-  const renderLightHelpers = () => {
-    if (!scene.editorConfig.showLights) return null;
-    
-    return scene.objects
-      .filter(obj => obj.components.some(comp => comp.type.includes('Light')))
-      .map(light => {
-        const lightComponent = light.components.find(comp => comp.type.includes('Light'));
-        if (!lightComponent) return null;
-
-        const position = [light.transform.position.x, light.transform.position.y, light.transform.position.z] as [number, number, number];
-        
-        switch (lightComponent.type) {
-          case 'DirectionalLight':
-            return (
-              <mesh key={`${light.id}-helper`} position={position}>
-                <coneGeometry args={[0.2, 0.5, 8]} />
-                <meshBasicMaterial color="#ffff00" wireframe />
-              </mesh>
-            );
-          case 'PointLight':
-            return (
-              <mesh key={`${light.id}-helper`} position={position}>
-                <sphereGeometry args={[0.2, 8, 6]} />
-                <meshBasicMaterial color="#ffff00" wireframe />
-              </mesh>
-            );
-          case 'SpotLight':
-            return (
-              <mesh key={`${light.id}-helper`} position={position}>
-                <coneGeometry args={[0.3, 0.6, 8]} />
-                <meshBasicMaterial color="#ffff00" wireframe />
-              </mesh>
-            );
-          default:
-            return null;
-        }
-      });
-  };
-
-  const renderCameraHelpers = () => {
-    if (!scene.editorConfig.showCameras) return null;
-    
-    return scene.objects
-      .filter(obj => obj.components.some(comp => comp.type.includes('Camera')))
-      .map(camera => (
-        <mesh 
-          key={`${camera.id}-helper`}
-          position={[
-            camera.transform.position.x,
-            camera.transform.position.y,
-            camera.transform.position.z
-          ]}
-        >
-          <boxGeometry args={[0.5, 0.3, 0.8]} />
-          <meshBasicMaterial color="#00ffff" wireframe />
-        </mesh>
-      ));
-  };
+  // Hide helpers when physics is playing
+  const shouldShowHelpers = physicsState !== 'playing';
 
   return (
     <div
@@ -154,7 +98,11 @@ export default function Viewport({
           toneMappingExposure: scene.runtimeConfig.exposure,
         }}
       >
-        <PhysicsProvider scene={scene} onObjectTransformUpdate={updateObjectTransform}>
+        <PhysicsProvider 
+          scene={scene} 
+          onObjectTransformUpdate={updateObjectTransform}
+          debugEnabled={shouldShowHelpers && scene.physicsWorld.debugRender?.enabled}
+        >
           <PhysicsCallbackProvider onPhysicsCallbacks={onPhysicsCallbacks} />
           <SceneEffects scene={scene} />
           
@@ -184,14 +132,8 @@ export default function Viewport({
             ))}
           </group>
 
-          {/* Light Helpers */}
-          {renderLightHelpers()}
-
-          {/* Camera Helpers */}
-          {renderCameraHelpers()}
-
           {/* Grid */}
-          {scene.editorConfig.showHelperGrid && (
+          {shouldShowHelpers && scene.editorConfig.showHelperGrid && (
             <Grid
               args={[
                 scene.editorConfig.gridSize * 20,

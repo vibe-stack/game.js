@@ -1,4 +1,4 @@
-import React, { forwardRef, useRef, useMemo } from "react";
+import React, { forwardRef, useRef, useCallback } from "react";
 import { PivotControls } from "@react-three/drei";
 import * as THREE from "three";
 import { renderComponent } from "./component-renderers";
@@ -41,7 +41,54 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
   const { position, rotation, scale } = transform;
   const isSelected = selectedObjects.includes(obj.id);
   const groupRef = useRef<THREE.Group>(null);
-  const { editorMode, updateObjectTransform } = useEditorStore();
+  const { editorMode, updateObjectTransform, physicsState } = useEditorStore();
+  
+  // Use a ref to maintain transform matrix stability
+  const matrixRef = useRef<THREE.Matrix4>(new THREE.Matrix4());
+  const isManipulatingRef = useRef(false);
+  const lastTransformRef = useRef<Transform>(transform);
+
+  // Update matrix when transform changes from external sources (not during manipulation)
+  React.useLayoutEffect(() => {
+    // Check if transform has actually changed
+    const lastTransform = lastTransformRef.current;
+    const hasChanged = 
+      lastTransform.position.x !== position.x ||
+      lastTransform.position.y !== position.y ||
+      lastTransform.position.z !== position.z ||
+      lastTransform.rotation.x !== rotation.x ||
+      lastTransform.rotation.y !== rotation.y ||
+      lastTransform.rotation.z !== rotation.z ||
+      lastTransform.scale.x !== scale.x ||
+      lastTransform.scale.y !== scale.y ||
+      lastTransform.scale.z !== scale.z;
+
+    // Always update matrix when transform changes or when pivot controls become active
+    if (hasChanged && !isManipulatingRef.current) {
+      const pos = new THREE.Vector3(position.x, position.y, position.z);
+      const rot = new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ');
+      const scl = new THREE.Vector3(scale.x, scale.y, scale.z);
+      const quaternion = new THREE.Quaternion().setFromEuler(rot);
+      
+      matrixRef.current.compose(pos, quaternion, scl);
+      lastTransformRef.current = { ...transform };
+    }
+  }, [position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, scale.x, scale.y, scale.z, transform]);
+
+  // Ensure matrix is properly initialized when pivot controls become active
+  React.useLayoutEffect(() => {
+    if (isSelected && editorMode !== "select" && !isManipulatingRef.current) {
+      const pos = new THREE.Vector3(position.x, position.y, position.z);
+      const rot = new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ');
+      const scl = new THREE.Vector3(scale.x, scale.y, scale.z);
+      const quaternion = new THREE.Quaternion().setFromEuler(rot);
+      
+      matrixRef.current.compose(pos, quaternion, scl);
+    }
+  }, [isSelected, editorMode, position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, scale.x, scale.y, scale.z]);
+
+  // Hide helpers when physics is playing
+  const shouldShowHelpers = isSelected && physicsState !== 'playing';
 
   if (!visible) return null;
 
@@ -53,20 +100,15 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
   // Check if this object has physics components
   const hasRigidBody = components.some(comp => comp.type === 'rigidBody' && comp.enabled);
 
-  // Create initial matrix from current transform values
-  const initialMatrix = useMemo(() => {
-    const matrix = new THREE.Matrix4();
-    const pos = new THREE.Vector3(position.x, position.y, position.z);
-    const rot = new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ');
-    const scl = new THREE.Vector3(scale.x, scale.y, scale.z);
-    const quaternion = new THREE.Quaternion().setFromEuler(rot);
-    
-    matrix.compose(pos, quaternion, scl);
-    return matrix;
-  }, [position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, scale.x, scale.y, scale.z]);
+  const handleDragStart = useCallback(() => {
+    isManipulatingRef.current = true;
+  }, []);
 
-  const handleTransformChange = (local: THREE.Matrix4) => {
-    // Extract position, rotation, and scale from the local matrix
+  const handleDrag = useCallback((local: THREE.Matrix4) => {
+    // Update the matrix ref for smooth manipulation
+    matrixRef.current.copy(local);
+    
+    // Extract transform components from the local matrix
     const position = new THREE.Vector3();
     const quaternion = new THREE.Quaternion();
     const scale = new THREE.Vector3();
@@ -75,13 +117,17 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
     // Convert quaternion to euler rotation with consistent rotation order
     const euler = new THREE.Euler().setFromQuaternion(quaternion, 'XYZ');
     
-    // Update the object's transform - this will flow through to physics if applicable
+    // Update the object's transform
     updateObjectTransform(obj.id, {
       position: { x: position.x, y: position.y, z: position.z },
       rotation: { x: euler.x, y: euler.y, z: euler.z },
       scale: { x: scale.x, y: scale.y, z: scale.z }
     });
-  };
+  }, [obj.id, updateObjectTransform]);
+
+  const handleDragEnd = useCallback(() => {
+    isManipulatingRef.current = false;
+  }, []);
 
   const getControlSettings = () => {
     switch (editorMode) {
@@ -116,14 +162,16 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
     }
   };
 
-  // Only apply transform to group if object doesn't have physics
+  // Only apply transform to group if object doesn't have physics AND is not being controlled by PivotControls
+  const isControlledByPivot = isSelected && editorMode !== "select";
   const groupProps = {
     ref: isSelected ? ref || groupRef : groupRef,
     onClick: handleClick,
     // Apply transforms to group only when:
     // 1. Object doesn't have a rigid body (non-physics objects need group transforms)
-    // Note: PivotControls handle their own positioning via the matrix prop
-    ...(!hasRigidBody && {
+    // 2. Object is NOT being controlled by PivotControls (which handles transforms via matrix)
+    // For physics objects with pivot controls active, treat like non-physics with pivot controls
+    ...(!isControlledByPivot && !hasRigidBody && {
       position: [position.x, position.y, position.z] as [number, number, number],
       rotation: [rotation.x, rotation.y, rotation.z] as [number, number, number],
       scale: [scale.x, scale.y, scale.z] as [number, number, number],
@@ -136,7 +184,13 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
 
   const groupContent = (
     <group {...groupProps}>
-      {renderComponents(effectiveComponents, children, selectedObjects, onSelect, isSelected, renderType, obj.id, transform)}
+      {renderComponents(effectiveComponents, children, selectedObjects, onSelect, shouldShowHelpers, renderType, obj.id, isControlledByPivot ? {
+        // When controlled by PivotControls, pass zeroed transform to avoid double positioning
+        // PivotControls handles all positioning via matrix
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 }
+      } : transform, editorMode)}
     </group>
   );
 
@@ -144,14 +198,13 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
   if (isSelected && editorMode !== "select") {
     const controlSettings = getControlSettings();
     
-    // PivotControls works for both physics and non-physics objects
-    // For physics objects: transforms flow GameObject -> RigidBody -> Physics World
-    // For non-physics objects: transforms flow GameObject -> Group props
     return (
       <PivotControls
-        matrix={initialMatrix}
+        matrix={matrixRef.current}
         autoTransform={false}
-        onDrag={handleTransformChange}
+        onDragStart={handleDragStart}
+        onDrag={handleDrag}
+        onDragEnd={handleDragEnd}
         {...controlSettings}
         scale={70}
         lineWidth={2}
@@ -200,8 +253,9 @@ function renderComponents(
   onSelect: (id: string) => void,
   showHelpers: boolean = false,
   renderType: string = "solid",
-  objectId?: string,
-  transform?: Transform
+  objectId: string | undefined = undefined,
+  transform: Transform | undefined = undefined,
+  editorMode: string = "select"
 ): React.ReactElement {
   const childElements = children.map((child) => (
     <SceneObject
@@ -221,6 +275,10 @@ function renderComponents(
   // Filter out physics components for regular rendering
   const regularComponents = components.filter(comp => !['rigidBody', 'collider', 'joint'].includes(comp.type)) as GameObjectComponent[];
 
+  // Check if object is selected and pivot controls are active
+  const isSelected = objectId ? selectedObjects.includes(objectId) : false;
+  const isPivotControlsActive = isSelected && editorMode !== "select";
+
   // Render visual content (without physics)
   let visualContent = regularComponents.reduce((acc, component) => {
     const enhancedComponent = {
@@ -233,8 +291,8 @@ function renderComponents(
     return renderComponent(enhancedComponent, acc, showHelpers);
   }, <>{childElements}</> as React.ReactElement);
 
-  // If there's a rigid body, wrap everything in RigidBodyRenderer and pass colliders separately
-  if (rigidBodyComp && objectId && transform) {
+  // If there's a rigid body AND pivot controls are NOT active, wrap everything in RigidBodyRenderer
+  if (rigidBodyComp && objectId && transform && !isPivotControlsActive) {
     return (
       <RigidBodyRenderer
         objectId={objectId}
@@ -247,18 +305,28 @@ function renderComponents(
     );
   }
 
+  // If pivot controls are active, don't render physics bodies to avoid conflicts
+  // Just render the visual content directly
+  if (isPivotControlsActive && rigidBodyComp) {
+    // When pivot controls are active, render visual content without physics
+    return visualContent;
+  }
+
   // If no rigid body but has colliders, wrap visual content with colliders
   // (This case is for static colliders without rigid bodies)
-  colliderComponents.forEach(colliderComponent => {
-    visualContent = (
-      <ColliderRenderer 
-        colliderComponent={colliderComponent}
-        transform={!rigidBodyComp ? transform : undefined}
-      >
-        {visualContent}
-      </ColliderRenderer>
-    );
-  });
+  // Also skip colliders when pivot controls are active to avoid conflicts
+  if (!isPivotControlsActive) {
+    colliderComponents.forEach(colliderComponent => {
+      visualContent = (
+        <ColliderRenderer 
+          colliderComponent={colliderComponent}
+          transform={!rigidBodyComp ? transform : undefined}
+        >
+          {visualContent}
+        </ColliderRenderer>
+      );
+    });
+  }
 
   // TODO: Handle joints - they need references to connected bodies
   // This is more complex and might need to be handled at a higher level

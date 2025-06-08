@@ -166,6 +166,33 @@ export default function MeshComponent({ component, onUpdate }: MeshComponentProp
               min={0}
               max={1}
             />
+
+            <div className="space-y-1">
+              <Label className="text-xs">Side</Label>
+              <Select
+                value={String(materialProps.side ?? 0)}
+                onValueChange={(value) => updateMaterialProp('side', parseInt(value))}
+              >
+                <SelectTrigger className="w-full h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">Front</SelectItem>
+                  <SelectItem value="1">Back</SelectItem>
+                  <SelectItem value="2">Double Side</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="wireframe"
+                checked={materialProps.wireframe || false}
+                onCheckedChange={(value: boolean) => updateMaterialProp('wireframe', value)}
+              />
+              <Label htmlFor="wireframe" className="text-xs">Wireframe</Label>
+            </div>
+
           </div>
         </div>
 

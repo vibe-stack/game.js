@@ -15,6 +15,7 @@ interface PhysicsContextType {
   registerRigidBody: (objectId: string, rigidBody: RapierRigidBody) => void;
   unregisterRigidBody: (objectId: string) => void;
   updateTransformFromPhysics: (objectId: string, position: Vector3, rotation: Vector3) => void;
+  forceDebugUpdate: () => void;
   isInitialized: boolean;
 }
 
@@ -24,6 +25,7 @@ interface PhysicsProviderProps {
   children: React.ReactNode;
   scene: GameScene;
   onObjectTransformUpdate: (objectId: string, transform: Partial<Transform>) => void;
+  debugEnabled?: boolean;
 }
 
 // Helper function to create default physics world config if missing
@@ -89,7 +91,7 @@ const validatePhysicsWorldConfig = (config: any): PhysicsWorldConfig => {
   };
 };
 
-export function PhysicsProvider({ children, scene, onObjectTransformUpdate }: PhysicsProviderProps) {
+export function PhysicsProvider({ children, scene, onObjectTransformUpdate, debugEnabled }: PhysicsProviderProps) {
   const [physicsState, setPhysicsState] = useState<PhysicsState>('stopped');
   
   // Memoize physics world config validation to prevent infinite re-renders
@@ -100,12 +102,15 @@ export function PhysicsProvider({ children, scene, onObjectTransformUpdate }: Ph
   // Control physics paused state
   const isPaused = physicsState !== 'playing';
 
+  // Use debugEnabled prop if provided, otherwise fall back to scene config
+  const shouldShowDebug = debugEnabled !== undefined ? debugEnabled : physicsWorldConfig.debugRender.enabled;
+
   return (
     <Physics
       gravity={[physicsWorldConfig.gravity.x, physicsWorldConfig.gravity.y, physicsWorldConfig.gravity.z]}
       timeStep={physicsWorldConfig.integrationParameters.dt}
       paused={isPaused}
-      debug={physicsWorldConfig.debugRender.enabled}
+      debug={shouldShowDebug}
       updateLoop="follow"
       interpolate={true}
       colliders={false}
@@ -137,6 +142,20 @@ function PhysicsInnerProvider({
   const rigidBodiesRef = useRef<Map<string, RapierRigidBody>>(new Map());
   const initialTransformsRef = useRef<Map<string, Transform>>(new Map());
   const isInitialized = world && rapier;
+
+  // Force update debug renderer - this is needed when objects are manually moved
+  // while physics simulation is not running
+  const forceDebugUpdate = useCallback(() => {
+    if (world && scene.physicsWorld.debugRender?.enabled && physicsState !== 'playing') {
+      try {
+        // Force a debug render update by calling the world's debug render
+        // This ensures the debug wireframes reflect the current rigid body positions
+        world.debugRender();
+      } catch {
+        // Silently ignore errors in debug rendering
+      }
+    }
+  }, [world, scene.physicsWorld.debugRender?.enabled, physicsState]);
 
   // Store initial transforms when simulation starts
   const storeInitialTransforms = useCallback(() => {
@@ -181,7 +200,10 @@ function PhysicsInnerProvider({
         }
       }
     });
-  }, [onObjectTransformUpdate]);
+    
+    // Force debug renderer update after restoring all transforms
+    forceDebugUpdate();
+  }, [onObjectTransformUpdate, forceDebugUpdate]);
 
   const play = useCallback(() => {
     if (!isInitialized) return;
@@ -234,6 +256,7 @@ function PhysicsInnerProvider({
     registerRigidBody,
     unregisterRigidBody,
     updateTransformFromPhysics,
+    forceDebugUpdate,
     isInitialized: !!isInitialized,
   };
 
