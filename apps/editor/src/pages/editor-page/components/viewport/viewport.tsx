@@ -1,9 +1,7 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Grid } from "@react-three/drei";
 import SceneObject from "./scene-object";
-import useEditorStore from "@/stores/editor-store";
-import GizmoOverlay from "./gizmo-overlay";
 
 interface ViewportProps {
   scene: GameScene | null;
@@ -16,27 +14,6 @@ export default function Viewport({
   selectedObjects,
   onSelectObject,
 }: ViewportProps) {
-  const { editorMode } = useEditorStore();
-
-  // Find the selected object in the scene
-  const selectedObject = useMemo(() => {
-    if (!scene || selectedObjects.length === 0) return null;
-
-    const findObjectById = (
-      objects: GameObject[],
-      id: string,
-    ): GameObject | null => {
-      for (const obj of objects) {
-        if (obj.id === id) return obj;
-        const found = findObjectById(obj.children, id);
-        if (found) return found;
-      }
-      return null;
-    };
-
-    return findObjectById(scene.objects, selectedObjects[0]);
-  }, [scene, selectedObjects]);
-
   if (!scene) {
     return (
       <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
@@ -75,14 +52,6 @@ export default function Viewport({
         )}
 
         <OrbitControls enablePan enableZoom enableRotate makeDefault />
-
-        {/* Gizmo for selected object */}
-        {selectedObject && editorMode !== "select" && (
-          <GizmoOverlay
-            selectedObject={selectedObject}
-            editorMode={editorMode}
-          />
-        )}
       </Canvas>
     </div>
   );

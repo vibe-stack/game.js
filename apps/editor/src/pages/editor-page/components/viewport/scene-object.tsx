@@ -1,5 +1,7 @@
 import React, { useRef, forwardRef } from "react";
+import { PivotControls } from "@react-three/drei";
 import { renderComponent } from "./component-renderers";
+import useEditorStore from "@/stores/editor-store";
 import * as THREE from "three";
 
 interface SceneObjectProps {
@@ -13,12 +15,64 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
   const { position, rotation, scale } = transform;
   const isSelected = selectedObjects.includes(obj.id);
   const groupRef = useRef<THREE.Group>(null);
+  const { editorMode, updateObjectTransform } = useEditorStore();
 
   if (!visible) return null;
 
   const handleClick = (event: React.MouseEvent) => {
     event.stopPropagation();
     onSelect(obj.id);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleTransformChange = (local: THREE.Matrix4, deltaLocal: THREE.Matrix4, world: THREE.Matrix4, deltaWorld: THREE.Matrix4) => {
+    // Extract position, rotation, and scale from the local matrix
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    local.decompose(position, quaternion, scale);
+    
+    // Convert quaternion to euler rotation
+    const euler = new THREE.Euler().setFromQuaternion(quaternion);
+    
+    updateObjectTransform(obj.id, {
+      position: { x: position.x, y: position.y, z: position.z },
+      rotation: { x: euler.x, y: euler.y, z: euler.z },
+      scale: { x: scale.x, y: scale.y, z: scale.z }
+    });
+  };
+
+  const getControlSettings = () => {
+    switch (editorMode) {
+      case "move":
+        return {
+          disableAxes: false,
+          disableSliders: false,
+          disableRotations: true,
+          disableScaling: true,
+        };
+      case "rotate":
+        return {
+          disableAxes: true,
+          disableSliders: true,
+          disableRotations: false,
+          disableScaling: true,
+        };
+      case "scale":
+        return {
+          disableAxes: false,
+          disableSliders: false,
+          disableRotations: true,
+          disableScaling: false,
+        };
+      default:
+        return {
+          disableAxes: true,
+          disableSliders: true,
+          disableRotations: true,
+          disableScaling: true,
+        };
+    }
   };
 
   const groupProps = {
@@ -33,11 +87,32 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
     ? components 
     : [createDefaultMeshComponent(isSelected)];
 
-  return (
+  const groupContent = (
     <group {...groupProps}>
       {renderComponents(effectiveComponents, children, selectedObjects, onSelect, isSelected)}
     </group>
   );
+
+  // Wrap selected objects with PivotControls when not in select mode
+  if (isSelected && editorMode !== "select") {
+    const controlSettings = getControlSettings();
+    
+    return (
+      <PivotControls
+        onDrag={handleTransformChange}
+        {...controlSettings}
+        scale={0.8}
+        lineWidth={2}
+        fixed={false}
+        annotations
+        depthTest={false}
+      >
+        {groupContent}
+      </PivotControls>
+    );
+  }
+
+  return groupContent;
 });
 
 SceneObject.displayName = "SceneObject";
