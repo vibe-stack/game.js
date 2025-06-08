@@ -233,7 +233,7 @@ const useEditorStore = create<EditorState>()(
     // Viewport Actions
     setViewportCamera: (camera) => set((state) => ({
       viewportCamera: { ...state.viewportCamera, ...camera }
-    }))
+    })),
   }))
 );
 

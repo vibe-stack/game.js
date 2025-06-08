@@ -17,9 +17,7 @@ export default function EditorPage() {
     currentProject,
     currentScene,
     selectedObjects,
-    editorMode,
     setCurrentScene,
-    setEditorMode,
     selectObject,
   } = useEditorStore();
 
@@ -120,14 +118,10 @@ export default function EditorPage() {
 
       {/* Floating Toolbar */}
       <FloatingToolbar
-        projectName={currentProject?.name}
-        sceneName={currentScene?.name}
         isSaving={isSaving}
-        editorMode={editorMode}
         onSave={saveScene}
         onHome={goHome}
         onOpenFolder={openProjectFolder}
-        onSetEditorMode={setEditorMode}
       />
 
       {/* Floating Left Panel */}

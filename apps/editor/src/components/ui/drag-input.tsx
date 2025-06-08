@@ -170,7 +170,7 @@ export function DragInput({
   }
 
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className={cn("flex items-center gap-1 w-full", className)}>
       {label && (
         <span className="text-xs text-zinc-400 w-3 flex-shrink-0">{label}</span>
       )}

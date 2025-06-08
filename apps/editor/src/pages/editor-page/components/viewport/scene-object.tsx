@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useRef, forwardRef } from "react";
 import { renderComponent } from "./component-renderers";
+import * as THREE from "three";
 
 interface SceneObjectProps {
   obj: GameObject;
@@ -7,10 +8,11 @@ interface SceneObjectProps {
   onSelect: (id: string) => void;
 }
 
-export default function SceneObject({ obj, selectedObjects, onSelect }: SceneObjectProps) {
+const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedObjects, onSelect }, ref) => {
   const { transform, components, children, visible } = obj;
   const { position, rotation, scale } = transform;
   const isSelected = selectedObjects.includes(obj.id);
+  const groupRef = useRef<THREE.Group>(null);
 
   if (!visible) return null;
 
@@ -20,6 +22,7 @@ export default function SceneObject({ obj, selectedObjects, onSelect }: SceneObj
   };
 
   const groupProps = {
+    ref: isSelected ? ref || groupRef : groupRef,
     position: [position.x, position.y, position.z] as [number, number, number],
     rotation: [rotation.x, rotation.y, rotation.z] as [number, number, number],
     scale: [scale.x, scale.y, scale.z] as [number, number, number],
@@ -35,7 +38,11 @@ export default function SceneObject({ obj, selectedObjects, onSelect }: SceneObj
       {renderComponents(effectiveComponents, children, selectedObjects, onSelect, isSelected)}
     </group>
   );
-}
+});
+
+SceneObject.displayName = "SceneObject";
+
+export default SceneObject;
 
 function createDefaultMeshComponent(isSelected: boolean): GameObjectComponent {
   return {
