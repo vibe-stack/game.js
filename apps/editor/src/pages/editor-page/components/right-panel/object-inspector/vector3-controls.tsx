@@ -47,6 +47,7 @@ export default function Vector3Controls({
           min={min}
           max={max}
           suffix={suffix}
+          compact
         />
         <DragInput
           label="Y"
@@ -57,6 +58,7 @@ export default function Vector3Controls({
           min={min}
           max={max}
           suffix={suffix}
+          compact
         />
         <DragInput
           label="Z"
@@ -67,6 +69,7 @@ export default function Vector3Controls({
           min={min}
           max={max}
           suffix={suffix}
+          compact
         />
       </div>
     </div>

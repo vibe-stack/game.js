@@ -147,13 +147,13 @@ export default function MeshComponent({ component, onUpdate }: MeshComponentProp
       </div>
 
       <div className="space-y-3">
-        <div>
+        <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Geometry</Label>
           <Select
             value={props.geometry || 'box'}
             onValueChange={(value) => updateProperty('geometry', value)}
           >
-            <SelectTrigger className="h-7 text-xs">
+            <SelectTrigger className="w-full h-7 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -166,34 +166,36 @@ export default function MeshComponent({ component, onUpdate }: MeshComponentProp
 
         {renderGeometryControls()}
 
-        <div className="space-y-2 max-w-full">
+        <div className="space-y-3">
           <Label className="text-xs text-muted-foreground">Material</Label>
           
-          <ColorInput
-            label="Color"
-            value={materialProps.color || '#ffffff'}
-            onChange={(value) => updateMaterialProp('color', value)}
-          />
+          <div className="space-y-2">
+            <ColorInput
+              label="Color"
+              value={materialProps.color || '#ffffff'}
+              onChange={(value) => updateMaterialProp('color', value)}
+            />
 
-          <DragInput
-            label="Metalness"
-            value={materialProps.metalness || 0}
-            onChange={(value) => updateMaterialProp('metalness', value)}
-            step={0.01}
-            precision={2}
-            min={0}
-            max={1}
-          />
+            <DragInput
+              label="Metalness"
+              value={materialProps.metalness || 0}
+              onChange={(value) => updateMaterialProp('metalness', value)}
+              step={0.01}
+              precision={2}
+              min={0}
+              max={1}
+            />
 
-          <DragInput
-            label="Roughness"
-            value={materialProps.roughness || 0.5}
-            onChange={(value) => updateMaterialProp('roughness', value)}
-            step={0.01}
-            precision={2}
-            min={0}
-            max={1}
-          />
+            <DragInput
+              label="Roughness"
+              value={materialProps.roughness || 0.5}
+              onChange={(value) => updateMaterialProp('roughness', value)}
+              step={0.01}
+              precision={2}
+              min={0}
+              max={1}
+            />
+          </div>
         </div>
 
         <div className="space-y-2">

@@ -21,7 +21,7 @@ export default function TransformControls({ transform, onUpdate }: TransformCont
 
   return (
     <div className="space-y-4">
-      <div className="border-b border-muted pb-2">
+      <div className="border-b border-muted pb-0">
         <h4 className="text-sm font-medium text-muted-foreground">Transform</h4>
       </div>
 

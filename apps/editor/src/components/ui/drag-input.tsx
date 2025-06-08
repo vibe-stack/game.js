@@ -12,6 +12,7 @@ interface DragInputProps {
   label?: string
   suffix?: string
   disabled?: boolean
+  compact?: boolean
 }
 
 export function DragInput({
@@ -24,7 +25,8 @@ export function DragInput({
   className,
   label,
   suffix,
-  disabled = false
+  disabled = false,
+  compact = false
 }: DragInputProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [hasDragged, setHasDragged] = useState(false)
@@ -172,7 +174,7 @@ export function DragInput({
   return (
     <div className={cn("flex items-center gap-1 w-full", className)}>
       {label && (
-        <span className="text-xs text-zinc-400 w-3 flex-shrink-0">{label}</span>
+        <span className={cn("text-xs text-zinc-400 flex-shrink-0", compact ? "min-w-0" : "min-w-[40px]")}>{label}</span>
       )}
       {isEditing ? (
         <input

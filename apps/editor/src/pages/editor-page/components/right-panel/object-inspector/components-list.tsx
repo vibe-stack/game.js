@@ -49,12 +49,12 @@ export default function ComponentsList({ components, onUpdate }: ComponentsListP
   };
 
   return (
-    <div className="space-y-4">
-      <div className="border-b border-muted pb-2">
+    <div className="space-y-0">
+      <div className="border-b border-muted pb-0">
         <h4 className="text-sm font-medium text-muted-foreground">Components</h4>
       </div>
       
-      <div className="space-y-3">
+      <div className="space-y-1">
         {components.map(renderComponent)}
       </div>
     </div>
