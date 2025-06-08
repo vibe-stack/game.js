@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "@tanstack/react-router";
 import useEditorStore from "@/stores/editor-store";
-import Viewport from "./components/viewport";
+import { Viewport } from "./components/viewport";
 import LeftPanel from "./components/left-panel";
 import RightPanel from "./components/right-panel";
 import FloatingToolbar from "./components/floating-toolbar";

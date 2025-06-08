@@ -33,6 +33,7 @@ export function DragInput({
   const [dragStartX, setDragStartX] = useState(0)
   const [dragStartValue, setDragStartValue] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const displayRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     // Don't update input value while actively dragging
@@ -111,14 +112,36 @@ export function DragInput({
     }
   }, [isDragging, handleMouseMove, handleMouseUp])
 
-  const handleClick = () => {
-    // Only allow editing if we didn't actually drag
-    if (!hasDragged && !disabled) {
+  const toggleEditing = () => {
+    if (disabled) return
+    
+    if (isEditing) {
+      handleInputBlur()
+    } else {
       setIsEditing(true)
       setTimeout(() => {
         inputRef.current?.focus()
         inputRef.current?.select()
       }, 0)
+    }
+  }
+
+  const handleClick = () => {
+    // Only allow editing if we didn't actually drag
+    if (!hasDragged && !disabled) {
+      toggleEditing()
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return
+    
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      toggleEditing()
+    } else if (e.key === ' ') {
+      e.preventDefault()
+      toggleEditing()
     }
   }
 
@@ -168,15 +191,18 @@ export function DragInput({
         />
       ) : (
         <div
+          ref={displayRef}
+          tabIndex={disabled ? -1 : 0}
           className={cn(
             "flex-1 h-6 px-2 text-xs border rounded flex items-center justify-between transition-colors select-none min-w-0",
             disabled 
               ? "bg-zinc-800/50 border-zinc-700/30 text-zinc-500 cursor-not-allowed"
-              : "bg-black/20 border-zinc-700/50 text-zinc-300 cursor-ew-resize hover:border-emerald-500/30",
+              : "bg-black/20 border-zinc-700/50 text-zinc-300 cursor-ew-resize hover:border-emerald-500/30 focus:border-emerald-500/50 focus:outline-none",
             isDragging && !disabled && "bg-emerald-500/10 border-emerald-500/30"
           )}
           onMouseDown={handleMouseDown}
           onClick={handleClick}
+          onKeyDown={handleKeyDown}
         >
           <span className="truncate">{value.toFixed(precision)}</span>
           {suffix && <span className="text-zinc-500 flex-shrink-0 ml-1">{suffix}</span>}
