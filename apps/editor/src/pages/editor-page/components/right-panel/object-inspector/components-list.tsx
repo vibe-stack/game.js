@@ -54,8 +54,8 @@ export default function ComponentsList({ components, onUpdate }: ComponentsListP
   };
 
   return (
-    <div className="space-y-0">
-      <div className="border-b border-muted pb-0">
+    <div className="">
+      <div className="border-b pb-0">
         <h4 className="text-sm font-medium text-muted-foreground">Components</h4>
       </div>
       

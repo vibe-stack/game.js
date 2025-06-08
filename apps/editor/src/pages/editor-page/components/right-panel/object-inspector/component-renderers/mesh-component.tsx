@@ -97,7 +97,7 @@ export default function MeshComponent({ component, onUpdate }: MeshComponentProp
   };
 
   return (
-    <div className="p-3 border border-muted rounded-md space-y-4">
+    <div className="p-0 mt-2 rounded-md space-y-4">
       <div className="flex items-center justify-between">
         <div className="text-sm font-medium">Mesh</div>
         <Switch

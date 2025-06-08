@@ -40,6 +40,10 @@ export function getMaterialComponent(type: string) {
           {...props}
         />
       );
+    case "normal":
+      return ({ ...props }) => (
+        <meshNormalMaterial {...props} />
+      );
     default:
       return ({ color = "#orange", ...props }) => (
         <meshStandardMaterial color={color} {...props} />

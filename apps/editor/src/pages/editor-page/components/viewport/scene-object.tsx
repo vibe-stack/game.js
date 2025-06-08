@@ -8,9 +8,10 @@ interface SceneObjectProps {
   obj: GameObject;
   selectedObjects: string[];
   onSelect: (id: string) => void;
+  renderType?: "solid" | "wireframe" | "normals" | "realistic";
 }
 
-const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedObjects, onSelect }, ref) => {
+const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedObjects, onSelect, renderType = "solid" }, ref) => {
   const { transform, components, children, visible } = obj;
   const { position, rotation, scale } = transform;
   const isSelected = selectedObjects.includes(obj.id);
@@ -99,11 +100,11 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({ obj, selectedOb
 
   const effectiveComponents = components.length > 0 
     ? components 
-    : [createDefaultMeshComponent(isSelected)];
+    : [createDefaultMeshComponent(isSelected, renderType)];
 
   const groupContent = (
     <group {...groupProps}>
-      {renderComponents(effectiveComponents, children, selectedObjects, onSelect, isSelected)}
+      {renderComponents(effectiveComponents, children, selectedObjects, onSelect, isSelected, renderType)}
     </group>
   );
 
@@ -135,7 +136,12 @@ SceneObject.displayName = "SceneObject";
 
 export default SceneObject;
 
-function createDefaultMeshComponent(isSelected: boolean): GameObjectComponent {
+function createDefaultMeshComponent(isSelected: boolean, renderType: string = "solid"): GameObjectComponent {
+  const baseProps = {
+    color: isSelected ? '#ffff00' : '#ffa500',
+    wireframe: renderType === 'wireframe' || isSelected 
+  };
+
   return {
     id: 'default-mesh',
     type: 'Mesh',
@@ -144,12 +150,10 @@ function createDefaultMeshComponent(isSelected: boolean): GameObjectComponent {
       geometry: 'box',
       material: 'standard',
       geometryProps: { width: 1, height: 1, depth: 1 },
-      materialProps: { 
-        color: isSelected ? '#ffff00' : '#ffa500',
-        wireframe: isSelected 
-      },
+      materialProps: baseProps,
       castShadow: true,
-      receiveShadow: true
+      receiveShadow: true,
+      renderType
     }
   };
 }
@@ -159,7 +163,8 @@ function renderComponents(
   children: GameObject[], 
   selectedObjects: string[],
   onSelect: (id: string) => void,
-  showHelpers: boolean = false
+  showHelpers: boolean = false,
+  renderType: string = "solid"
 ): React.ReactElement {
   const childElements = children.map((child) => (
     <SceneObject
@@ -167,10 +172,18 @@ function renderComponents(
       obj={child}
       selectedObjects={selectedObjects}
       onSelect={onSelect}
+      renderType={renderType as any}
     />
   ));
 
   return components.reduce((acc, component) => {
-    return renderComponent(component, acc, showHelpers);
+    const enhancedComponent = {
+      ...component,
+      properties: {
+        ...component.properties,
+        renderType
+      }
+    };
+    return renderComponent(enhancedComponent, acc, showHelpers);
   }, <>{childElements}</> as React.ReactElement);
 } 

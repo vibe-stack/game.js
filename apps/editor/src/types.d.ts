@@ -25,11 +25,188 @@ interface GameObjectComponent {
   properties: Record<string, any>;
 }
 
+// Physics Types for Rapier3D Integration
+
+type RigidBodyType = 'dynamic' | 'static' | 'kinematic';
+
+interface RigidBodyComponent {
+  id: string;
+  type: 'rigidBody';
+  enabled: boolean;
+  properties: {
+    bodyType: RigidBodyType;
+    mass?: number;
+    linearDamping: number;
+    angularDamping: number;
+    gravityScale: number;
+    canSleep: boolean;
+    sleeping: boolean;
+    lockTranslations: {
+      x: boolean;
+      y: boolean;
+      z: boolean;
+    };
+    lockRotations: {
+      x: boolean;
+      y: boolean;
+      z: boolean;
+    };
+    dominanceGroup: number;
+    additionalMassProperties?: {
+      mass: number;
+      centerOfMass: Vector3;
+      principalInertia: Vector3;
+      inertiaOrientation: Vector3; // quaternion as Vector3 for simplicity
+    };
+  };
+}
+
+type ColliderShape = 
+  | { type: 'box'; halfExtents: Vector3 }
+  | { type: 'sphere'; radius: number }
+  | { type: 'capsule'; halfHeight: number; radius: number }
+  | { type: 'cylinder'; height: number; radius: number }
+  | { type: 'cone'; height: number; radius: number }
+  | { type: 'convexHull'; vertices: Vector3[] }
+  | { type: 'trimesh'; vertices: Vector3[]; indices: number[] }
+  | { type: 'heightfield'; heights: number[][]; scale: Vector3 };
+
+interface PhysicsMaterial {
+  friction: number;
+  restitution: number;
+  frictionCombineRule: 'average' | 'min' | 'multiply' | 'max';
+  restitutionCombineRule: 'average' | 'min' | 'multiply' | 'max';
+}
+
+interface CollisionGroups {
+  membership: number; // Bitmask for which groups this collider belongs to
+  filter: number; // Bitmask for which groups this collider can collide with
+}
+
+interface ColliderComponent {
+  id: string;
+  type: 'collider';
+  enabled: boolean;
+  properties: {
+    shape: ColliderShape;
+    isSensor: boolean;
+    density?: number;
+    material: PhysicsMaterial;
+    collisionGroups: CollisionGroups;
+    solverGroups: CollisionGroups;
+    activeCollisionTypes: {
+      default: boolean;
+      kinematic: boolean;
+      sensor: boolean;
+    };
+    activeEvents: {
+      collisionEvents: boolean;
+      contactForceEvents: boolean;
+    };
+    contactForceEventThreshold: number;
+    massModification: 'density' | 'mass' | 'massProps';
+  };
+}
+
+type JointType = 
+  | 'fixed'
+  | 'revolute' 
+  | 'prismatic'
+  | 'spherical'
+  | 'rope'
+  | 'spring'
+  | 'generic';
+
+interface JointLimits {
+  min: number;
+  max: number;
+}
+
+interface JointMotor {
+  targetVel: number;
+  targetPos: number;
+  stiffness: number;
+  damping: number;
+  maxForce: number;
+}
+
+interface JointComponent {
+  id: string;
+  type: 'joint';
+  enabled: boolean;
+  properties: {
+    jointType: JointType;
+    connectedBody: string; // ID of the connected GameObject
+    anchor1: Vector3; // Local anchor point on this body
+    anchor2: Vector3; // Local anchor point on connected body
+    axis1?: Vector3; // Primary axis for revolute/prismatic joints
+    axis2?: Vector3; // Secondary axis for some joint types
+    limits?: JointLimits;
+    motor?: JointMotor;
+    breakForce?: number; // Force threshold to break the joint
+    breakTorque?: number; // Torque threshold to break the joint
+    // Generic joint specific properties
+    lockedAxes?: {
+      linearX: boolean;
+      linearY: boolean;
+      linearZ: boolean;
+      angularX: boolean;
+      angularY: boolean;
+      angularZ: boolean;
+    };
+    motorAxes?: {
+      linearX: JointMotor;
+      linearY: JointMotor;
+      linearZ: JointMotor;
+      angularX: JointMotor;
+      angularY: JointMotor;
+      angularZ: JointMotor;
+    };
+  };
+}
+
+type PhysicsComponent = RigidBodyComponent | ColliderComponent | JointComponent;
+
+interface PhysicsWorldConfig {
+  gravity: Vector3;
+  integrationParameters: {
+    dt: number;
+    minCcdDt: number;
+    erp: number;
+    damping: number;
+    jointErp: number;
+    jointDamping: number;
+    allowedLinearError: number;
+    allowedAngularError: number;
+    maxVelocityIterations: number;
+    maxVelocityFrictionIterations: number;
+    maxStabilizationIterations: number;
+    interleaveRestitutionAndFrictionResolution: boolean;
+    minIslandSize: number;
+    maxCcdSubsteps: number;
+  };
+  collisionDetection: {
+    predictionDistance: number;
+    allowedLinearError: number;
+  };
+  debugRender: {
+    enabled: boolean;
+    renderBodies: boolean;
+    renderShapes: boolean;
+    renderJoints: boolean;
+    renderMultibodyJoints: boolean;
+    renderContacts: boolean;
+    renderCollisionEvents: boolean;
+    contactPointLength: number;
+    contactNormalLength: number;
+  };
+}
+
 interface GameObject {
   id: string;
   name: string;
   transform: Transform;
-  components: GameObjectComponent[];
+  components: (GameObjectComponent | PhysicsComponent)[];
   children: GameObject[];
   visible: boolean;
   tags: string[];
@@ -87,6 +264,7 @@ interface GameScene {
   objects: GameObject[];
   editorConfig: SceneEditorConfig;
   runtimeConfig: SceneRuntimeConfig;
+  physicsWorld: PhysicsWorldConfig;
   assets: AssetReference[];
   activeCamera?: string;
   lightingSetup: any;

@@ -22,17 +22,49 @@ export function MeshRenderer({
     geometryProps = {},
     castShadow = false,
     receiveShadow = false,
+    renderType = "solid"
   } = component.properties;
 
   if (!component.enabled) return <>{children}</>;
 
   const GeometryComponent = getGeometryComponent(geometry);
-  const MaterialComponent = getMaterialComponent(material);
+
+  // Apply render type specific properties
+  const enhancedMaterialProps = React.useMemo(() => {
+    const baseProps = { ...materialProps };
+    
+    switch (renderType) {
+      case "wireframe":
+        baseProps.wireframe = true;
+        break;
+      case "normals":
+        return {
+          ...baseProps,
+          vertexColors: true,
+          // Use a normal material for debugging
+        };
+      case "realistic":
+        // Enhanced realistic rendering
+        baseProps.envMapIntensity = baseProps.envMapIntensity || 1;
+        baseProps.metalness = baseProps.metalness || 0.1;
+        baseProps.roughness = baseProps.roughness || 0.3;
+        break;
+      case "solid":
+      default:
+        // Keep default solid rendering
+        break;
+    }
+    
+    return baseProps;
+  }, [materialProps, renderType]);
+
+  const effectiveMaterial = renderType === "normals" ? "normal" : material;
+  const EffectiveMaterialComponent = getMaterialComponent(effectiveMaterial);
 
   return (
     <mesh castShadow={castShadow} receiveShadow={receiveShadow}>
       <GeometryComponent {...geometryProps} />
-      <MaterialComponent {...materialProps} />
+      <EffectiveMaterialComponent {...enhancedMaterialProps} />
       {showHelpers && (
         <Helper type={BoxHelper} args={[0xffff00]} />
       )}

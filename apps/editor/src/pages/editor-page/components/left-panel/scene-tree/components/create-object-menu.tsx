@@ -67,7 +67,7 @@ export default function CreateObjectMenu({ onAddObject }: CreateObjectMenuProps)
                 />
                 <span>{category.name}</span>
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-64 max-h-[300px] overflow-y-auto">
+              <DropdownMenuSubContent className="w-64 max-h-[450px] overflow-y-auto">
                 <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
                   {category.description}
                 </DropdownMenuLabel>
