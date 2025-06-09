@@ -15,7 +15,6 @@ interface PhysicsContextType {
   registerRigidBody: (objectId: string, rigidBody: RapierRigidBody) => void;
   unregisterRigidBody: (objectId: string) => void;
   updateTransformFromPhysics: (objectId: string, position: Vector3, rotation: Vector3) => void;
-  forceDebugUpdate: () => void;
   isInitialized: boolean;
 }
 
@@ -143,20 +142,6 @@ function PhysicsInnerProvider({
   const initialTransformsRef = useRef<Map<string, Transform>>(new Map());
   const isInitialized = world && rapier;
 
-  // Force update debug renderer - this is needed when objects are manually moved
-  // while physics simulation is not running
-  const forceDebugUpdate = useCallback(() => {
-    if (world && scene.physicsWorld.debugRender?.enabled && physicsState !== 'playing') {
-      try {
-        // Force a debug render update by calling the world's debug render
-        // This ensures the debug wireframes reflect the current rigid body positions
-        world.debugRender();
-      } catch {
-        // Silently ignore errors in debug rendering
-      }
-    }
-  }, [world, scene.physicsWorld.debugRender?.enabled, physicsState]);
-
   // Store initial transforms when simulation starts
   const storeInitialTransforms = useCallback(() => {
     initialTransformsRef.current.clear();
@@ -200,10 +185,7 @@ function PhysicsInnerProvider({
         }
       }
     });
-    
-    // Force debug renderer update after restoring all transforms
-    forceDebugUpdate();
-  }, [onObjectTransformUpdate, forceDebugUpdate]);
+  }, [onObjectTransformUpdate]);
 
   const play = useCallback(() => {
     if (!isInitialized) return;
@@ -256,7 +238,6 @@ function PhysicsInnerProvider({
     registerRigidBody,
     unregisterRigidBody,
     updateTransformFromPhysics,
-    forceDebugUpdate,
     isInitialized: !!isInitialized,
   };
 

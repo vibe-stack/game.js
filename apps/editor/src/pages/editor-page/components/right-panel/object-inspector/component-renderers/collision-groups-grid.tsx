@@ -47,10 +47,9 @@ export default function CollisionGroupsGrid({ value, onChange, label }: Collisio
             key={bitIndex}
             variant={isActive ? "default" : "outline"}
             size="sm"
-            className="w-8 h-8 p-0 text-xs"
+            className="w-4 h-4 rounded-none p-0 text-xs"
             onClick={() => onToggle(bitIndex)}
           >
-            {bitIndex}
           </Button>
         );
       }
@@ -74,12 +73,12 @@ export default function CollisionGroupsGrid({ value, onChange, label }: Collisio
       
       <div className="space-y-3">
         <div className="space-y-1">
-          <Label className="text-xs">Membership (Groups this object belongs to)</Label>
+          <Label className="text-xs text-muted-foreground/50">Membership</Label>
           {renderGrid(value.membership, toggleMembership)}
         </div>
         
         <div className="space-y-1">
-          <Label className="text-xs">Filter (Groups this object can collide with)</Label>
+          <Label className="text-xs text-muted-foreground/50">Filter</Label>
           {renderGrid(value.filter, toggleFilter)}
         </div>
       </div>

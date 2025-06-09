@@ -101,7 +101,7 @@ export default function Viewport({
         <PhysicsProvider 
           scene={scene} 
           onObjectTransformUpdate={updateObjectTransform}
-          debugEnabled={shouldShowHelpers && scene.physicsWorld.debugRender?.enabled}
+          debugEnabled={shouldShowHelpers && scene.physicsWorld?.debugRender?.enabled}
         >
           <PhysicsCallbackProvider onPhysicsCallbacks={onPhysicsCallbacks} />
           <SceneEffects scene={scene} />

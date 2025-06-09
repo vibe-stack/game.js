@@ -58,15 +58,15 @@ const ensureCompletePhysicsConfig = (physicsWorld: any): PhysicsWorldConfig => {
     gravity: physicsWorld.gravity || defaultConfig.gravity,
     integrationParameters: {
       ...defaultConfig.integrationParameters,
-      ...(physicsWorld.integrationParameters || {})
+      ...(physicsWorld?.integrationParameters || {})
     },
     collisionDetection: {
       ...defaultConfig.collisionDetection,
-      ...(physicsWorld.collisionDetection || {})
+      ...(physicsWorld?.collisionDetection || {})
     },
     debugRender: {
-      ...defaultConfig.debugRender,
-      ...(physicsWorld.debugRender || {})
+      ...defaultConfig?.debugRender,
+      ...(physicsWorld?.debugRender || {})
     }
   };
 };
