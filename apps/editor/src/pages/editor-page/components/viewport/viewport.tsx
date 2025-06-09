@@ -18,7 +18,7 @@ import useEditorStore from "@/stores/editor-store";
 interface ViewportProps {
   scene: GameScene | null;
   selectedObjects: string[];
-  onSelectObject: (id: string) => void;
+  onSelectObject: (id: string, event?: React.MouseEvent) => void;
   onPhysicsCallbacks?: (callbacks: {
     play?: () => void;
     pause?: () => void;

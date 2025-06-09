@@ -80,8 +80,30 @@ export default function EditorPage() {
     }
   };
 
-  const handleObjectSelect = (objectId: string) => {
-    selectObject(objectId);
+  const handleObjectSelect = (objectId: string, event?: React.MouseEvent) => {
+    if (event) {
+      const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+      const isShift = event.shiftKey;
+      
+      if (isCtrlOrCmd || isShift) {
+        // Multi-selection mode
+        const isCurrentlySelected = selectedObjects.includes(objectId);
+        
+        if (isShift && isCurrentlySelected) {
+          // Shift + click on selected item = deselect
+          selectObject(objectId, true); // This will toggle it off
+        } else {
+          // Ctrl/Cmd + click = toggle selection
+          selectObject(objectId, true);
+        }
+      } else {
+        // Normal click = single selection
+        selectObject(objectId, false);
+      }
+    } else {
+      // Fallback for calls without event
+      selectObject(objectId, false);
+    }
   };
 
   if (isLoading) {

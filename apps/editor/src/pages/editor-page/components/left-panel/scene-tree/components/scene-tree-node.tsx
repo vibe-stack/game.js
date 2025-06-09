@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { EyeIcon, EyeOffIcon, ChevronRight, ChevronDown } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -16,7 +16,7 @@ interface SceneTreeNodeProps {
   object: GameObject;
   depth: number;
   selectedObjects: string[];
-  onSelectObject: (objectId: string) => void;
+  onSelectObject: (objectId: string, event?: React.MouseEvent) => void;
   onToggleVisibility: (objectId: string) => void;
   onDuplicate: (object: GameObject) => void;
   onCopy: (object: GameObject) => void;
@@ -57,6 +57,8 @@ export default function SceneTreeNode({
   indentationWidth,
   isOverParent = false,
 }: SceneTreeNodeProps) {
+  const wasDraggingRef = useRef(false);
+  
   const {
     attributes,
     listeners,
@@ -81,6 +83,19 @@ export default function SceneTreeNode({
   const isSelected = selectedObjects.includes(id);
   const actualIsDragging = isDragging || sortableIsDragging;
 
+  // Track dragging state
+  useEffect(() => {
+    if (actualIsDragging) {
+      wasDraggingRef.current = true;
+    } else if (wasDraggingRef.current) {
+      // Reset flag after a short delay to allow click to be processed
+      const timer = setTimeout(() => {
+        wasDraggingRef.current = false;
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [actualIsDragging]);
+
   const handleToggleExpanded = (e: React.MouseEvent) => {
     e.stopPropagation();
     onCollapse(id);
@@ -91,12 +106,15 @@ export default function SceneTreeNode({
     onToggleVisibility(id);
   };
 
-  const handleSelect = () => {
-    // Only select if we're not in the middle of a drag operation
-    if (!actualIsDragging) {
-      onSelectObject(id);
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    // Don't handle click if we were just dragging
+    if (wasDraggingRef.current) {
+      return;
     }
-  };
+    
+    e.stopPropagation();
+    onSelectObject(id, e);
+  }, [id, onSelectObject]);
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
@@ -121,7 +139,7 @@ export default function SceneTreeNode({
             isOverParent ? "bg-blue-500/20 border-blue-500/50" : ""
           }`}
           style={{ paddingLeft: `${12 + depth * indentationWidth}px` }}
-          onClick={handleSelect}
+          onClick={handleClick}
           {...listeners}
         >
           <div className="flex items-center gap-2">

@@ -42,7 +42,7 @@ import {
 interface SceneTreeProps {
   scene: GameScene | null;
   selectedObjects: string[];
-  onSelectObject: (objectId: string) => void;
+  onSelectObject: (objectId: string, event?: React.MouseEvent) => void;
 }
 
 const measuring = {
@@ -58,7 +58,7 @@ export default function SceneTree({
   selectedObjects,
   onSelectObject,
 }: SceneTreeProps) {
-  const { addObject, removeObject, setCurrentScene } = useEditorStore();
+  const { addObject, removeObject, setCurrentScene, deselectAll } = useEditorStore();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [clipboard, setClipboard] = useState<GameObject | null>(null);
@@ -76,8 +76,8 @@ export default function SceneTree({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { 
-        delay: 100, 
-        distance: 8,
+        delay: 300, 
+        distance: 15,
       },
     }),
     useSensor(KeyboardSensor),
@@ -335,6 +335,13 @@ export default function SceneTree({
     ],
   );
 
+  const handleEmptySpaceClick = useCallback((e: React.MouseEvent) => {
+    // Only clear selection if clicking directly on the container, not on child elements
+    if (e.target === e.currentTarget) {
+      deselectAll();
+    }
+  }, [deselectAll]);
+
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -349,7 +356,7 @@ export default function SceneTree({
   }
 
   return (
-    <div className="space-y-1 p-4" data-scene-tree tabIndex={0}>
+    <div className="space-y-1 p-4" data-scene-tree tabIndex={0} onClick={handleEmptySpaceClick}>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-muted-foreground text-sm font-medium">
           Scene Objects

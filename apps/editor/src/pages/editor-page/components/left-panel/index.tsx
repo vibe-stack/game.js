@@ -7,7 +7,7 @@ import AssetsPanel from "./assets-panel";
 interface LeftPanelProps {
   scene: GameScene | null;
   selectedObjects: string[];
-  onSelectObject: (objectId: string) => void;
+  onSelectObject: (objectId: string, event?: React.MouseEvent) => void;
 }
 
 export default function LeftPanel({ scene, selectedObjects, onSelectObject }: LeftPanelProps) {
