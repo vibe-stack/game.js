@@ -358,3 +358,438 @@ declare interface Window {
   electronWindow: ElectronWindow;
   projectAPI: ProjectAPI;
 }
+
+// Enhanced Material System with TSL Support
+
+type TextureType = 'color' | 'normal' | 'roughness' | 'metalness' | 'emissive' | 'ao' | 'displacement' | 'alpha' | 'environment' | 'lightmap' | 'bumpmap' | 'clearcoat' | 'clearcoat-normal' | 'clearcoat-roughness' | 'iridescence' | 'iridescence-thickness' | 'sheen' | 'specular-intensity' | 'specular-color' | 'transmission' | 'thickness';
+
+interface TextureReference {
+  id: string;
+  assetId: string; // Reference to AssetReference
+  type: TextureType;
+  wrapS?: 'repeat' | 'clampToEdge' | 'mirroredRepeat';
+  wrapT?: 'repeat' | 'clampToEdge' | 'mirroredRepeat';
+  repeat: Vector2;
+  offset: Vector2;
+  rotation: number;
+  flipY: boolean;
+  generateMipmaps: boolean;
+  minFilter?: 'nearest' | 'linear' | 'nearestMipmapNearest' | 'nearestMipmapLinear' | 'linearMipmapNearest' | 'linearMipmapLinear';
+  magFilter?: 'nearest' | 'linear';
+  anisotropy: number;
+}
+
+interface Vector2 {
+  x: number;
+  y: number;
+}
+
+// TSL Node System Types
+
+type TSLNodeType = 
+  // Input nodes
+  | 'uniform' | 'attribute' | 'varying' | 'texture' | 'cubeTexture' | 'time' | 'deltaTime' | 'frameId'
+  // Math nodes  
+  | 'add' | 'subtract' | 'multiply' | 'divide' | 'power' | 'sqrt' | 'sin' | 'cos' | 'tan' | 'atan2' | 'abs' | 'floor' | 'ceil' | 'round' | 'min' | 'max' | 'clamp' | 'saturate' | 'smoothstep' | 'step' | 'mix' | 'dot' | 'cross' | 'normalize' | 'length' | 'distance' | 'reflect' | 'refract' | 'faceforward'
+  // UV and coordinate nodes
+  | 'uv' | 'screenUV' | 'worldUV' | 'matcap' | 'parallax' | 'rotate' | 'scale' | 'translate'
+  // Lighting nodes
+  | 'lambert' | 'phong' | 'physical' | 'toon' | 'fresnel' | 'rim'
+  // Utility nodes
+  | 'split' | 'join' | 'swizzle' | 'convert' | 'if' | 'switch' | 'loop'
+  // Noise and patterns
+  | 'noise' | 'fbm' | 'voronoi' | 'checker' | 'gradient' | 'stripes'
+  // Color nodes
+  | 'colorSpace' | 'hue' | 'saturation' | 'brightness' | 'contrast' | 'levels'
+  // Output nodes
+  | 'output' | 'materialOutput';
+
+type TSLDataType = 'float' | 'vec2' | 'vec3' | 'vec4' | 'mat3' | 'mat4' | 'sampler2D' | 'samplerCube' | 'bool' | 'int';
+
+interface TSLNodeInput {
+  id: string;
+  name: string;
+  type: TSLDataType;
+  required: boolean;
+  defaultValue?: any;
+  min?: number;
+  max?: number;
+  options?: string[]; // For enum-like inputs
+}
+
+interface TSLNodeOutput {
+  id: string;
+  name: string;
+  type: TSLDataType;
+}
+
+interface TSLNodeConnection {
+  from: {
+    nodeId: string;
+    outputId: string;
+  };
+  to: {
+    nodeId: string;
+    inputId: string;
+  };
+}
+
+interface TSLGraphNode {
+  id: string;
+  type: TSLNodeType;
+  name: string;
+  position: Vector2;
+  inputs: TSLNodeInput[];
+  outputs: TSLNodeOutput[];
+  properties: Record<string, any>;
+  // For uniform nodes
+  uniformValue?: any;
+  uniformType?: TSLDataType;
+  // For texture nodes
+  textureReference?: string; // Reference to TextureReference id
+  // For attribute nodes
+  attributeName?: string;
+}
+
+interface TSLShaderGraph {
+  id: string;
+  name: string;
+  description: string;
+  nodes: TSLGraphNode[];
+  connections: TSLNodeConnection[];
+  // Define which outputs connect to material properties
+  materialConnections: {
+    colorNode?: string; // nodeId.outputId
+    normalNode?: string;
+    roughnessNode?: string;
+    metalnessNode?: string;
+    emissiveNode?: string;
+    alphaNode?: string;
+    displacementNode?: string;
+    clearcoatNode?: string;
+    clearcoatRoughnessNode?: string;
+    clearcoatNormalNode?: string;
+    sheenNode?: string;
+    iridescenceNode?: string;
+    iridescenceIORNode?: string;
+    iridescenceThicknessNode?: string;
+    specularIntensityNode?: string;
+    specularColorNode?: string;
+    iorNode?: string;
+    transmissionNode?: string;
+    thicknessNode?: string;
+    attenuationDistanceNode?: string;
+    attenuationColorNode?: string;
+    dispersionNode?: string;
+    anisotropyNode?: string;
+  };
+  metadata: {
+    created: Date;
+    modified: Date;
+    version: string;
+    author?: string;
+    tags: string[];
+  };
+}
+
+// Material Type Definitions
+
+type MaterialType = 'basic' | 'lambert' | 'phong' | 'standard' | 'physical' | 'toon' | 'shader' | 'points' | 'line' | 'lineBasic' | 'lineDashed' | 'sprite' | 'shadow';
+
+// Base material properties that all materials share
+interface BaseMaterialProperties {
+  name?: string;
+  transparent: boolean;
+  opacity: number;
+  alphaTest: number;
+  side: 0 | 1 | 2; // FrontSide | BackSide | DoubleSide
+  visible: boolean;
+  depthTest: boolean;
+  depthWrite: boolean;
+  blending: 'normal' | 'additive' | 'subtractive' | 'multiply' | 'custom';
+  premultipliedAlpha: boolean;
+  dithering: boolean;
+  fog: boolean;
+  wireframe: boolean;
+  vertexColors: boolean;
+  clippingPlanes?: any[];
+  clipIntersection: boolean;
+  clipShadows: boolean;
+  colorWrite: boolean;
+  precision?: 'lowp' | 'mediump' | 'highp';
+  polygonOffset: boolean;
+  polygonOffsetFactor: number;
+  polygonOffsetUnits: number;
+  alphaHash: boolean;
+  stencilWrite: boolean;
+  stencilFunc: number;
+  stencilRef: number;
+  stencilFuncMask: number;
+  stencilFail: number;
+  stencilZFail: number;
+  stencilZPass: number;
+  stencilWriteMask: number;
+}
+
+interface BasicMaterialProperties extends BaseMaterialProperties {
+  type: 'basic';
+  color: string;
+  map?: string; // TextureReference id
+  lightMap?: string;
+  lightMapIntensity: number;
+  aoMap?: string;
+  aoMapIntensity: number;
+  specularMap?: string;
+  alphaMap?: string;
+  envMap?: string;
+  combine: 'multiply' | 'mix' | 'add';
+  reflectivity: number;
+  refractionRatio: number;
+}
+
+interface LambertMaterialProperties extends BaseMaterialProperties {
+  type: 'lambert';
+  color: string;
+  emissive: string;
+  emissiveIntensity: number;
+  emissiveMap?: string;
+  map?: string;
+  lightMap?: string;
+  lightMapIntensity: number;
+  aoMap?: string;
+  aoMapIntensity: number;
+  specularMap?: string;
+  alphaMap?: string;
+  envMap?: string;
+  combine: 'multiply' | 'mix' | 'add';
+  reflectivity: number;
+  refractionRatio: number;
+}
+
+interface PhongMaterialProperties extends BaseMaterialProperties {
+  type: 'phong';
+  color: string;
+  emissive: string;
+  emissiveIntensity: number;
+  emissiveMap?: string;
+  specular: string;
+  shininess: number;
+  map?: string;
+  lightMap?: string;
+  lightMapIntensity: number;
+  aoMap?: string;
+  aoMapIntensity: number;
+  bumpMap?: string;
+  bumpScale: number;
+  normalMap?: string;
+  normalMapType: 'tangentSpace' | 'objectSpace';
+  normalScale: Vector2;
+  displacementMap?: string;
+  displacementScale: number;
+  displacementBias: number;
+  specularMap?: string;
+  alphaMap?: string;
+  envMap?: string;
+  combine: 'multiply' | 'mix' | 'add';
+  reflectivity: number;
+  refractionRatio: number;
+}
+
+interface StandardMaterialProperties extends BaseMaterialProperties {
+  type: 'standard';
+  color: string;
+  emissive: string;
+  emissiveIntensity: number;
+  emissiveMap?: string;
+  roughness: number;
+  metalness: number;
+  map?: string;
+  lightMap?: string;
+  lightMapIntensity: number;
+  aoMap?: string;
+  aoMapIntensity: number;
+  bumpMap?: string;
+  bumpScale: number;
+  normalMap?: string;
+  normalMapType: 'tangentSpace' | 'objectSpace';
+  normalScale: Vector2;
+  displacementMap?: string;
+  displacementScale: number;
+  displacementBias: number;
+  roughnessMap?: string;
+  metalnessMap?: string;
+  alphaMap?: string;
+  envMap?: string;
+  envMapIntensity: number;
+}
+
+interface PhysicalMaterialProperties extends BaseMaterialProperties {
+  type: 'physical';
+  // Standard material properties
+  color: string;
+  emissive: string;
+  emissiveIntensity: number;
+  emissiveMap?: string;
+  roughness: number;
+  metalness: number;
+  map?: string;
+  lightMap?: string;
+  lightMapIntensity: number;
+  aoMap?: string;
+  aoMapIntensity: number;
+  bumpMap?: string;
+  bumpScale: number;
+  normalMap?: string;
+  normalMapType: 'tangentSpace' | 'objectSpace';
+  normalScale: Vector2;
+  displacementMap?: string;
+  displacementScale: number;
+  displacementBias: number;
+  roughnessMap?: string;
+  metalnessMap?: string;
+  alphaMap?: string;
+  envMap?: string;
+  envMapIntensity: number;
+  // Physical material specific properties
+  clearcoat: number;
+  clearcoatMap?: string;
+  clearcoatRoughness: number;
+  clearcoatRoughnessMap?: string;
+  clearcoatNormalScale: Vector2;
+  clearcoatNormalMap?: string;
+  ior: number;
+  reflectivity: number;
+  iridescence: number;
+  iridescenceMap?: string;
+  iridescenceIOR: number;
+  iridescenceThicknessRange: Vector2;
+  iridescenceThicknessMap?: string;
+  sheen: number;
+  sheenColor: string;
+  sheenColorMap?: string;
+  sheenRoughness: number;
+  sheenRoughnessMap?: string;
+  transmission: number;
+  transmissionMap?: string;
+  thickness: number;
+  thicknessMap?: string;
+  attenuationDistance: number;
+  attenuationColor: string;
+  specularIntensity: number;
+  specularIntensityMap?: string;
+  specularColor: string;
+  specularColorMap?: string;
+  anisotropy: number;
+  anisotropyRotation: number;
+  anisotropyMap?: string;
+}
+
+interface ToonMaterialProperties extends BaseMaterialProperties {
+  type: 'toon';
+  color: string;
+  emissive: string;
+  emissiveIntensity: number;
+  emissiveMap?: string;
+  map?: string;
+  bumpMap?: string;
+  bumpScale: number;
+  normalMap?: string;
+  normalMapType: 'tangentSpace' | 'objectSpace';
+  normalScale: Vector2;
+  displacementMap?: string;
+  displacementScale: number;
+  displacementBias: number;
+  gradientMap?: string;
+  alphaMap?: string;
+}
+
+interface ShaderMaterialProperties extends BaseMaterialProperties {
+  type: 'shader';
+  // TSL Shader Graph
+  shaderGraph?: string; // TSLShaderGraph id
+  // Traditional uniforms for fallback
+  uniforms: Record<string, {
+    type: TSLDataType;
+    value: any;
+  }>;
+  vertexShader?: string; // GLSL fallback
+  fragmentShader?: string; // GLSL fallback
+  // Lighting model for shader materials
+  lights: boolean;
+  clipping: boolean;
+  extensions: {
+    derivatives: boolean;
+    fragDepth: boolean;
+    drawBuffers: boolean;
+    shaderTextureLOD: boolean;
+  };
+}
+
+type MaterialProperties = 
+  | BasicMaterialProperties 
+  | LambertMaterialProperties 
+  | PhongMaterialProperties 
+  | StandardMaterialProperties 
+  | PhysicalMaterialProperties 
+  | ToonMaterialProperties 
+  | ShaderMaterialProperties;
+
+// Centralized Material Definition
+interface MaterialDefinition {
+  id: string;
+  name: string;
+  description: string;
+  properties: MaterialProperties;
+  textures: TextureReference[];
+  shaderGraphs: TSLShaderGraph[];
+  previewSettings: {
+    geometry: 'sphere' | 'cube' | 'plane' | 'cylinder';
+    lighting: 'studio' | 'outdoor' | 'indoor' | 'custom';
+    environment?: string; // HDRI environment map
+  };
+  metadata: {
+    created: Date;
+    modified: Date;
+    version: string;
+    author?: string;
+    tags: string[];
+    category: string;
+  };
+}
+
+// Material Library/Registry
+interface MaterialLibrary {
+  id: string;
+  name: string;
+  description: string;
+  materials: MaterialDefinition[];
+  sharedTextures: TextureReference[];
+  sharedShaderGraphs: TSLShaderGraph[];
+  metadata: {
+    created: Date;
+    modified: Date;
+    version: string;
+    author?: string;
+  };
+}
+
+// Enhanced AssetReference to support more texture types
+interface EnhancedAssetReference extends AssetReference {
+  // For texture assets
+  textureProperties?: {
+    format: 'RGB' | 'RGBA' | 'RGBE' | 'RGBM' | 'sRGB' | 'Linear';
+    type: 'UnsignedByte' | 'Float' | 'HalfFloat';
+    colorSpace: 'sRGB' | 'Linear' | 'Rec2020' | 'DisplayP3';
+    flipY: boolean;
+    generateMipmaps: boolean;
+    premultiplyAlpha: boolean;
+    unpackAlignment: number;
+  };
+  // For model assets
+  modelProperties?: {
+    format: 'GLTF' | 'GLB' | 'FBX' | 'OBJ' | 'DAE' | 'PLY' | 'STL';
+    animations: string[];
+    materials: string[];
+    textures: string[];
+  };
+}

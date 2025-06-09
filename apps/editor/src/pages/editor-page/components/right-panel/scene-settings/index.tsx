@@ -84,8 +84,8 @@ export default function SceneSettings({ scene }: SceneSettingsProps) {
                 value={scene.editorConfig.gridSize}
                 onChange={(value) => handleEditorConfigChange('gridSize', value)}
                 min={0.1}
-                max={10}
-                step={0.1}
+                max={100}
+                step={0.5}
                 precision={1}
                 className="w-16"
               />

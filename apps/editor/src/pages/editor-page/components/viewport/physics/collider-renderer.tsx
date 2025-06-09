@@ -24,7 +24,7 @@ const packCollisionGroups = (membership: number, filter: number): number => {
   return (membership << 16) | (filter & 0xFFFF);
 };
 
-export default function ColliderRenderer({ colliderComponent, children, transform }: ColliderRendererProps) {
+export default function ColliderRenderer({ colliderComponent, children }: ColliderRendererProps) {
   if (!colliderComponent.enabled) {
     return <>{children}</>;
   }
@@ -53,11 +53,6 @@ export default function ColliderRenderer({ colliderComponent, children, transfor
     collisionGroups: packedCollisionGroups,
     solverGroups: packedSolverGroups,
     contactForceEventThreshold: props.contactForceEventThreshold,
-    // Apply transform to standalone colliders (when not part of a rigid body)
-    ...(transform && {
-      position: [transform.position.x, transform.position.y, transform.position.z] as [number, number, number],
-      rotation: [transform.rotation.x, transform.rotation.y, transform.rotation.z] as [number, number, number],
-    })
   };
 
   // Render different collider types based on shape

@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { RigidBody, RapierRigidBody } from "@react-three/rapier";
-import { useFrame } from "@react-three/fiber";
+import {
+  RigidBody,
+  RapierRigidBody,
+  useAfterPhysicsStep,
+} from "@react-three/rapier";
 import { usePhysics } from "./physics-context";
 import ColliderRenderer from "./collider-renderer";
 import * as THREE from "three";
@@ -12,6 +15,9 @@ interface RigidBodyRendererProps {
   colliderComponents?: ColliderComponent[];
   children: React.ReactNode;
 }
+
+const euler = new THREE.Euler(0, 0, 0, "XYZ");
+const quaternion = new THREE.Quaternion().setFromEuler(euler);
 
 export default function RigidBodyRenderer({
   objectId,
@@ -33,22 +39,6 @@ export default function RigidBodyRenderer({
   useEffect(() => {
     const rigidBody = rigidBodyRef.current;
     if (rigidBody && rigidBodyComponent.enabled && !isRegistered) {
-      // Set initial transform immediately after creation
-      rigidBody.setTranslation(transform.position, true);
-
-      const euler = new THREE.Euler(
-        transform.rotation.x,
-        transform.rotation.y,
-        transform.rotation.z,
-        'XYZ' // Specify rotation order for consistency
-      );
-      const quaternion = new THREE.Quaternion().setFromEuler(euler);
-      rigidBody.setRotation(quaternion, true);
-
-      // Reset velocities
-      rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-      rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-
       registerRigidBody(objectId, rigidBody);
       setIsRegistered(true);
 
@@ -64,55 +54,12 @@ export default function RigidBodyRenderer({
     registerRigidBody,
     unregisterRigidBody,
     rigidBodyComponent.enabled,
-    transform,
     isRegistered,
-  ]);
-
-  // Update transforms when physics is not playing
-  useEffect(() => {
-    if (physicsState === "playing" || !rigidBodyRef.current || !isRegistered)
-      return;
-
-    const rigidBody = rigidBodyRef.current;
-
-    try {
-      // Always update the rigid body position and rotation when transform changes
-      rigidBody.setTranslation(transform.position, true);
-
-      // Update rotation (convert euler to quaternion)
-      const euler = new THREE.Euler(
-        transform.rotation.x,
-        transform.rotation.y,
-        transform.rotation.z,
-        'XYZ' // Specify rotation order for consistency
-      );
-      const quaternion = new THREE.Quaternion().setFromEuler(euler);
-      rigidBody.setRotation(quaternion, true);
-
-      // Reset velocities when manually positioning
-      rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-      rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    } catch (error) {
-      console.warn("Failed to update rigid body transform:", error);
-    }
-  }, [
-    transform.position.x,
-    transform.position.y,
-    transform.position.z,
-    transform.rotation.x,
-    transform.rotation.y,
-    transform.rotation.z,
-    transform.scale.x, // Include scale in dependencies
-    transform.scale.y,
-    transform.scale.z,
-    physicsState,
-    isRegistered,
-    objectId,
   ]);
 
   // Handle physics updates using useFrame
-  useFrame(() => {
-    if (!rigidBodyRef.current || physicsState !== "playing" || !isRegistered)
+  useAfterPhysicsStep(() => {
+    if (!rigidBodyRef.current || !isRegistered || physicsState !== "playing")
       return;
 
     try {
@@ -126,11 +73,10 @@ export default function RigidBodyRenderer({
         z: translation.z,
       };
 
+      quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+
       // Convert quaternion to euler angles with consistent rotation order
-      const euler = new THREE.Euler().setFromQuaternion(
-        new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
-        'XYZ' // Specify rotation order for consistency
-      );
+      euler.setFromQuaternion(quaternion, "XYZ");
 
       const rotationEuler: Vector3 = {
         x: euler.x,
@@ -171,7 +117,6 @@ export default function RigidBodyRenderer({
     <RigidBody
       ref={rigidBodyRef}
       type={bodyType}
-      // Set initial position and rotation - RigidBody will be the transform owner
       position={[
         transform.position.x,
         transform.position.y,
@@ -182,6 +127,7 @@ export default function RigidBodyRenderer({
         transform.rotation.y,
         transform.rotation.z,
       ]}
+      scale={[transform.scale.x, transform.scale.y, transform.scale.z]}
       mass={props.mass}
       linearDamping={props.linearDamping}
       angularDamping={props.angularDamping}

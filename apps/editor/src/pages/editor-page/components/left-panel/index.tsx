@@ -27,7 +27,7 @@ export default function LeftPanel({ scene, selectedObjects, onSelectObject }: Le
           <TabsTrigger value="assets">Assets</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="hierarchy" className="p-0 m-0">
+        <TabsContent value="hierarchy" className="p-0 m-0 max-h-[calc(100vh-10rem)] overflow-y-auto">
           <SceneTree 
             scene={scene}
             selectedObjects={selectedObjects}
