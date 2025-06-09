@@ -10,6 +10,34 @@ interface PhysicsWrapperProps {
   isPivotControlsActive: boolean;
 }
 
+// Simple error boundary for physics components
+class PhysicsComponentErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.warn('Physics component error:', error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Render children without physics wrapper when error occurs
+      return <>{this.props.children}</>;
+    }
+
+    return this.props.children;
+  }
+}
+
 const PhysicsWrapper: React.FC<PhysicsWrapperProps> = ({
   objectId,
   transform,
@@ -36,14 +64,16 @@ const PhysicsWrapper: React.FC<PhysicsWrapperProps> = ({
   // If there's a rigid body AND pivot controls are NOT active, wrap with RigidBodyRenderer
   if (rigidBodyComp && !isPivotControlsActive) {
     return (
-      <RigidBodyRenderer
-        objectId={objectId}
-        transform={transform}
-        rigidBodyComponent={rigidBodyComp}
-        colliderComponents={colliderComponents}
-      >
-        {children}
-      </RigidBodyRenderer>
+      <PhysicsComponentErrorBoundary>
+        <RigidBodyRenderer
+          objectId={objectId}
+          transform={transform}
+          rigidBodyComponent={rigidBodyComp}
+          colliderComponents={colliderComponents}
+        >
+          {children}
+        </RigidBodyRenderer>
+      </PhysicsComponentErrorBoundary>
     );
   }
 
@@ -55,14 +85,18 @@ const PhysicsWrapper: React.FC<PhysicsWrapperProps> = ({
   // If no rigid body but has colliders (static colliders), wrap with ColliderRenderer
   // Skip colliders when pivot controls are active to avoid conflicts
   if (!isPivotControlsActive && colliderComponents.length > 0) {
-    return colliderComponents.reduce((acc, colliderComponent) => (
-      <ColliderRenderer 
-        colliderComponent={colliderComponent}
-        transform={transform}
-      >
-        {acc}
-      </ColliderRenderer>
-    ), children as React.ReactElement);
+    return (
+      <PhysicsComponentErrorBoundary>
+        {colliderComponents.reduce((acc, colliderComponent) => (
+          <ColliderRenderer 
+            colliderComponent={colliderComponent}
+            transform={transform}
+          >
+            {acc}
+          </ColliderRenderer>
+        ), children as React.ReactElement)}
+      </PhysicsComponentErrorBoundary>
+    );
   }
 
   return <>{children}</>;

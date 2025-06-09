@@ -31,35 +31,56 @@ export default function RigidBodyRenderer({
     registerRigidBody,
     unregisterRigidBody,
     updateTransformFromPhysics,
+    isInitialized,
   } = usePhysics();
   const rigidBodyRef = useRef<RapierRigidBody>(null);
   const [isRegistered, setIsRegistered] = useState(false);
+  const cleanupExecutedRef = useRef(false);
 
-  // Register/unregister rigid body
+  // Register/unregister rigid body with improved cleanup logic
   useEffect(() => {
     const rigidBody = rigidBodyRef.current;
-    if (rigidBody && rigidBodyComponent.enabled && !isRegistered) {
+    
+    if (rigidBody && rigidBodyComponent.enabled && !isRegistered && isInitialized) {
       registerRigidBody(objectId, rigidBody);
       setIsRegistered(true);
-
-      return () => {
-        if (isRegistered) {
-          unregisterRigidBody(objectId);
-          setIsRegistered(false);
-        }
-      };
+      cleanupExecutedRef.current = false;
     }
+
+    return () => {
+      // Only execute cleanup once and only if we were actually registered
+      if (isRegistered && !cleanupExecutedRef.current) {
+        cleanupExecutedRef.current = true;
+        
+        // Use a timeout to defer cleanup until after React's current render cycle
+        // This prevents conflicts with physics world state changes
+        setTimeout(() => {
+          try {
+            // Only attempt cleanup if physics is still initialized
+            if (isInitialized) {
+              unregisterRigidBody(objectId);
+            }
+          } catch {
+            // Silently ignore cleanup errors - they typically happen when 
+            // the physics world is already being destroyed
+          }
+        }, 0);
+        
+        setIsRegistered(false);
+      }
+    };
   }, [
     objectId,
     registerRigidBody,
     unregisterRigidBody,
     rigidBodyComponent.enabled,
     isRegistered,
+    isInitialized,
   ]);
 
-  // Handle physics updates using useFrame
+  // Handle physics updates using useAfterPhysicsStep
   useAfterPhysicsStep(() => {
-    if (!rigidBodyRef.current || !isRegistered || physicsState !== "playing")
+    if (!rigidBodyRef.current || !isRegistered || physicsState !== "playing" || !isInitialized)
       return;
 
     try {

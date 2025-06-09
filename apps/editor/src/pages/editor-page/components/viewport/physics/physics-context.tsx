@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, useRef, useState, useMemo } from 'react';
+import React, { createContext, useContext, useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { Physics, useRapier, RapierRigidBody } from '@react-three/rapier';
 import * as THREE from 'three';
 
@@ -90,6 +90,39 @@ const validatePhysicsWorldConfig = (config: any): PhysicsWorldConfig => {
   };
 };
 
+// Physics Error Boundary
+class PhysicsErrorBoundary extends React.Component<
+  { children: React.ReactNode; onError?: () => void },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; onError?: () => void }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.warn('Physics error caught:', error, errorInfo);
+    this.props.onError?.();
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <group>
+          {/* Render children without physics when error occurs */}
+          {this.props.children}
+        </group>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export function PhysicsProvider({ children, scene, onObjectTransformUpdate, debugEnabled }: PhysicsProviderProps) {
   const [physicsState, setPhysicsState] = useState<PhysicsState>('stopped');
   
@@ -105,24 +138,26 @@ export function PhysicsProvider({ children, scene, onObjectTransformUpdate, debu
   const shouldShowDebug = debugEnabled !== undefined ? debugEnabled : physicsWorldConfig.debugRender.enabled;
 
   return (
-    <Physics
-      gravity={[physicsWorldConfig.gravity.x, physicsWorldConfig.gravity.y, physicsWorldConfig.gravity.z]}
-      timeStep={physicsWorldConfig.integrationParameters.dt}
-      paused={isPaused}
-      debug={shouldShowDebug}
-      updateLoop="follow"
-      interpolate={true}
-      colliders={false}
-    >
-      <PhysicsInnerProvider 
-        scene={scene} 
-        onObjectTransformUpdate={onObjectTransformUpdate}
-        physicsState={physicsState}
-        setPhysicsState={setPhysicsState}
+    <PhysicsErrorBoundary onError={() => setPhysicsState('stopped')}>
+      <Physics
+        gravity={[physicsWorldConfig.gravity.x, physicsWorldConfig.gravity.y, physicsWorldConfig.gravity.z]}
+        timeStep={physicsWorldConfig.integrationParameters.dt}
+        paused={isPaused}
+        debug={shouldShowDebug}
+        updateLoop="follow"
+        interpolate={true}
+        colliders={false}
       >
-        {children}
-      </PhysicsInnerProvider>
-    </Physics>
+        <PhysicsInnerProvider 
+          scene={scene} 
+          onObjectTransformUpdate={onObjectTransformUpdate}
+          physicsState={physicsState}
+          setPhysicsState={setPhysicsState}
+        >
+          {children}
+        </PhysicsInnerProvider>
+      </Physics>
+    </PhysicsErrorBoundary>
   );
 }
 
@@ -141,9 +176,54 @@ function PhysicsInnerProvider({
   const rigidBodiesRef = useRef<Map<string, RapierRigidBody>>(new Map());
   const initialTransformsRef = useRef<Map<string, Transform>>(new Map());
   const isInitialized = world && rapier;
+  const cleanupInProgressRef = useRef(false);
+  const lastSceneObjectsRef = useRef<GameObject[]>([]);
+  const [isSceneStable, setIsSceneStable] = useState(true);
+
+  // Detect scene changes and stabilize physics operations
+  useEffect(() => {
+    const currentObjects = scene.objects;
+    const lastObjects = lastSceneObjectsRef.current;
+    
+    // Check if scene objects have changed
+    const hasSceneChanged = currentObjects.length !== lastObjects.length ||
+      currentObjects.some((obj, index) => obj.id !== lastObjects[index]?.id);
+    
+    if (hasSceneChanged) {
+      // Stop physics when scene changes to prevent operations on stale objects
+      if (physicsState === 'playing') {
+        setPhysicsState('stopped');
+      }
+      
+      // Temporarily pause physics operations during scene changes
+      setIsSceneStable(false);
+      
+      // Stabilize after a short delay to allow React to finish updates
+      const stabilizeTimer = setTimeout(() => {
+        setIsSceneStable(true);
+      }, 100);
+      
+      lastSceneObjectsRef.current = currentObjects;
+      return () => clearTimeout(stabilizeTimer);
+    }
+    
+    lastSceneObjectsRef.current = currentObjects;
+  }, [scene.objects, physicsState, setPhysicsState]);
+
+  // Clean up all rigid bodies when component unmounts or physics world changes
+  useEffect(() => {
+    return () => {
+      cleanupInProgressRef.current = true;
+      // Clear the rigid bodies map to prevent further access
+      rigidBodiesRef.current.clear();
+      initialTransformsRef.current.clear();
+    };
+  }, []);
 
   // Store initial transforms when simulation starts
   const storeInitialTransforms = useCallback(() => {
+    if (cleanupInProgressRef.current) return;
+    
     initialTransformsRef.current.clear();
     const storeObjectTransforms = (objects: GameObject[]) => {
       objects.forEach(obj => {
@@ -158,6 +238,8 @@ function PhysicsInnerProvider({
 
   // Restore initial transforms when simulation stops
   const restoreInitialTransforms = useCallback(() => {
+    if (cleanupInProgressRef.current) return;
+    
     initialTransformsRef.current.forEach((transform, objectId) => {
       onObjectTransformUpdate(objectId, transform);
       
@@ -188,7 +270,7 @@ function PhysicsInnerProvider({
   }, [onObjectTransformUpdate]);
 
   const play = useCallback(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || cleanupInProgressRef.current) return;
     
     if (physicsState === 'stopped') {
       storeInitialTransforms();
@@ -197,35 +279,37 @@ function PhysicsInnerProvider({
   }, [physicsState, storeInitialTransforms, isInitialized, setPhysicsState]);
 
   const pause = useCallback(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || cleanupInProgressRef.current) return;
     setPhysicsState('paused');
   }, [isInitialized, setPhysicsState]);
 
   const resume = useCallback(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || cleanupInProgressRef.current) return;
     setPhysicsState('playing');
   }, [isInitialized, setPhysicsState]);
 
   const stop = useCallback(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || cleanupInProgressRef.current) return;
     setPhysicsState('stopped');
     restoreInitialTransforms();
   }, [restoreInitialTransforms, isInitialized, setPhysicsState]);
 
   const registerRigidBody = useCallback((objectId: string, rigidBody: RapierRigidBody) => {
+    if (cleanupInProgressRef.current || !isSceneStable) return;
     rigidBodiesRef.current.set(objectId, rigidBody);
-  }, []);
+  }, [isSceneStable]);
 
   const unregisterRigidBody = useCallback((objectId: string) => {
+    if (cleanupInProgressRef.current) return;
     rigidBodiesRef.current.delete(objectId);
   }, []);
 
   const updateTransformFromPhysics = useCallback((objectId: string, position: Vector3, rotation: Vector3) => {
-    if (physicsState === 'playing') {
+    if (physicsState === 'playing' && !cleanupInProgressRef.current && isSceneStable) {
       // Only update position and rotation from physics, preserve existing scale
       onObjectTransformUpdate(objectId, { position, rotation });
     }
-  }, [physicsState, onObjectTransformUpdate]);
+  }, [physicsState, onObjectTransformUpdate, isSceneStable]);
 
   const contextValue: PhysicsContextType = {
     physicsState,
@@ -238,7 +322,7 @@ function PhysicsInnerProvider({
     registerRigidBody,
     unregisterRigidBody,
     updateTransformFromPhysics,
-    isInitialized: !!isInitialized,
+    isInitialized: !!isInitialized && !cleanupInProgressRef.current && isSceneStable,
   };
 
   return (
