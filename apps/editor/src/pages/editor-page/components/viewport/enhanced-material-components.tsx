@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { useLoader } from '@react-three/fiber';
+import { getGeometryComponent } from './geometry-components';
+import useEditorStore from '@/stores/editor-store';
 
 // Enhanced Material Component for React Three Fiber Integration
 interface MaterialReference {
@@ -24,6 +26,7 @@ export function EnhancedMaterial({
   onMaterialReady 
 }: EnhancedMaterialProps) {
   const [material, setMaterial] = useState<THREE.Material | null>(null);
+  const { materials } = useEditorStore();
   
   // Load textures
   const textureMap = useLoader(
@@ -46,9 +49,14 @@ export function EnhancedMaterial({
       let mat: THREE.Material;
 
       if (materialRef.type === 'library' && materialRef.materialId) {
-        // Load from material library (future implementation)
-        // mat = await materialSystem.createMaterial(materialRef.materialId, assetMap);
-        mat = new THREE.MeshStandardMaterial(); // Fallback for now
+        // Load from material library using editor store
+        const materialDefinition = materials.find(m => m.id === materialRef.materialId);
+        if (materialDefinition) {
+          mat = createInlineMaterial(materialDefinition.properties, loadedTextures, uniforms);
+        } else {
+          console.warn(`Material not found in library: ${materialRef.materialId}`);
+          mat = new THREE.MeshStandardMaterial({ color: '#ff0000' }); // Red to indicate error
+        }
       } else if (materialRef.properties) {
         // Create inline material
         mat = createInlineMaterial(materialRef.properties, loadedTextures, uniforms);
@@ -61,7 +69,7 @@ export function EnhancedMaterial({
     };
 
     createMaterial();
-  }, [materialRef, loadedTextures, uniforms, onMaterialReady]);
+  }, [materialRef, loadedTextures, uniforms, onMaterialReady, materials]);
 
   if (!material) return null;
 
@@ -268,26 +276,6 @@ export function EnhancedMeshRenderer({
       {children}
     </mesh>
   );
-}
-
-// Helper function to get geometry component (import from existing file)
-function getGeometryComponent(type: string) {
-  switch (type) {
-    case 'box':
-      return ({ width = 1, height = 1, depth = 1, ...props }: any) => (
-        <boxGeometry args={[width, height, depth]} {...props} />
-      );
-    case 'sphere':
-      return ({ radius = 0.5, widthSegments = 32, heightSegments = 16, ...props }: any) => (
-        <sphereGeometry args={[radius, widthSegments, heightSegments]} {...props} />
-      );
-    case 'plane':
-      return ({ width = 1, height = 1, widthSegments = 1, heightSegments = 1, ...props }: any) => (
-        <planeGeometry args={[width, height, widthSegments, heightSegments]} {...props} />
-      );
-    default:
-      return ({ ...props }: any) => <boxGeometry args={[1, 1, 1]} {...props} />;
-  }
 }
 
 // Material presets for quick access

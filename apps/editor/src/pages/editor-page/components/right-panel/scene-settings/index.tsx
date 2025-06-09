@@ -1,31 +1,46 @@
 import React from "react";
-import { Settings, Eye, Zap, Palette } from "lucide-react";
+import { Settings, Eye, Zap, Palette, AlertTriangle } from "lucide-react";
 import { DragInput } from "@/components/ui/drag-input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import useEditorStore from "@/stores/editor-store";
+import { sceneHasLegacyMaterials, getLegacyMaterialStats, upgradeSceneMaterials } from "@/pages/editor-page/components/viewport/scene-migration";
 
 interface SceneSettingsProps {
   scene: GameScene | null;
 }
 
 export default function SceneSettings({ scene }: SceneSettingsProps) {
-  const { updateSceneEditorConfig, updateSceneRuntimeConfig } = useEditorStore();
+  const { updateSceneEditorConfig, updateSceneRuntimeConfig, setCurrentScene } = useEditorStore();
 
   if (!scene) {
     return (
-      <div className="p-4">
-        <h3 className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
-          <Settings size={16} />
-          Scene Settings
-        </h3>
-        <div className="text-center text-muted-foreground text-sm">
-          No scene selected
-        </div>
+      <div className="p-4 text-center text-muted-foreground">
+        No scene selected
       </div>
     );
   }
+
+  const hasLegacyMaterials = sceneHasLegacyMaterials(scene);
+  const materialStats = getLegacyMaterialStats(scene);
+
+  const handleUpgradeScene = async () => {
+    const upgradedScene = upgradeSceneMaterials(scene);
+    setCurrentScene(upgradedScene);
+    
+    // Save the upgraded scene
+    const { currentProject } = useEditorStore.getState();
+    if (currentProject) {
+      try {
+        await window.projectAPI.saveScene(currentProject.path, upgradedScene);
+      } catch (error) {
+        console.error('Failed to save upgraded scene:', error);
+      }
+    }
+  };
 
   const handleEditorConfigChange = (key: keyof SceneEditorConfig, value: any) => {
     updateSceneEditorConfig({ [key]: value });
@@ -342,6 +357,32 @@ export default function SceneSettings({ scene }: SceneSettingsProps) {
           </div>
         </div>
       </div>
+
+      {/* Legacy Material Detection and Upgrade */}
+      {hasLegacyMaterials && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-red-400">
+            <AlertTriangle size={14} />
+            Legacy Materials Detected
+          </div>
+          
+          <div className="p-3 bg-red-950/20 border border-red-800 rounded-lg">
+            <AlertDescription className="text-xs text-red-200 mb-3">
+              This scene contains {materialStats.legacyMeshComponents} legacy material{materialStats.legacyMeshComponents !== 1 ? 's' : ''} out of {materialStats.totalMeshComponents} total mesh components. 
+              Legacy materials use an older format and should be upgraded for better performance and new features.
+            </AlertDescription>
+            
+            <Button
+              onClick={handleUpgradeScene}
+              size="sm"
+              variant="outline"
+              className="w-full text-xs border-red-700 text-red-200 hover:bg-red-800/20"
+            >
+              Upgrade All Legacy Materials
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

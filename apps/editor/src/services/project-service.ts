@@ -255,6 +255,7 @@ export class ProjectService {
           layer: 0
         }
       ],
+      materials: [],
       editorConfig: {
         showHelperGrid: true,
         gridSize: 1,
@@ -454,6 +455,7 @@ export class ProjectService {
           layer: 0
         }
       ],
+      materials: [],
       editorConfig: {
         showHelperGrid: true,
         gridSize: 1,

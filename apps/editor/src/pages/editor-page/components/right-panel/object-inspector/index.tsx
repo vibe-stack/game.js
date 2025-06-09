@@ -69,6 +69,7 @@ export default function ObjectInspector({ scene, selectedObjects }: ObjectInspec
         
         <ComponentsList 
           components={obj.components}
+          objectId={obj.id}
           onUpdate={(componentId, updates) => handleComponentUpdate(obj.id, componentId, updates)}
           onAddComponent={(component) => handleAddComponent(obj.id, component)}
         />

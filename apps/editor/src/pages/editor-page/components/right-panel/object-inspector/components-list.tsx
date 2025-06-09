@@ -8,20 +8,27 @@ import AddComponentMenu from "./add-component-menu";
 
 interface ComponentsListProps {
   components: (GameObjectComponent | PhysicsComponent)[];
+  objectId: string;
   onUpdate: (componentId: string, updates: Partial<GameObjectComponent | PhysicsComponent>) => void;
   onAddComponent: (component: GameObjectComponent | PhysicsComponent) => void;
 }
 
-export default function ComponentsList({ components, onUpdate, onAddComponent }: ComponentsListProps) {
+export default function ComponentsList({ components, objectId, onUpdate, onAddComponent }: ComponentsListProps) {
   const renderComponent = (component: GameObjectComponent | PhysicsComponent) => {
     const commonProps = {
       component,
       onUpdate: (updates: Partial<GameObjectComponent | PhysicsComponent>) => onUpdate(component.id, updates)
     };
 
+    const meshProps = {
+      component,
+      objectId,
+      onUpdate: (updates: Partial<GameObjectComponent | PhysicsComponent>) => onUpdate(component.id, updates)
+    };
+
     switch (component.type) {
       case 'Mesh':
-        return <MeshComponent key={component.id} {...commonProps} component={component as GameObjectComponent} />;
+        return <MeshComponent key={component.id} {...meshProps} component={component as GameObjectComponent} />;
       case 'DirectionalLight':
       case 'PointLight':
       case 'SpotLight':

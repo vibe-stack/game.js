@@ -62,6 +62,22 @@ interface EditorState {
   
   // Scene switching
   switchScene: (sceneName: string) => Promise<void>;
+  
+  // Material management
+  materials: MaterialDefinition[];
+  selectedMaterialId: string | null;
+  isMaterialBrowserOpen: boolean;
+  editingMeshId: string | null; // Which mesh is being edited for material assignment
+  
+  // Material Management Actions
+  setMaterials: (materials: MaterialDefinition[]) => void;
+  addMaterial: (material: MaterialDefinition) => void;
+  updateMaterial: (materialId: string, updatedMaterial: MaterialDefinition) => void;
+  deleteMaterial: (materialId: string) => void;
+  setSelectedMaterial: (materialId: string | null) => void;
+  openMaterialBrowser: (meshId?: string) => void;
+  closeMaterialBrowser: () => void;
+  assignMaterialToMesh: (meshId: string, materialId: string) => void;
 }
 
 const useEditorStore = create<EditorState>()(
@@ -79,6 +95,12 @@ const useEditorStore = create<EditorState>()(
     },
     physicsState: 'stopped',
     physicsCallbacks: {},
+    
+    // Material management
+    materials: [],
+    selectedMaterialId: null,
+    isMaterialBrowserOpen: false,
+    editingMeshId: null,
 
     // Project Actions
     setCurrentProject: (project) => set({ currentProject: project }),
@@ -87,7 +109,8 @@ const useEditorStore = create<EditorState>()(
     // Scene Actions
     setCurrentScene: (scene) => set({ 
       currentScene: scene,
-      selectedObjects: [] // Clear selection when changing scenes
+      selectedObjects: [], // Clear selection when changing scenes
+      materials: scene?.materials || [] // Load materials from scene
     }),
     
     // Scene switching
@@ -341,6 +364,120 @@ const useEditorStore = create<EditorState>()(
       const { physicsState, physicsCallbacks } = useEditorStore.getState();
       if (physicsState === 'paused' && physicsCallbacks.resume) {
         physicsCallbacks.resume();
+      }
+    },
+
+    // Material Management Actions
+    setMaterials: (materials: MaterialDefinition[]) => set({ materials }),
+    
+    addMaterial: (material: MaterialDefinition) => set((state) => {
+      const updatedMaterials = [...state.materials, material];
+      
+      // Also add to current scene's materials if a scene is loaded
+      const updatedScene = state.currentScene ? {
+        ...state.currentScene,
+        materials: [...(state.currentScene.materials || []), material]
+      } : state.currentScene;
+
+      return {
+        materials: updatedMaterials,
+        currentScene: updatedScene
+      };
+    }),
+    
+    updateMaterial: (materialId: string, updatedMaterial: MaterialDefinition) => set((state) => {
+      const updatedMaterials = state.materials.map(material => 
+        material.id === materialId ? updatedMaterial : material
+      );
+      
+      // Also update in current scene's materials if a scene is loaded
+      const updatedScene = state.currentScene ? {
+        ...state.currentScene,
+        materials: (state.currentScene.materials || []).map(material => 
+          material.id === materialId ? updatedMaterial : material
+        )
+      } : state.currentScene;
+
+      return {
+        materials: updatedMaterials,
+        currentScene: updatedScene
+      };
+    }),
+    
+    deleteMaterial: (materialId: string) => set((state) => {
+      const updatedMaterials = state.materials.filter(material => material.id !== materialId);
+      
+      // Also remove from current scene's materials if a scene is loaded
+      const updatedScene = state.currentScene ? {
+        ...state.currentScene,
+        materials: (state.currentScene.materials || []).filter(material => material.id !== materialId)
+      } : state.currentScene;
+
+      return {
+        materials: updatedMaterials,
+        currentScene: updatedScene
+      };
+    }),
+    
+    setSelectedMaterial: (materialId: string | null) => set({ selectedMaterialId: materialId }),
+    
+    openMaterialBrowser: (meshId?: string) => set({ 
+      isMaterialBrowserOpen: true,
+      editingMeshId: meshId || null
+    }),
+    
+    closeMaterialBrowser: () => set({ 
+      isMaterialBrowserOpen: false,
+      editingMeshId: null,
+      selectedMaterialId: null
+    }),
+    
+    assignMaterialToMesh: (meshId: string, materialId: string) => {
+      const state = useEditorStore.getState();
+      const material = state.materials.find(m => m.id === materialId);
+      if (material && state.currentScene) {
+        // Find the object and update its mesh component
+        const findAndUpdateObject = (objects: GameObject[]): GameObject[] => {
+          return objects.map(obj => {
+            if (obj.id === meshId) {
+              return {
+                ...obj,
+                components: obj.components.map(comp => {
+                  if (comp.type === 'Mesh') {
+                    return {
+                      ...comp,
+                      properties: {
+                        ...comp.properties,
+                        materialRef: {
+                          type: 'library',
+                          materialId: materialId
+                        }
+                      }
+                    };
+                  }
+                  return comp;
+                })
+              };
+            }
+            return {
+              ...obj,
+              children: findAndUpdateObject(obj.children)
+            };
+          });
+        };
+
+        // Ensure the material is included in the scene's materials array
+        const sceneMaterials = state.currentScene.materials || [];
+        const materialExists = sceneMaterials.some(m => m.id === materialId);
+        const updatedMaterials = materialExists ? sceneMaterials : [...sceneMaterials, material];
+
+        const updatedScene = {
+          ...state.currentScene,
+          objects: findAndUpdateObject(state.currentScene.objects),
+          materials: updatedMaterials
+        };
+
+        set({ currentScene: updatedScene });
       }
     },
   }))

@@ -2,10 +2,8 @@ import React from "react";
 import * as THREE from "three";
 
 export function createDefaultMeshComponent(isSelected: boolean, renderType: string = "solid"): GameObjectComponent {
-  const baseProps = {
-    color: isSelected ? '#ffff00' : '#ffa500',
-    wireframe: renderType === 'wireframe' || isSelected 
-  };
+  const baseColor = isSelected ? '#ffff00' : '#ffa500';
+  const wireframe = renderType === 'wireframe' || isSelected;
 
   return {
     id: 'default-mesh',
@@ -13,9 +11,17 @@ export function createDefaultMeshComponent(isSelected: boolean, renderType: stri
     enabled: true,
     properties: {
       geometry: 'box',
-      material: 'standard',
       geometryProps: { width: 1, height: 1, depth: 1 },
-      materialProps: baseProps,
+      materialRef: {
+        type: 'inline',
+        properties: {
+          type: 'standard',
+          color: baseColor,
+          wireframe,
+          metalness: 0.1,
+          roughness: 0.7
+        }
+      },
       castShadow: true,
       receiveShadow: true,
       renderType

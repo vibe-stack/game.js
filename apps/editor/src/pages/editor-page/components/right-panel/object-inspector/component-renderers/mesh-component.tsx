@@ -3,6 +3,9 @@ import { DragInput } from "@/components/ui/drag-input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Palette, Plus, AlertTriangle, ArrowUp } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import ColorInput from "../color-input";
 import BoxGeometry from "./geometry-controls/box-geometry";
 import SphereGeometry from "./geometry-controls/sphere-geometry";
@@ -15,16 +18,25 @@ import CapsuleGeometry from "./geometry-controls/capsule-geometry";
 import CircleGeometry from "./geometry-controls/circle-geometry";
 import RingGeometry from "./geometry-controls/ring-geometry";
 import PolyhedronGeometry from "./geometry-controls/polyhedron-geometry";
+import useEditorStore from "@/stores/editor-store";
+import { isLegacyMaterial, upgradeMaterialComponent, getMaterialDisplayName } from "@/pages/editor-page/components/viewport/material-compatibility";
 
 interface MeshComponentProps {
   component: GameObjectComponent;
+  objectId: string;
   onUpdate: (updates: Partial<GameObjectComponent>) => void;
 }
 
-export default function MeshComponent({ component, onUpdate }: MeshComponentProps) {
+export default function MeshComponent({ component, objectId, onUpdate }: MeshComponentProps) {
+  const { materials, openMaterialBrowser } = useEditorStore();
   const props = component.properties || {};
   const geometryProps = props.geometryProps || {};
-  const materialProps = props.materialProps || {};
+  
+  // Handle both legacy and new materials
+  const isLegacy = isLegacyMaterial(component);
+  const materialRef = isLegacy 
+    ? { type: 'inline', properties: { type: props.material || 'standard', ...props.materialProps } }
+    : (props.materialRef || { type: 'inline', properties: { type: 'standard', color: '#ffffff' } });
 
   const updateProperty = (key: string, value: any) => {
     onUpdate({
@@ -47,14 +59,45 @@ export default function MeshComponent({ component, onUpdate }: MeshComponentProp
     });
   };
 
-  const updateMaterialProp = (key: string, value: any) => {
-    onUpdate({
-      properties: {
-        ...props,
-        materialProps: {
-          ...materialProps,
-          [key]: value
+  const updateMaterialRef = (materialRef: any) => {
+    if (isLegacy) {
+      // When updating legacy materials, first upgrade to new format
+      const upgraded = upgradeMaterialComponent(component);
+      onUpdate({
+        properties: {
+          ...upgraded.properties,
+          materialRef
         }
+      });
+    } else {
+      updateProperty('materialRef', materialRef);
+    }
+  };
+
+  const handleUpgradeMaterial = () => {
+    const upgraded = upgradeMaterialComponent(component);
+    onUpdate(upgraded);
+  };
+
+  const getAssignedMaterial = () => {
+    if (materialRef.type === 'library' && materialRef.materialId) {
+      return materials.find(m => m.id === materialRef.materialId);
+    }
+    return null;
+  };
+
+  const handleOpenMaterialBrowser = () => {
+    openMaterialBrowser(objectId);
+  };
+
+  const handleSwitchToInlineMaterial = () => {
+    updateMaterialRef({
+      type: 'inline',
+      properties: {
+        type: 'standard',
+        color: '#ffffff',
+        metalness: 0,
+        roughness: 0.5
       }
     });
   };
@@ -94,6 +137,227 @@ export default function MeshComponent({ component, onUpdate }: MeshComponentProp
       default:
         return null;
     }
+  };
+
+  const renderMaterialControls = () => {
+    if (materialRef.type === 'library') {
+      const assignedMaterial = getAssignedMaterial();
+      
+      return (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenMaterialBrowser}
+              className="flex-1"
+            >
+              <Palette className="h-3 w-3 mr-2" />
+              {assignedMaterial ? assignedMaterial.name : 'Select Material'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSwitchToInlineMaterial}
+              title="Switch to inline material"
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
+          
+          {assignedMaterial && (
+            <div className="p-2 bg-muted/30 rounded text-xs">
+              <div className="font-medium">{assignedMaterial.name}</div>
+              <div className="text-muted-foreground">Type: {assignedMaterial.properties.type}</div>
+              <div className="text-muted-foreground">Category: {assignedMaterial.metadata.category}</div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Inline material controls
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleOpenMaterialBrowser}
+            className="flex-1"
+          >
+            <Palette className="h-3 w-3 mr-2" />
+            Browse Materials
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Material Type</Label>
+            <Select
+              value={materialRef.properties?.type || 'standard'}
+              onValueChange={(type) => updateMaterialRef({
+                ...materialRef,
+                properties: { ...materialRef.properties, type }
+              })}
+            >
+              <SelectTrigger className="w-full h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="basic">Basic</SelectItem>
+                <SelectItem value="lambert">Lambert</SelectItem>
+                <SelectItem value="phong">Phong</SelectItem>
+                <SelectItem value="standard">Standard</SelectItem>
+                <SelectItem value="physical">Physical</SelectItem>
+                <SelectItem value="toon">Toon</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <ColorInput
+            label="Color"
+            value={materialRef.properties?.color || '#ffffff'}
+            onChange={(value) => updateMaterialRef({
+              ...materialRef,
+              properties: { ...materialRef.properties, color: value }
+            })}
+          />
+
+          {(materialRef.properties?.type === 'standard' || materialRef.properties?.type === 'physical') && (
+            <>
+              <DragInput
+                label="Metalness"
+                value={materialRef.properties?.metalness || 0}
+                onChange={(value) => updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, metalness: value }
+                })}
+                step={0.01}
+                precision={2}
+                min={0}
+                max={1}
+              />
+
+              <DragInput
+                label="Roughness"
+                value={materialRef.properties?.roughness || 0.5}
+                onChange={(value) => updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, roughness: value }
+                })}
+                step={0.01}
+                precision={2}
+                min={0}
+                max={1}
+              />
+            </>
+          )}
+
+          {materialRef.properties?.type === 'physical' && (
+            <>
+              <DragInput
+                label="Transmission"
+                value={materialRef.properties?.transmission || 0}
+                onChange={(value) => updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, transmission: value }
+                })}
+                step={0.01}
+                precision={2}
+                min={0}
+                max={1}
+              />
+
+              <DragInput
+                label="Thickness"
+                value={materialRef.properties?.thickness || 0}
+                onChange={(value) => updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, thickness: value }
+                })}
+                step={0.01}
+                precision={2}
+                min={0}
+                max={5}
+              />
+
+              <DragInput
+                label="IOR"
+                value={materialRef.properties?.ior || 1.5}
+                onChange={(value) => updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, ior: value }
+                })}
+                step={0.01}
+                precision={2}
+                min={1}
+                max={3}
+              />
+            </>
+          )}
+
+          <div className="space-y-1">
+            <Label className="text-xs">Side</Label>
+            <Select
+              value={String(materialRef.properties?.side ?? 0)}
+              onValueChange={(value) => updateMaterialRef({
+                ...materialRef,
+                properties: { ...materialRef.properties, side: parseInt(value) }
+              })}
+            >
+              <SelectTrigger className="w-full h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Front</SelectItem>
+                <SelectItem value="1">Back</SelectItem>
+                <SelectItem value="2">Double Side</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="wireframe"
+              checked={materialRef.properties?.wireframe || false}
+              onCheckedChange={(value: boolean) => updateMaterialRef({
+                ...materialRef,
+                properties: { ...materialRef.properties, wireframe: value }
+              })}
+            />
+            <Label htmlFor="wireframe" className="text-xs">Wireframe</Label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="transparent"
+              checked={materialRef.properties?.transparent || false}
+              onCheckedChange={(value: boolean) => updateMaterialRef({
+                ...materialRef,
+                properties: { ...materialRef.properties, transparent: value }
+              })}
+            />
+            <Label htmlFor="transparent" className="text-xs">Transparent</Label>
+          </div>
+
+          {materialRef.properties?.transparent && (
+            <DragInput
+              label="Opacity"
+              value={materialRef.properties?.opacity || 1}
+              onChange={(value) => updateMaterialRef({
+                ...materialRef,
+                properties: { ...materialRef.properties, opacity: value }
+              })}
+              step={0.01}
+              precision={2}
+              min={0}
+              max={1}
+            />
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -140,60 +404,26 @@ export default function MeshComponent({ component, onUpdate }: MeshComponentProp
         <div className="space-y-3">
           <Label className="text-xs text-muted-foreground">Material</Label>
           
-          <div className="space-y-2">
-            <ColorInput
-              label="Color"
-              value={materialProps.color || '#ffffff'}
-              onChange={(value) => updateMaterialProp('color', value)}
-            />
-
-            <DragInput
-              label="Metalness"
-              value={materialProps.metalness || 0}
-              onChange={(value) => updateMaterialProp('metalness', value)}
-              step={0.01}
-              precision={2}
-              min={0}
-              max={1}
-            />
-
-            <DragInput
-              label="Roughness"
-              value={materialProps.roughness || 0.5}
-              onChange={(value) => updateMaterialProp('roughness', value)}
-              step={0.01}
-              precision={2}
-              min={0}
-              max={1}
-            />
-
-            <div className="space-y-1">
-              <Label className="text-xs">Side</Label>
-              <Select
-                value={String(materialProps.side ?? 0)}
-                onValueChange={(value) => updateMaterialProp('side', parseInt(value))}
-              >
-                <SelectTrigger className="w-full h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">Front</SelectItem>
-                  <SelectItem value="1">Back</SelectItem>
-                  <SelectItem value="2">Double Side</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="wireframe"
-                checked={materialProps.wireframe || false}
-                onCheckedChange={(value: boolean) => updateMaterialProp('wireframe', value)}
-              />
-              <Label htmlFor="wireframe" className="text-xs">Wireframe</Label>
-            </div>
-
-          </div>
+          {/* Legacy Material Warning */}
+          {isLegacy && (
+            <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                This object uses a legacy material format ({getMaterialDisplayName(component)}). 
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={handleUpgradeMaterial}
+                  className="h-auto p-0 ml-1 text-amber-800 dark:text-amber-200 underline"
+                >
+                  <ArrowUp className="h-3 w-3 mr-1" />
+                  Upgrade to new format
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {renderMaterialControls()}
         </div>
 
         <div className="space-y-2">

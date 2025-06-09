@@ -262,6 +262,7 @@ interface GameScene {
   id: string;
   name: string;
   objects: GameObject[];
+  materials: MaterialDefinition[];
   editorConfig: SceneEditorConfig;
   runtimeConfig: SceneRuntimeConfig;
   physicsWorld: PhysicsWorldConfig;

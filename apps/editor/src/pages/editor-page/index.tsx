@@ -6,6 +6,7 @@ import { Viewport } from "./components/viewport";
 import LeftPanel from "./components/left-panel";
 import RightPanel from "./components/right-panel";
 import FloatingToolbar from "./components/floating-toolbar";
+import MaterialBrowser from '@/components/material-browser';
 
 export default function EditorPage() {
   const navigate = useNavigate();
@@ -139,6 +140,9 @@ export default function EditorPage() {
         scene={currentScene}
         selectedObjects={selectedObjects}
       />
+
+      {/* Floating Panels */}
+      <MaterialBrowser />
     </div>
   );
 }
