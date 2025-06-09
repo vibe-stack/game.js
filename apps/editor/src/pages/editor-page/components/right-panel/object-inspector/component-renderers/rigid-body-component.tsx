@@ -36,15 +36,7 @@ export default function RigidBodyComponent({ component, onUpdate }: RigidBodyCom
   };
 
   return (
-    <div className="p-0 mt-2 rounded-md space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Rigid Body</div>
-        <Switch
-          checked={component.enabled}
-          onCheckedChange={(enabled) => onUpdate({ enabled })}
-        />
-      </div>
-
+    <div className="space-y-4">
       <div className="space-y-3">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Body Type</Label>

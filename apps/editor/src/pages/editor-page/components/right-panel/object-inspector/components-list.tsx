@@ -5,6 +5,8 @@ import CameraComponent from "./component-renderers/camera-component";
 import RigidBodyComponent from "./component-renderers/rigid-body-component";
 import ColliderComponent from "./component-renderers/collider-component";
 import AddComponentMenu from "./add-component-menu";
+import CollapsibleSection from "./collapsible-section";
+import CustomToggle from "./custom-toggle";
 
 interface ComponentsListProps {
   components: (GameObjectComponent | PhysicsComponent)[];
@@ -26,48 +28,79 @@ export default function ComponentsList({ components, objectId, onUpdate, onAddCo
       onUpdate: (updates: Partial<GameObjectComponent | PhysicsComponent>) => onUpdate(component.id, updates)
     };
 
-    switch (component.type) {
-      case 'Mesh':
-        return <MeshComponent key={component.id} {...meshProps} component={component as GameObjectComponent} />;
-      case 'DirectionalLight':
-      case 'PointLight':
-      case 'SpotLight':
-      case 'AmbientLight':
-      case 'HemisphereLight':
-      case 'RectAreaLight':
-        return <LightComponent key={component.id} {...commonProps} component={component as GameObjectComponent} />;
-      case 'PerspectiveCamera':
-      case 'OrthographicCamera':
-        return <CameraComponent key={component.id} {...commonProps} component={component as GameObjectComponent} />;
-      case 'rigidBody':
-        return <RigidBodyComponent key={component.id} {...commonProps} component={component as RigidBodyComponent} />;
-      case 'collider':
-        return <ColliderComponent key={component.id} {...commonProps} component={component as ColliderComponent} />;
-      case 'joint':
-        return (
-          <div key={component.id} className="p-3 border border-muted rounded-md">
-            <div className="text-sm font-medium mb-2">Joint</div>
+    const getComponentTitle = (comp: GameObjectComponent | PhysicsComponent) => {
+      switch (comp.type) {
+        case 'Mesh': return 'Mesh Renderer';
+        case 'DirectionalLight': return 'Directional Light';
+        case 'PointLight': return 'Point Light';
+        case 'SpotLight': return 'Spot Light';
+        case 'AmbientLight': return 'Ambient Light';
+        case 'HemisphereLight': return 'Hemisphere Light';
+        case 'RectAreaLight': return 'Rect Area Light';
+        case 'PerspectiveCamera': return 'Perspective Camera';
+        case 'OrthographicCamera': return 'Orthographic Camera';
+        case 'rigidBody': return 'Rigid Body';
+        case 'collider': return 'Collider';
+        case 'joint': return 'Joint';
+        default: return comp.type;
+      }
+    };
+
+    const renderComponentContent = () => {
+      switch (component.type) {
+        case 'Mesh':
+          return <MeshComponent {...meshProps} component={component as GameObjectComponent} />;
+        case 'DirectionalLight':
+        case 'PointLight':
+        case 'SpotLight':
+        case 'AmbientLight':
+        case 'HemisphereLight':
+        case 'RectAreaLight':
+          return <LightComponent {...commonProps} component={component as GameObjectComponent} />;
+        case 'PerspectiveCamera':
+        case 'OrthographicCamera':
+          return <CameraComponent {...commonProps} component={component as GameObjectComponent} />;
+        case 'rigidBody':
+          return <RigidBodyComponent {...commonProps} component={component as RigidBodyComponent} />;
+        case 'collider':
+          return <ColliderComponent {...commonProps} component={component as ColliderComponent} />;
+        case 'joint':
+          return (
             <div className="text-xs text-muted-foreground">
               Joint component renderer coming soon
             </div>
-          </div>
-        );
-      default:
-        return (
-          <div key={component.id} className="p-3 border border-muted rounded-md">
-            <div className="text-sm font-medium mb-2">{component.type}</div>
+          );
+        default:
+          return (
             <div className="text-xs text-muted-foreground">
               Component type not implemented yet
             </div>
-          </div>
-        );
-    }
+          );
+      }
+    };
+
+    return (
+      <CollapsibleSection 
+        key={component.id}
+        title={getComponentTitle(component)}
+        storageKey={`component-${component.type}-${component.id}`}
+        defaultOpen={false}
+        rightElement={
+          <CustomToggle
+            checked={component.enabled}
+            onCheckedChange={(enabled) => onUpdate(component.id, { enabled })}
+            onClick={(e) => e.stopPropagation()}
+          />
+        }
+      >
+        {renderComponentContent()}
+      </CollapsibleSection>
+    );
   };
 
   return (
-    <div className="">
-      <div className="border-b pb-2 flex items-center justify-between">
-        <h4 className="text-sm font-medium text-muted-foreground">Components</h4>
+    <div className="space-y-0">
+      <div className="flex items-center justify-between px-1 pb-3">
         <AddComponentMenu onAddComponent={onAddComponent} />
       </div>
       
@@ -76,7 +109,7 @@ export default function ComponentsList({ components, objectId, onUpdate, onAddCo
           No components attached
         </div>
       ) : (
-        <div className="space-y-1">
+        <div>
           {components.map(renderComponent)}
         </div>
       )}

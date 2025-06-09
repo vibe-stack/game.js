@@ -32,14 +32,14 @@ export default function CollisionGroupsGrid({ value, onChange, label }: Collisio
     });
   };
 
-  // Create 4x4 grid for 16 collision groups (0-15)
+  // Create 2x8 grid for 16 collision groups (0-15)
   const renderGrid = (bitmask: number, onToggle: (bitIndex: number) => void) => {
     const buttons = [];
     
-    for (let row = 0; row < 4; row++) {
+    for (let row = 0; row < 2; row++) {
       const rowButtons = [];
-      for (let col = 0; col < 4; col++) {
-        const bitIndex = row * 4 + col;
+      for (let col = 0; col < 8; col++) {
+        const bitIndex = row * 8 + col;
         const isActive = isBitSet(bitmask, bitIndex);
         
         rowButtons.push(

@@ -84,44 +84,34 @@ export default function CameraComponent({ component, onUpdate }: CameraComponent
   };
 
   return (
-    <div className="p-3 border border-muted rounded-md space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">{component.type}</div>
+    <div className="space-y-3">
+      {renderCameraSpecificControls()}
+
+      <DragInput
+        label="Near"
+        value={props.near || 0.1}
+        onChange={(value) => updateProperty('near', value)}
+        step={0.01}
+        precision={2}
+        min={0.001}
+      />
+
+      <DragInput
+        label="Far"
+        value={props.far || 1000}
+        onChange={(value) => updateProperty('far', value)}
+        step={10}
+        precision={0}
+        min={1}
+      />
+
+      <div className="flex items-center space-x-2">
         <Switch
-          checked={component.enabled}
-          onCheckedChange={(enabled) => onUpdate({ enabled })}
+          id="isMain"
+          checked={props.isMain || false}
+          onCheckedChange={(value: boolean) => updateProperty('isMain', value)}
         />
-      </div>
-
-      <div className="space-y-3">
-        {renderCameraSpecificControls()}
-
-        <DragInput
-          label="Near"
-          value={props.near || 0.1}
-          onChange={(value) => updateProperty('near', value)}
-          step={0.01}
-          precision={2}
-          min={0.001}
-        />
-
-        <DragInput
-          label="Far"
-          value={props.far || 1000}
-          onChange={(value) => updateProperty('far', value)}
-          step={10}
-          precision={0}
-          min={1}
-        />
-
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="isMain"
-            checked={props.isMain || false}
-            onCheckedChange={(value: boolean) => updateProperty('isMain', value)}
-          />
-          <Label htmlFor="isMain" className="text-xs">Main Camera</Label>
-        </div>
+        <Label htmlFor="isMain" className="text-xs">Main Camera</Label>
       </div>
     </div>
   );

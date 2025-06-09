@@ -207,53 +207,43 @@ export default function LightComponent({ component, onUpdate }: LightComponentPr
   };
 
   return (
-    <div className="p-3 border border-muted rounded-md space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">{component.type}</div>
-        <Switch
-          checked={component.enabled}
-          onCheckedChange={(enabled) => onUpdate({ enabled })}
+    <div className="space-y-3">
+      {component.type === 'HemisphereLight' ? (
+        <ColorInput
+          label="Sky Color"
+          value={props.skyColor || '#ffffff'}
+          onChange={(value) => updateProperty('skyColor', value)}
         />
-      </div>
-
-      <div className="space-y-3">
-        {component.type === 'HemisphereLight' ? (
-          <ColorInput
-            label="Sky Color"
-            value={props.skyColor || '#ffffff'}
-            onChange={(value) => updateProperty('skyColor', value)}
-          />
-        ) : (
-          <ColorInput
-            label="Color"
-            value={props.color || '#ffffff'}
-            onChange={(value) => updateProperty('color', value)}
-          />
-        )}
-
-        <DragInput
-          label="Intensity"
-          value={props.intensity || 1}
-          onChange={(value) => updateProperty('intensity', value)}
-          step={0.1}
-          precision={1}
-          min={0}
-          max={10}
+      ) : (
+        <ColorInput
+          label="Color"
+          value={props.color || '#ffffff'}
+          onChange={(value) => updateProperty('color', value)}
         />
+      )}
 
-        {renderLightSpecificControls()}
+      <DragInput
+        label="Intensity"
+        value={props.intensity || 1}
+        onChange={(value) => updateProperty('intensity', value)}
+        step={0.1}
+        precision={1}
+        min={0}
+        max={10}
+      />
 
-        {component.type !== 'AmbientLight' && component.type !== 'HemisphereLight' && component.type !== 'RectAreaLight' && (
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="castShadow"
-              checked={props.castShadow || false}
-              onCheckedChange={(value: boolean) => updateProperty('castShadow', value)}
-            />
-            <Label htmlFor="castShadow" className="text-xs">Cast Shadow</Label>
-          </div>
-        )}
-      </div>
+      {renderLightSpecificControls()}
+
+      {component.type !== 'AmbientLight' && component.type !== 'HemisphereLight' && component.type !== 'RectAreaLight' && (
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="castShadow"
+            checked={props.castShadow || false}
+            onCheckedChange={(value: boolean) => updateProperty('castShadow', value)}
+          />
+          <Label htmlFor="castShadow" className="text-xs">Cast Shadow</Label>
+        </div>
+      )}
     </div>
   );
 } 

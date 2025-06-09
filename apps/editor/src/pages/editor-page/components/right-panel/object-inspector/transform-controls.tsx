@@ -24,43 +24,36 @@ export default function TransformControls({ transform, onUpdate }: TransformCont
   };
 
   return (
-    <div className="space-y-4">
-      <div className="border-b border-muted pb-0">
-        <h4 className="text-sm font-medium text-muted-foreground">Transform</h4>
-      </div>
+    <div className="space-y-3">
+      <Vector3Controls
+        label="Position"
+        value={transform.position}
+        onChange={handlePositionChange}
+        step={0.1}
+        precision={2}
+      />
 
-      <div className="space-y-3">
-        <Vector3Controls
-          label="Position"
-          value={transform.position}
-          onChange={handlePositionChange}
-          step={0.1}
-          precision={2}
-        />
+      <Vector3Controls
+        label="Rotation"
+        value={{
+          x: r2d(transform.rotation.x),
+          y: r2d(transform.rotation.y),
+          z: r2d(transform.rotation.z),
+        }}
+        onChange={handleRotationChange}
+        step={1}
+        precision={0}
+        suffix="°"
+      />
 
-        <Vector3Controls
-          label="Rotation"
-          value={{
-            // 
-            x: r2d(transform.rotation.x),
-            y: r2d(transform.rotation.y),
-            z: r2d(transform.rotation.z),
-          }}
-          onChange={handleRotationChange}
-          step={1}
-          precision={0}
-          suffix="°"
-        />
-
-        <Vector3Controls
-          label="Scale"
-          value={transform.scale}
-          onChange={handleScaleChange}
-          step={0.01}
-          precision={2}
-          min={0.001}
-        />
-      </div>
+      <Vector3Controls
+        label="Scale"
+        value={transform.scale}
+        onChange={handleScaleChange}
+        step={0.01}
+        precision={2}
+        min={0.001}
+      />
     </div>
   );
 } 

@@ -2,7 +2,13 @@ import React from "react";
 import { DragInput } from "@/components/ui/drag-input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Palette, Plus, AlertTriangle, ArrowUp } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -19,7 +25,11 @@ import CircleGeometry from "./geometry-controls/circle-geometry";
 import RingGeometry from "./geometry-controls/ring-geometry";
 import PolyhedronGeometry from "./geometry-controls/polyhedron-geometry";
 import useEditorStore from "@/stores/editor-store";
-import { isLegacyMaterial, upgradeMaterialComponent, getMaterialDisplayName } from "@/pages/editor-page/components/viewport/material-compatibility";
+import {
+  isLegacyMaterial,
+  upgradeMaterialComponent,
+  getMaterialDisplayName,
+} from "@/pages/editor-page/components/viewport/material-compatibility";
 
 interface MeshComponentProps {
   component: GameObjectComponent;
@@ -27,23 +37,36 @@ interface MeshComponentProps {
   onUpdate: (updates: Partial<GameObjectComponent>) => void;
 }
 
-export default function MeshComponent({ component, objectId, onUpdate }: MeshComponentProps) {
+export default function MeshComponent({
+  component,
+  objectId,
+  onUpdate,
+}: MeshComponentProps) {
   const { materials, openMaterialBrowser } = useEditorStore();
   const props = component.properties || {};
   const geometryProps = props.geometryProps || {};
-  
+
   // Handle both legacy and new materials
   const isLegacy = isLegacyMaterial(component);
-  const materialRef = isLegacy 
-    ? { type: 'inline', properties: { type: props.material || 'standard', ...props.materialProps } }
-    : (props.materialRef || { type: 'inline', properties: { type: 'standard', color: '#ffffff' } });
+  const materialRef = isLegacy
+    ? {
+        type: "inline",
+        properties: {
+          type: props.material || "standard",
+          ...props.materialProps,
+        },
+      }
+    : props.materialRef || {
+        type: "inline",
+        properties: { type: "standard", color: "#ffffff" },
+      };
 
   const updateProperty = (key: string, value: any) => {
     onUpdate({
       properties: {
         ...props,
-        [key]: value
-      }
+        [key]: value,
+      },
     });
   };
 
@@ -53,9 +76,9 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
         ...props,
         geometryProps: {
           ...geometryProps,
-          [key]: value
-        }
-      }
+          [key]: value,
+        },
+      },
     });
   };
 
@@ -66,11 +89,11 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
       onUpdate({
         properties: {
           ...upgraded.properties,
-          materialRef
-        }
+          materialRef,
+        },
       });
     } else {
-      updateProperty('materialRef', materialRef);
+      updateProperty("materialRef", materialRef);
     }
   };
 
@@ -80,8 +103,8 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
   };
 
   const getAssignedMaterial = () => {
-    if (materialRef.type === 'library' && materialRef.materialId) {
-      return materials.find(m => m.id === materialRef.materialId);
+    if (materialRef.type === "library" && materialRef.materialId) {
+      return materials.find((m) => m.id === materialRef.materialId);
     }
     return null;
   };
@@ -92,47 +115,47 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
 
   const handleSwitchToInlineMaterial = () => {
     updateMaterialRef({
-      type: 'inline',
+      type: "inline",
       properties: {
-        type: 'standard',
-        color: '#ffffff',
+        type: "standard",
+        color: "#ffffff",
         metalness: 0,
-        roughness: 0.5
-      }
+        roughness: 0.5,
+      },
     });
   };
 
   const renderGeometryControls = () => {
     const controlProps = {
       geometryProps,
-      onUpdate: updateGeometryProp
+      onUpdate: updateGeometryProp,
     };
 
     switch (props.geometry) {
-      case 'box':
+      case "box":
         return <BoxGeometry {...controlProps} />;
-      case 'sphere':
+      case "sphere":
         return <SphereGeometry {...controlProps} />;
-      case 'plane':
+      case "plane":
         return <PlaneGeometry {...controlProps} />;
-      case 'cylinder':
+      case "cylinder":
         return <CylinderGeometry {...controlProps} />;
-      case 'cone':
+      case "cone":
         return <ConeGeometry {...controlProps} />;
-      case 'torus':
+      case "torus":
         return <TorusGeometry {...controlProps} />;
-      case 'torusKnot':
+      case "torusKnot":
         return <TorusKnotGeometry {...controlProps} />;
-      case 'capsule':
+      case "capsule":
         return <CapsuleGeometry {...controlProps} />;
-      case 'circle':
+      case "circle":
         return <CircleGeometry {...controlProps} />;
-      case 'ring':
+      case "ring":
         return <RingGeometry {...controlProps} />;
-      case 'dodecahedron':
-      case 'icosahedron':
-      case 'octahedron':
-      case 'tetrahedron':
+      case "dodecahedron":
+      case "icosahedron":
+      case "octahedron":
+      case "tetrahedron":
         return <PolyhedronGeometry {...controlProps} />;
       default:
         return null;
@@ -140,9 +163,9 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
   };
 
   const renderMaterialControls = () => {
-    if (materialRef.type === 'library') {
+    if (materialRef.type === "library") {
       const assignedMaterial = getAssignedMaterial();
-      
+
       return (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
@@ -152,8 +175,8 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
               onClick={handleOpenMaterialBrowser}
               className="flex-1"
             >
-              <Palette className="h-3 w-3 mr-2" />
-              {assignedMaterial ? assignedMaterial.name : 'Select Material'}
+              <Palette className="mr-2 h-3 w-3" />
+              {assignedMaterial ? assignedMaterial.name : "Select Material"}
             </Button>
             <Button
               variant="outline"
@@ -164,12 +187,16 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
               <Plus className="h-3 w-3" />
             </Button>
           </div>
-          
+
           {assignedMaterial && (
-            <div className="p-2 bg-muted/30 rounded text-xs">
+            <div className="bg-muted/30 rounded p-2 text-xs">
               <div className="font-medium">{assignedMaterial.name}</div>
-              <div className="text-muted-foreground">Type: {assignedMaterial.properties.type}</div>
-              <div className="text-muted-foreground">Category: {assignedMaterial.metadata.category}</div>
+              <div className="text-muted-foreground">
+                Type: {assignedMaterial.properties.type}
+              </div>
+              <div className="text-muted-foreground">
+                Category: {assignedMaterial.metadata.category}
+              </div>
             </div>
           )}
         </div>
@@ -186,7 +213,7 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
             onClick={handleOpenMaterialBrowser}
             className="flex-1"
           >
-            <Palette className="h-3 w-3 mr-2" />
+            <Palette className="mr-2 h-3 w-3" />
             Browse Materials
           </Button>
         </div>
@@ -195,13 +222,15 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
           <div className="space-y-1">
             <Label className="text-xs">Material Type</Label>
             <Select
-              value={materialRef.properties?.type || 'standard'}
-              onValueChange={(type) => updateMaterialRef({
-                ...materialRef,
-                properties: { ...materialRef.properties, type }
-              })}
+              value={materialRef.properties?.type || "standard"}
+              onValueChange={(type) =>
+                updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, type },
+                })
+              }
             >
-              <SelectTrigger className="w-full h-7 text-xs">
+              <SelectTrigger className="h-7 w-full text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -217,22 +246,27 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
 
           <ColorInput
             label="Color"
-            value={materialRef.properties?.color || '#ffffff'}
-            onChange={(value) => updateMaterialRef({
-              ...materialRef,
-              properties: { ...materialRef.properties, color: value }
-            })}
+            value={materialRef.properties?.color || "#ffffff"}
+            onChange={(value) =>
+              updateMaterialRef({
+                ...materialRef,
+                properties: { ...materialRef.properties, color: value },
+              })
+            }
           />
 
-          {(materialRef.properties?.type === 'standard' || materialRef.properties?.type === 'physical') && (
+          {(materialRef.properties?.type === "standard" ||
+            materialRef.properties?.type === "physical") && (
             <>
               <DragInput
                 label="Metalness"
                 value={materialRef.properties?.metalness || 0}
-                onChange={(value) => updateMaterialRef({
-                  ...materialRef,
-                  properties: { ...materialRef.properties, metalness: value }
-                })}
+                onChange={(value) =>
+                  updateMaterialRef({
+                    ...materialRef,
+                    properties: { ...materialRef.properties, metalness: value },
+                  })
+                }
                 step={0.01}
                 precision={2}
                 min={0}
@@ -242,10 +276,12 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
               <DragInput
                 label="Roughness"
                 value={materialRef.properties?.roughness || 0.5}
-                onChange={(value) => updateMaterialRef({
-                  ...materialRef,
-                  properties: { ...materialRef.properties, roughness: value }
-                })}
+                onChange={(value) =>
+                  updateMaterialRef({
+                    ...materialRef,
+                    properties: { ...materialRef.properties, roughness: value },
+                  })
+                }
                 step={0.01}
                 precision={2}
                 min={0}
@@ -254,15 +290,20 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
             </>
           )}
 
-          {materialRef.properties?.type === 'physical' && (
+          {materialRef.properties?.type === "physical" && (
             <>
               <DragInput
                 label="Transmission"
                 value={materialRef.properties?.transmission || 0}
-                onChange={(value) => updateMaterialRef({
-                  ...materialRef,
-                  properties: { ...materialRef.properties, transmission: value }
-                })}
+                onChange={(value) =>
+                  updateMaterialRef({
+                    ...materialRef,
+                    properties: {
+                      ...materialRef.properties,
+                      transmission: value,
+                    },
+                  })
+                }
                 step={0.01}
                 precision={2}
                 min={0}
@@ -272,10 +313,12 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
               <DragInput
                 label="Thickness"
                 value={materialRef.properties?.thickness || 0}
-                onChange={(value) => updateMaterialRef({
-                  ...materialRef,
-                  properties: { ...materialRef.properties, thickness: value }
-                })}
+                onChange={(value) =>
+                  updateMaterialRef({
+                    ...materialRef,
+                    properties: { ...materialRef.properties, thickness: value },
+                  })
+                }
                 step={0.01}
                 precision={2}
                 min={0}
@@ -285,10 +328,12 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
               <DragInput
                 label="IOR"
                 value={materialRef.properties?.ior || 1.5}
-                onChange={(value) => updateMaterialRef({
-                  ...materialRef,
-                  properties: { ...materialRef.properties, ior: value }
-                })}
+                onChange={(value) =>
+                  updateMaterialRef({
+                    ...materialRef,
+                    properties: { ...materialRef.properties, ior: value },
+                  })
+                }
                 step={0.01}
                 precision={2}
                 min={1}
@@ -301,12 +346,17 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
             <Label className="text-xs">Side</Label>
             <Select
               value={String(materialRef.properties?.side ?? 0)}
-              onValueChange={(value) => updateMaterialRef({
-                ...materialRef,
-                properties: { ...materialRef.properties, side: parseInt(value) }
-              })}
+              onValueChange={(value) =>
+                updateMaterialRef({
+                  ...materialRef,
+                  properties: {
+                    ...materialRef.properties,
+                    side: parseInt(value),
+                  },
+                })
+              }
             >
-              <SelectTrigger className="w-full h-7 text-xs">
+              <SelectTrigger className="h-7 w-full text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -321,34 +371,44 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
             <Switch
               id="wireframe"
               checked={materialRef.properties?.wireframe || false}
-              onCheckedChange={(value: boolean) => updateMaterialRef({
-                ...materialRef,
-                properties: { ...materialRef.properties, wireframe: value }
-              })}
+              onCheckedChange={(value: boolean) =>
+                updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, wireframe: value },
+                })
+              }
             />
-            <Label htmlFor="wireframe" className="text-xs">Wireframe</Label>
+            <Label htmlFor="wireframe" className="text-xs">
+              Wireframe
+            </Label>
           </div>
 
           <div className="flex items-center space-x-2">
             <Switch
               id="transparent"
               checked={materialRef.properties?.transparent || false}
-              onCheckedChange={(value: boolean) => updateMaterialRef({
-                ...materialRef,
-                properties: { ...materialRef.properties, transparent: value }
-              })}
+              onCheckedChange={(value: boolean) =>
+                updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, transparent: value },
+                })
+              }
             />
-            <Label htmlFor="transparent" className="text-xs">Transparent</Label>
+            <Label htmlFor="transparent" className="text-xs">
+              Transparent
+            </Label>
           </div>
 
           {materialRef.properties?.transparent && (
             <DragInput
               label="Opacity"
               value={materialRef.properties?.opacity || 1}
-              onChange={(value) => updateMaterialRef({
-                ...materialRef,
-                properties: { ...materialRef.properties, opacity: value }
-              })}
+              onChange={(value) =>
+                updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, opacity: value },
+                })
+              }
               step={0.01}
               precision={2}
               min={0}
@@ -361,23 +421,15 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
   };
 
   return (
-    <div className="p-0 mt-2 rounded-md space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Mesh</div>
-        <Switch
-          checked={component.enabled}
-          onCheckedChange={(enabled) => onUpdate({ enabled })}
-        />
-      </div>
-
+    <div className="space-y-4">
       <div className="space-y-3">
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Geometry</Label>
+          <Label className="text-muted-foreground text-xs">Geometry</Label>
           <Select
-            value={props.geometry || 'box'}
-            onValueChange={(value) => updateProperty('geometry', value)}
+            value={props.geometry || "box"}
+            onValueChange={(value) => updateProperty("geometry", value)}
           >
-            <SelectTrigger className="w-full h-7 text-xs">
+            <SelectTrigger className="h-7 w-full text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -400,52 +452,57 @@ export default function MeshComponent({ component, objectId, onUpdate }: MeshCom
         </div>
 
         {renderGeometryControls()}
+      </div>
 
-        <div className="space-y-3">
-          <Label className="text-xs text-muted-foreground">Material</Label>
-          
-          {/* Legacy Material Warning */}
-          {isLegacy && (
-            <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
-              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
-                This object uses a legacy material format ({getMaterialDisplayName(component)}). 
-                <Button
-                  variant="link"
-                  size="sm"
-                  onClick={handleUpgradeMaterial}
-                  className="h-auto p-0 ml-1 text-amber-800 dark:text-amber-200 underline"
-                >
-                  <ArrowUp className="h-3 w-3 mr-1" />
-                  Upgrade to new format
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {renderMaterialControls()}
-        </div>
+      <div className="space-y-3">
+        <Label className="text-muted-foreground text-xs">Material</Label>
 
+        {/* Legacy Material Warning */}
+        {isLegacy && (
+          <Button
+            variant="link"
+            size="sm"
+            onClick={handleUpgradeMaterial}
+            className="ml-1 h-auto p-0 text-xs text-amber-800 underline dark:text-amber-200"
+          >
+            <ArrowUp className="mr-1 h-3 w-3" />
+            Upgrade to new materials
+          </Button>
+        )}
+
+        {renderMaterialControls()}
+      </div>
+
+      <div className="space-y-3">
+        <Label className="text-muted-foreground text-xs">Rendering</Label>
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
             <Switch
               id="castShadow"
               checked={props.castShadow || false}
-              onCheckedChange={(value: boolean) => updateProperty('castShadow', value)}
+              onCheckedChange={(value: boolean) =>
+                updateProperty("castShadow", value)
+              }
             />
-            <Label htmlFor="castShadow" className="text-xs">Cast Shadow</Label>
+            <Label htmlFor="castShadow" className="text-xs">
+              Cast Shadow
+            </Label>
           </div>
 
           <div className="flex items-center space-x-2">
             <Switch
               id="receiveShadow"
               checked={props.receiveShadow || false}
-              onCheckedChange={(value: boolean) => updateProperty('receiveShadow', value)}
+              onCheckedChange={(value: boolean) =>
+                updateProperty("receiveShadow", value)
+              }
             />
-            <Label htmlFor="receiveShadow" className="text-xs">Receive Shadow</Label>
+            <Label htmlFor="receiveShadow" className="text-xs">
+              Receive Shadow
+            </Label>
           </div>
         </div>
       </div>
     </div>
   );
-} 
+}

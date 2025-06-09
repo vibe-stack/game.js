@@ -144,6 +144,16 @@ export function DragInput({
     } else if (e.key === ' ') {
       e.preventDefault()
       toggleEditing()
+    } else if (/^[0-9]$/.test(e.key)) {
+      // Start editing and replace the current value with the typed digit
+      e.preventDefault()
+      setIsEditing(true)
+      setInputValue(e.key)
+      setTimeout(() => {
+        inputRef.current?.focus()
+        // Position cursor at the end
+        inputRef.current?.setSelectionRange(1, 1)
+      }, 0)
     }
   }
 
@@ -164,6 +174,7 @@ export function DragInput({
 
   const handleInputKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault()
       handleInputBlur()
     } else if (e.key === 'Escape') {
       setInputValue(value.toFixed(precision))

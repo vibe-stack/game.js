@@ -146,15 +146,7 @@ export default function ColliderComponent({ component, onUpdate }: ColliderCompo
   };
 
   return (
-    <div className="p-0 mt-2 rounded-md space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Collider</div>
-        <Switch
-          checked={component.enabled}
-          onCheckedChange={(enabled) => onUpdate({ enabled })}
-        />
-      </div>
-
+    <div className="space-y-4">
       <div className="space-y-3">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Shape</Label>
@@ -192,7 +184,10 @@ export default function ColliderComponent({ component, onUpdate }: ColliderCompo
         </div>
 
         {renderShapeControls()}
+      </div>
 
+      <div className="space-y-3">
+        <Label className="text-xs text-muted-foreground">Properties</Label>
         <div className="flex items-center space-x-2">
           <Switch
             id="isSensor"
@@ -212,69 +207,71 @@ export default function ColliderComponent({ component, onUpdate }: ColliderCompo
             min={0.01}
           />
         )}
+      </div>
 
-        <div className="space-y-3">
-          <Label className="text-xs text-muted-foreground">Physics Material</Label>
-          
-          <div className="space-y-2">
-            <DragInput
-              label="Friction"
-              value={props.material.friction}
-              onChange={(value) => updateMaterial('friction', value)}
-              step={0.01}
-              precision={2}
-              min={0}
-              max={2}
-            />
+      <div className="space-y-3">
+        <Label className="text-xs text-muted-foreground">Physics Material</Label>
+        <div className="space-y-2">
+          <DragInput
+            label="Friction"
+            value={props.material.friction}
+            onChange={(value) => updateMaterial('friction', value)}
+            step={0.01}
+            precision={2}
+            min={0}
+            max={2}
+          />
 
-            <DragInput
-              label="Restitution"
-              value={props.material.restitution}
-              onChange={(value) => updateMaterial('restitution', value)}
-              step={0.01}
-              precision={2}
-              min={0}
-              max={1}
-            />
+          <DragInput
+            label="Restitution"
+            value={props.material.restitution}
+            onChange={(value) => updateMaterial('restitution', value)}
+            step={0.01}
+            precision={2}
+            min={0}
+            max={1}
+          />
 
-            <div className="space-y-1">
-              <Label className="text-xs">Friction Combine Rule</Label>
-              <Select
-                value={props.material.frictionCombineRule}
-                onValueChange={(value) => updateMaterial('frictionCombineRule', value)}
-              >
-                <SelectTrigger className="w-full h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="average">Average</SelectItem>
-                  <SelectItem value="min">Minimum</SelectItem>
-                  <SelectItem value="multiply">Multiply</SelectItem>
-                  <SelectItem value="max">Maximum</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Friction Combine Rule</Label>
+            <Select
+              value={props.material.frictionCombineRule}
+              onValueChange={(value) => updateMaterial('frictionCombineRule', value)}
+            >
+              <SelectTrigger className="w-full h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="average">Average</SelectItem>
+                <SelectItem value="min">Minimum</SelectItem>
+                <SelectItem value="multiply">Multiply</SelectItem>
+                <SelectItem value="max">Maximum</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs">Restitution Combine Rule</Label>
-              <Select
-                value={props.material.restitutionCombineRule}
-                onValueChange={(value) => updateMaterial('restitutionCombineRule', value)}
-              >
-                <SelectTrigger className="w-full h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="average">Average</SelectItem>
-                  <SelectItem value="min">Minimum</SelectItem>
-                  <SelectItem value="multiply">Multiply</SelectItem>
-                  <SelectItem value="max">Maximum</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Restitution Combine Rule</Label>
+            <Select
+              value={props.material.restitutionCombineRule}
+              onValueChange={(value) => updateMaterial('restitutionCombineRule', value)}
+            >
+              <SelectTrigger className="w-full h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="average">Average</SelectItem>
+                <SelectItem value="min">Minimum</SelectItem>
+                <SelectItem value="multiply">Multiply</SelectItem>
+                <SelectItem value="max">Maximum</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
+      </div>
 
+      <div className="space-y-3">
+        <Label className="text-xs text-muted-foreground">Collision Groups</Label>
         <CollisionGroupsGrid
           label="Collision Groups"
           value={props.collisionGroups}
@@ -286,69 +283,74 @@ export default function ColliderComponent({ component, onUpdate }: ColliderCompo
           value={props.solverGroups}
           onChange={(groups) => updateProperty('solverGroups', groups)}
         />
+      </div>
 
+      <div className="space-y-3">
+        <Label className="text-xs text-muted-foreground">Events & Collision Types</Label>
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">Active Collision Types</Label>
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="activeDefault"
-                checked={props.activeCollisionTypes.default}
-                onCheckedChange={(value) => updateActiveCollisionTypes('default', value)}
-              />
-              <Label htmlFor="activeDefault" className="text-xs">Default</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="activeKinematic"
-                checked={props.activeCollisionTypes.kinematic}
-                onCheckedChange={(value) => updateActiveCollisionTypes('kinematic', value)}
-              />
-              <Label htmlFor="activeKinematic" className="text-xs">Kinematic</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="activeSensor"
-                checked={props.activeCollisionTypes.sensor}
-                onCheckedChange={(value) => updateActiveCollisionTypes('sensor', value)}
-              />
-              <Label htmlFor="activeSensor" className="text-xs">Sensor</Label>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Active Collision Types</Label>
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="activeDefault"
+                  checked={props.activeCollisionTypes.default}
+                  onCheckedChange={(value) => updateActiveCollisionTypes('default', value)}
+                />
+                <Label htmlFor="activeDefault" className="text-xs">Default</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="activeKinematic"
+                  checked={props.activeCollisionTypes.kinematic}
+                  onCheckedChange={(value) => updateActiveCollisionTypes('kinematic', value)}
+                />
+                <Label htmlFor="activeKinematic" className="text-xs">Kinematic</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="activeSensor"
+                  checked={props.activeCollisionTypes.sensor}
+                  onCheckedChange={(value) => updateActiveCollisionTypes('sensor', value)}
+                />
+                <Label htmlFor="activeSensor" className="text-xs">Sensor</Label>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">Active Events</Label>
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="collisionEvents"
-                checked={props.activeEvents.collisionEvents}
-                onCheckedChange={(value) => updateActiveEvents('collisionEvents', value)}
-              />
-              <Label htmlFor="collisionEvents" className="text-xs">Collision Events</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="contactForceEvents"
-                checked={props.activeEvents.contactForceEvents}
-                onCheckedChange={(value) => updateActiveEvents('contactForceEvents', value)}
-              />
-              <Label htmlFor="contactForceEvents" className="text-xs">Contact Force Events</Label>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Active Events</Label>
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="collisionEvents"
+                  checked={props.activeEvents.collisionEvents}
+                  onCheckedChange={(value) => updateActiveEvents('collisionEvents', value)}
+                />
+                <Label htmlFor="collisionEvents" className="text-xs">Collision Events</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="contactForceEvents"
+                  checked={props.activeEvents.contactForceEvents}
+                  onCheckedChange={(value) => updateActiveEvents('contactForceEvents', value)}
+                />
+                <Label htmlFor="contactForceEvents" className="text-xs">Contact Force Events</Label>
+              </div>
             </div>
           </div>
-        </div>
 
-        {props.activeEvents.contactForceEvents && (
-          <DragInput
-            label="Contact Force Threshold"
-            value={props.contactForceEventThreshold}
-            onChange={(value) => updateProperty('contactForceEventThreshold', value)}
-            step={0.1}
-            precision={2}
-            min={0}
-          />
-        )}
+          {props.activeEvents.contactForceEvents && (
+            <DragInput
+              label="Contact Force Threshold"
+              value={props.contactForceEventThreshold}
+              onChange={(value) => updateProperty('contactForceEventThreshold', value)}
+              step={0.1}
+              precision={2}
+              min={0}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

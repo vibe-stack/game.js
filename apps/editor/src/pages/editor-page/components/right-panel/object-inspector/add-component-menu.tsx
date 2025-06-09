@@ -174,12 +174,13 @@ export default function AddComponentMenu({ onAddComponent }: AddComponentMenuPro
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="">
-          <Plus className="h-4 w-4" />
+        <Button variant="outline" size="sm" className="h-7 px-2">
+          <Plus className="h-3 w-3 mr-1" />
+          <span className="text-xs">Add Component</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        {/* <DropdownMenuLabel className="text-xs">Rendering</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs">Rendering</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => handleAddComponent('Mesh')}>
           <Box className="h-4 w-4 mr-2" />
           Mesh Renderer
@@ -195,9 +196,9 @@ export default function AddComponentMenu({ onAddComponent }: AddComponentMenuPro
         <DropdownMenuItem onClick={() => handleAddComponent('PointLight')}>
           <Lightbulb className="h-4 w-4 mr-2" />
           Point Light
-        </DropdownMenuItem> */}
+        </DropdownMenuItem>
         
-        {/* <DropdownMenuSeparator />
+        <DropdownMenuSeparator />
         
         <DropdownMenuLabel className="text-xs">Camera</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => handleAddComponent('PerspectiveCamera')}>
@@ -205,7 +206,7 @@ export default function AddComponentMenu({ onAddComponent }: AddComponentMenuPro
           Perspective Camera
         </DropdownMenuItem>
         
-        <DropdownMenuSeparator /> */}
+        <DropdownMenuSeparator />
         
         <DropdownMenuLabel className="text-xs">Physics</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => handleAddComponent('rigidBody')}>

@@ -3,6 +3,7 @@ import useEditorStore from "@/stores/editor-store";
 import TransformControls from "./transform-controls";
 import ComponentsList from "./components-list";
 import ObjectHeader from "./object-header";
+import CollapsibleSection from "./collapsible-section";
 
 interface ObjectInspectorProps {
   scene: GameScene | null;
@@ -56,23 +57,37 @@ export default function ObjectInspector({ scene, selectedObjects }: ObjectInspec
     if (!obj) return null;
 
     return (
-      <div className="p-4 space-y-6 max-h-[calc(90vh-10rem)] overflow-y-auto">
-        <ObjectHeader 
-          object={obj} 
-          onUpdate={(updates) => handleObjectUpdate(obj.id, updates)}
-        />
+      <div className="max-h-[calc(90vh-10rem)] overflow-y-auto">
+        <div className="p-4 border-b border-border/30">
+          <ObjectHeader 
+            object={obj} 
+            onUpdate={(updates) => handleObjectUpdate(obj.id, updates)}
+          />
+        </div>
         
-        <TransformControls 
-          transform={obj.transform}
-          onUpdate={(transform) => handleTransformUpdate(obj.id, transform)}
-        />
+        <CollapsibleSection 
+          title="Transform" 
+          storageKey="transform"
+          defaultOpen={true}
+        >
+          <TransformControls 
+            transform={obj.transform}
+            onUpdate={(transform) => handleTransformUpdate(obj.id, transform)}
+          />
+        </CollapsibleSection>
         
-        <ComponentsList 
-          components={obj.components}
-          objectId={obj.id}
-          onUpdate={(componentId, updates) => handleComponentUpdate(obj.id, componentId, updates)}
-          onAddComponent={(component) => handleAddComponent(obj.id, component)}
-        />
+        <CollapsibleSection 
+          title="Components" 
+          storageKey="components"
+          defaultOpen={true}
+        >
+          <ComponentsList 
+            components={obj.components}
+            objectId={obj.id}
+            onUpdate={(componentId, updates) => handleComponentUpdate(obj.id, componentId, updates)}
+            onAddComponent={(component) => handleAddComponent(obj.id, component)}
+          />
+        </CollapsibleSection>
       </div>
     );
   }
