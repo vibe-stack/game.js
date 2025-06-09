@@ -106,10 +106,6 @@ export default function Viewport({
   // Hide helpers when physics is playing
   const shouldShowHelpers = physicsState !== "playing";
 
-  // Optimize grid size to prevent performance issues
-  const optimizedGridSize = Math.min(scene.editorConfig.gridSize, 5); // Cap at 5 to prevent massive grids
-  const gridDimension = optimizedGridSize * 20;
-
   return (
     <div
       className="h-screen"
@@ -122,21 +118,25 @@ export default function Viewport({
           antialias: scene.runtimeConfig.antialias,
           toneMapping: getToneMapping(scene.runtimeConfig.toneMapping),
           toneMappingExposure: scene.runtimeConfig.exposure,
-          // Add performance optimizations
-          powerPreference: "high-performance",
         }}
-        // Optimize performance with frame limiting
-        frameloop="demand"
-        dpr={[1, 2]}
+        // gl={async (props) => {
+        //   const renderer = new THREE.WebGPURenderer({
+        //     ...(props as any),
+        //     antialias: scene.runtimeConfig.antialias,
+        //     toneMapping: getToneMapping(scene.runtimeConfig.toneMapping),
+        //     toneMappingExposure: scene.runtimeConfig.exposure,
+        //   })
+        //   await renderer.init()
+        //   return renderer
+        // }}
       >
-        <Suspense fallback={null}>
+        <Suspense>
           <PhysicsProvider
             key={scene.id}
             scene={scene}
             onObjectTransformUpdate={updateObjectTransform}
             debugEnabled={
-              // Disable physics debug for better performance unless explicitly needed
-              shouldShowHelpers && scene.physicsWorld?.debugRender?.enabled && selectedObjects.length > 0
+              shouldShowHelpers && scene.physicsWorld?.debugRender?.enabled
             }
           >
             <PhysicsCallbackProvider onPhysicsCallbacks={onPhysicsCallbacks} />
@@ -172,29 +172,20 @@ export default function Viewport({
               ))}
             </group>
 
-            {/* Grid - Optimized for performance */}
+            {/* Grid */}
             {shouldShowHelpers && scene.editorConfig.showHelperGrid && (
               <Grid
-                args={[gridDimension, gridDimension]}
+                // cellSize={scene.editorConfig.gridSize * 20}
+                // sectionSize={scene.editorConfig.gridSize * 20}
+                args={[scene.editorConfig.gridSize * 20, scene.editorConfig.gridSize * 20]}
                 cellColor="#666666"
                 sectionColor="#111111"
-                fadeDistance={Math.min(500, gridDimension * 2)}
+                fadeDistance={500}
                 fadeStrength={0.6}
-                // Reduce segments for better performance
-                cellSize={1}
-                sectionSize={10}
               />
             )}
 
-            <OrbitControls 
-              enablePan 
-              enableZoom 
-              enableRotate 
-              makeDefault 
-              // Add damping for smoother controls
-              enableDamping
-              dampingFactor={0.05}
-            />
+            <OrbitControls enablePan enableZoom enableRotate makeDefault />
           </PhysicsProvider>
         </Suspense>
       </Canvas>

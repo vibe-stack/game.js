@@ -14,7 +14,6 @@ interface PhysicsContextType {
   resume: () => void;
   registerRigidBody: (objectId: string, rigidBody: RapierRigidBody) => void;
   unregisterRigidBody: (objectId: string) => void;
-  updateTransformFromPhysics: (objectId: string, position: Vector3, rotation: Vector3) => void;
   isInitialized: boolean;
 }
 
@@ -150,9 +149,9 @@ export function PhysicsProvider({ children, scene, onObjectTransformUpdate, debu
       >
         <PhysicsInnerProvider 
           scene={scene} 
-          onObjectTransformUpdate={onObjectTransformUpdate}
           physicsState={physicsState}
           setPhysicsState={setPhysicsState}
+          onObjectTransformUpdate={onObjectTransformUpdate}
         >
           {children}
         </PhysicsInnerProvider>
@@ -165,9 +164,9 @@ export function PhysicsProvider({ children, scene, onObjectTransformUpdate, debu
 function PhysicsInnerProvider({ 
   children, 
   scene, 
-  onObjectTransformUpdate, 
   physicsState, 
-  setPhysicsState 
+  setPhysicsState,
+  onObjectTransformUpdate
 }: PhysicsProviderProps & { 
   physicsState: PhysicsState; 
   setPhysicsState: React.Dispatch<React.SetStateAction<PhysicsState>>; 
@@ -241,6 +240,7 @@ function PhysicsInnerProvider({
     if (cleanupInProgressRef.current) return;
     
     initialTransformsRef.current.forEach((transform, objectId) => {
+      // Update the store to reset GameObject.transform to initial state
       onObjectTransformUpdate(objectId, transform);
       
       // Reset rigid body transforms too
@@ -304,13 +304,6 @@ function PhysicsInnerProvider({
     rigidBodiesRef.current.delete(objectId);
   }, []);
 
-  const updateTransformFromPhysics = useCallback((objectId: string, position: Vector3, rotation: Vector3) => {
-    if (physicsState === 'playing' && !cleanupInProgressRef.current && isSceneStable) {
-      // Only update position and rotation from physics, preserve existing scale
-      onObjectTransformUpdate(objectId, { position, rotation });
-    }
-  }, [physicsState, onObjectTransformUpdate, isSceneStable]);
-
   const contextValue: PhysicsContextType = {
     physicsState,
     world,
@@ -321,7 +314,6 @@ function PhysicsInnerProvider({
     resume,
     registerRigidBody,
     unregisterRigidBody,
-    updateTransformFromPhysics,
     isInitialized: !!isInitialized && !cleanupInProgressRef.current && isSceneStable,
   };
 

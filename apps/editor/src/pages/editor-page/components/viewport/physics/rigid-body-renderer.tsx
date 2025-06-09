@@ -2,11 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   RigidBody,
   RapierRigidBody,
-  useAfterPhysicsStep,
 } from "@react-three/rapier";
 import { usePhysics } from "./physics-context";
 import ColliderRenderer from "./collider-renderer";
-import * as THREE from "three";
 
 interface RigidBodyRendererProps {
   objectId: string;
@@ -16,9 +14,6 @@ interface RigidBodyRendererProps {
   children: React.ReactNode;
 }
 
-const euler = new THREE.Euler(0, 0, 0, "XYZ");
-const quaternion = new THREE.Quaternion().setFromEuler(euler);
-
 export default function RigidBodyRenderer({
   objectId,
   transform,
@@ -27,10 +22,8 @@ export default function RigidBodyRenderer({
   children,
 }: RigidBodyRendererProps) {
   const {
-    physicsState,
     registerRigidBody,
     unregisterRigidBody,
-    updateTransformFromPhysics,
     isInitialized,
   } = usePhysics();
   const rigidBodyRef = useRef<RapierRigidBody>(null);
@@ -78,38 +71,8 @@ export default function RigidBodyRenderer({
     isInitialized,
   ]);
 
-  // Handle physics updates using useAfterPhysicsStep
-  useAfterPhysicsStep(() => {
-    if (!rigidBodyRef.current || !isRegistered || physicsState !== "playing" || !isInitialized)
-      return;
-
-    try {
-      const rigidBody = rigidBodyRef.current;
-      const translation = rigidBody.translation();
-      const rotation = rigidBody.rotation();
-
-      const position: Vector3 = {
-        x: translation.x,
-        y: translation.y,
-        z: translation.z,
-      };
-
-      quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
-
-      // Convert quaternion to euler angles with consistent rotation order
-      euler.setFromQuaternion(quaternion, "XYZ");
-
-      const rotationEuler: Vector3 = {
-        x: euler.x,
-        y: euler.y,
-        z: euler.z,
-      };
-
-      updateTransformFromPhysics(objectId, position, rotationEuler);
-    } catch {
-      // Silently ignore errors during physics updates to prevent spam
-    }
-  });
+  // REMOVED: useAfterPhysicsStep hook that was causing the feedback loop
+  // The RigidBody component will automatically manage transforms during physics simulation
 
   if (!rigidBodyComponent.enabled) {
     return <group>{children}</group>;
