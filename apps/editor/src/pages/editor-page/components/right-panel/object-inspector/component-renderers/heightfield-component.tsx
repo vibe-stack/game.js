@@ -4,9 +4,14 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Palette, Plus, ArrowUp } from "lucide-react";
 import Vector2Controls from "../vector2-controls";
+import ColorInput from "../color-input";
 import useEditorStore from "@/stores/editor-store";
+import {
+  isLegacyMaterial,
+  upgradeMaterialComponent
+} from "@/pages/editor-page/components/viewport/material-compatibility";
 
 interface HeightfieldComponentProps {
   component: HeightfieldComponent;
@@ -14,8 +19,23 @@ interface HeightfieldComponentProps {
 }
 
 export default function HeightfieldComponent({ component, objectId }: HeightfieldComponentProps) {
-  const { updateHeightfieldComponent } = useEditorStore();
+  const { updateHeightfieldComponent, materials, openMaterialBrowser } = useEditorStore();
   const props = component.properties;
+
+  // Handle both legacy and new materials (similar to mesh component)
+  const isLegacy = isLegacyMaterial(component as any);
+  const materialRef = isLegacy
+    ? {
+        type: "inline" as const,
+        properties: {
+          type: props.material || "standard",
+          ...props.materialProps,
+        },
+      }
+    : props.materialRef || {
+        type: "inline" as const,
+        properties: { type: "standard", color: "#8b7355" }, // Default terrain color
+      };
 
   const updateProperty = (key: keyof typeof props, value: any) => {
     updateHeightfieldComponent(objectId, component.id, { [key]: value });
@@ -39,12 +59,311 @@ export default function HeightfieldComponent({ component, objectId }: Heightfiel
     });
   };
 
+  const updateMaterialRef = (materialRef: any) => {
+    if (isLegacy) {
+      // When updating legacy materials, first upgrade to new format
+      const upgraded = upgradeMaterialComponent(component as any);
+      updateHeightfieldComponent(objectId, component.id, {
+        ...upgraded.properties,
+        materialRef,
+      });
+    } else {
+      updateProperty("materialRef", materialRef);
+    }
+  };
+
+  const handleUpgradeMaterial = () => {
+    const upgraded = upgradeMaterialComponent(component as any);
+    updateHeightfieldComponent(objectId, component.id, upgraded.properties);
+  };
+
+  const getAssignedMaterial = () => {
+    if (materialRef.type === "library" && "materialId" in materialRef && materialRef.materialId) {
+      return materials.find((m) => m.id === materialRef.materialId);
+    }
+    return null;
+  };
+
+  const handleOpenMaterialBrowser = () => {
+    openMaterialBrowser(objectId);
+  };
+
+  const handleSwitchToInlineMaterial = () => {
+    updateMaterialRef({
+      type: "inline",
+      properties: {
+        type: "standard",
+        color: "#8b7355",
+        metalness: 0,
+        roughness: 0.8,
+      },
+    });
+  };
+
   const handleRegenerate = () => {
     updateHeightfieldComponent(objectId, component.id, { lastGenerated: new Date() });
   };
 
   const handleRandomSeed = () => {
     updateProperty('seed', Math.floor(Math.random() * 100000));
+  };
+
+  const renderMaterialControls = () => {
+    if (materialRef.type === "library") {
+      const assignedMaterial = getAssignedMaterial();
+
+      return (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenMaterialBrowser}
+              className="flex-1"
+            >
+              <Palette className="mr-2 h-3 w-3" />
+              {assignedMaterial ? assignedMaterial.name : "Select Material"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSwitchToInlineMaterial}
+              title="Switch to inline material"
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
+
+          {assignedMaterial && (
+            <div className="bg-muted/30 rounded p-2 text-xs">
+              <div className="font-medium">{assignedMaterial.name}</div>
+              <div className="text-muted-foreground">
+                Type: {assignedMaterial.properties.type}
+              </div>
+              <div className="text-muted-foreground">
+                Category: {assignedMaterial.metadata.category}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Inline material controls
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleOpenMaterialBrowser}
+            className="flex-1"
+          >
+            <Palette className="mr-2 h-3 w-3" />
+            Browse Materials
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Material Type</Label>
+            <Select
+              value={materialRef.properties?.type || "standard"}
+              onValueChange={(type) =>
+                updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, type },
+                })
+              }
+            >
+              <SelectTrigger className="h-7 w-full text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="basic">Basic</SelectItem>
+                <SelectItem value="lambert">Lambert</SelectItem>
+                <SelectItem value="phong">Phong</SelectItem>
+                <SelectItem value="standard">Standard</SelectItem>
+                <SelectItem value="physical">Physical</SelectItem>
+                <SelectItem value="toon">Toon</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <ColorInput
+            label="Color"
+            value={materialRef.properties?.color || "#8b7355"}
+            onChange={(value) =>
+              updateMaterialRef({
+                ...materialRef,
+                properties: { ...materialRef.properties, color: value },
+              })
+            }
+          />
+
+          {(materialRef.properties?.type === "standard" ||
+            materialRef.properties?.type === "physical") && (
+            <>
+              <DragInput
+                label="Metalness"
+                value={materialRef.properties?.metalness || 0}
+                onChange={(value) =>
+                  updateMaterialRef({
+                    ...materialRef,
+                    properties: { ...materialRef.properties, metalness: value },
+                  })
+                }
+                step={0.01}
+                precision={2}
+                min={0}
+                max={1}
+              />
+
+              <DragInput
+                label="Roughness"
+                value={materialRef.properties?.roughness || 0.8}
+                onChange={(value) =>
+                  updateMaterialRef({
+                    ...materialRef,
+                    properties: { ...materialRef.properties, roughness: value },
+                  })
+                }
+                step={0.01}
+                precision={2}
+                min={0}
+                max={1}
+              />
+            </>
+          )}
+
+          {materialRef.properties?.type === "physical" && (
+            <>
+              <DragInput
+                label="Transmission"
+                value={materialRef.properties?.transmission || 0}
+                onChange={(value) =>
+                  updateMaterialRef({
+                    ...materialRef,
+                    properties: {
+                      ...materialRef.properties,
+                      transmission: value,
+                    },
+                  })
+                }
+                step={0.01}
+                precision={2}
+                min={0}
+                max={1}
+              />
+
+              <DragInput
+                label="Thickness"
+                value={materialRef.properties?.thickness || 0}
+                onChange={(value) =>
+                  updateMaterialRef({
+                    ...materialRef,
+                    properties: { ...materialRef.properties, thickness: value },
+                  })
+                }
+                step={0.01}
+                precision={2}
+                min={0}
+                max={5}
+              />
+
+              <DragInput
+                label="IOR"
+                value={materialRef.properties?.ior || 1.5}
+                onChange={(value) =>
+                  updateMaterialRef({
+                    ...materialRef,
+                    properties: { ...materialRef.properties, ior: value },
+                  })
+                }
+                step={0.01}
+                precision={2}
+                min={1}
+                max={3}
+              />
+            </>
+          )}
+
+          <div className="space-y-1">
+            <Label className="text-xs">Side</Label>
+            <Select
+              value={String(materialRef.properties?.side ?? 0)}
+              onValueChange={(value) =>
+                updateMaterialRef({
+                  ...materialRef,
+                  properties: {
+                    ...materialRef.properties,
+                    side: parseInt(value),
+                  },
+                })
+              }
+            >
+              <SelectTrigger className="h-7 w-full text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Front</SelectItem>
+                <SelectItem value="1">Back</SelectItem>
+                <SelectItem value="2">Double Side</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="wireframe"
+              checked={materialRef.properties?.wireframe || false}
+              onCheckedChange={(value: boolean) =>
+                updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, wireframe: value },
+                })
+              }
+            />
+            <Label htmlFor="wireframe" className="text-xs">
+              Wireframe
+            </Label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="transparent"
+              checked={materialRef.properties?.transparent || false}
+              onCheckedChange={(value: boolean) =>
+                updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, transparent: value },
+                })
+              }
+            />
+            <Label htmlFor="transparent" className="text-xs">
+              Transparent
+            </Label>
+          </div>
+
+          {materialRef.properties?.transparent && (
+            <DragInput
+              label="Opacity"
+              value={materialRef.properties?.opacity || 1}
+              onChange={(value) =>
+                updateMaterialRef({
+                  ...materialRef,
+                  properties: { ...materialRef.properties, opacity: value },
+                })
+              }
+              step={0.01}
+              precision={2}
+              min={0}
+              max={1}
+            />
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -210,7 +529,7 @@ export default function HeightfieldComponent({ component, objectId }: Heightfiel
               label="Persistence"
               value={props.noise.persistence}
               onChange={(value) => updateNoise('persistence', value)}
-              step={0.01}
+              step={0.1}
               precision={2}
               min={0.01}
               max={1}
@@ -264,6 +583,25 @@ export default function HeightfieldComponent({ component, objectId }: Heightfiel
       )}
 
       <div className="space-y-3">
+        <Label className="text-xs text-muted-foreground">Material</Label>
+
+        {/* Legacy Material Warning */}
+        {isLegacy && (
+          <Button
+            variant="link"
+            size="sm"
+            onClick={handleUpgradeMaterial}
+            className="ml-1 h-auto p-0 text-xs text-amber-800 underline dark:text-amber-200"
+          >
+            <ArrowUp className="mr-1 h-3 w-3" />
+            Upgrade to new materials
+          </Button>
+        )}
+
+        {renderMaterialControls()}
+      </div>
+
+      <div className="space-y-3">
         <Label className="text-xs text-muted-foreground">Visual Properties</Label>
         <div className="space-y-2">
           <DragInput
@@ -293,15 +631,6 @@ export default function HeightfieldComponent({ component, objectId }: Heightfiel
             />
             <Label htmlFor="smoothing" className="text-xs">Smoothing</Label>
           </div>
-
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="wireframe"
-              checked={props.wireframe}
-              onCheckedChange={(value) => updateProperty('wireframe', value)}
-            />
-            <Label htmlFor="wireframe" className="text-xs">Wireframe</Label>
-          </div>
         </div>
       </div>
 
@@ -330,6 +659,37 @@ export default function HeightfieldComponent({ component, objectId }: Heightfiel
               />
             </>
           )}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <Label className="text-xs text-muted-foreground">Rendering</Label>
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="castShadow"
+              checked={props.castShadow || false}
+              onCheckedChange={(value: boolean) =>
+                updateProperty("castShadow", value)
+              }
+            />
+            <Label htmlFor="castShadow" className="text-xs">
+              Cast Shadow
+            </Label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="receiveShadow"
+              checked={props.receiveShadow || false}
+              onCheckedChange={(value: boolean) =>
+                updateProperty("receiveShadow", value)
+              }
+            />
+            <Label htmlFor="receiveShadow" className="text-xs">
+              Receive Shadow
+            </Label>
+          </div>
         </div>
       </div>
     </div>

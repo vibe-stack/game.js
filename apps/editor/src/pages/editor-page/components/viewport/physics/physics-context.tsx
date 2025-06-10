@@ -130,8 +130,8 @@ export function PhysicsProvider({ children, scene, onObjectTransformUpdate, debu
     return validatePhysicsWorldConfig(scene.physicsWorld);
   }, [scene.physicsWorld]);
 
-  // Control physics paused state
-  const isPaused = physicsState !== 'playing';
+  // Remove physics pausing - physics will always run for debug helpers
+  // Movement will be controlled by individual rigid bodies instead
 
   // Use debugEnabled prop if provided, otherwise fall back to scene config
   const shouldShowDebug = debugEnabled !== undefined ? debugEnabled : physicsWorldConfig.debugRender.enabled;
@@ -141,7 +141,6 @@ export function PhysicsProvider({ children, scene, onObjectTransformUpdate, debu
       <Physics
         gravity={[physicsWorldConfig.gravity.x, physicsWorldConfig.gravity.y, physicsWorldConfig.gravity.z]}
         timeStep={physicsWorldConfig.integrationParameters.dt}
-        paused={isPaused}
         debug={shouldShowDebug}
         updateLoop="follow"
         interpolate={true}

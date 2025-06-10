@@ -10,8 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Palette, Plus, AlertTriangle, ArrowUp } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Palette, Plus, ArrowUp } from "lucide-react";
 import ColorInput from "../color-input";
 import BoxGeometry from "./geometry-controls/box-geometry";
 import SphereGeometry from "./geometry-controls/sphere-geometry";
@@ -27,8 +26,7 @@ import PolyhedronGeometry from "./geometry-controls/polyhedron-geometry";
 import useEditorStore from "@/stores/editor-store";
 import {
   isLegacyMaterial,
-  upgradeMaterialComponent,
-  getMaterialDisplayName,
+  upgradeMaterialComponent
 } from "@/pages/editor-page/components/viewport/material-compatibility";
 
 interface MeshComponentProps {

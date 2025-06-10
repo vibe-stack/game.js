@@ -242,6 +242,24 @@ interface HeightfieldComponent {
     // Auto-regeneration
     autoRegenerate: boolean; // Regenerate when parameters change
     lastGenerated: Date; // Timestamp of last generation
+    
+    // Material system (same as mesh components)
+    materialRef?: {
+      type: 'library' | 'inline';
+      materialId?: string;
+      properties?: any;
+    };
+    textures?: Record<string, string>;
+    uniforms?: Record<string, any>;
+    
+    // Legacy material support for compatibility
+    material?: string;
+    materialProps?: Record<string, any>;
+    
+    // Rendering properties
+    castShadow?: boolean;
+    receiveShadow?: boolean;
+    renderType?: string;
   };
 }
 

@@ -462,7 +462,7 @@ const useEditorStore = create<EditorState>()(
               return {
                 ...obj,
                 components: obj.components.map(comp => {
-                  if (comp.type === 'Mesh') {
+                  if (comp.type === 'Mesh' || comp.type === 'heightfield') {
                     return {
                       ...comp,
                       properties: {

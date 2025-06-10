@@ -827,7 +827,6 @@ export const gameObjectTemplates = [
               heights: [],
               displacementScale: 1.0,
               smoothing: false,
-              wireframe: false,
               lod: {
                 enabled: false,
                 levels: 3,
@@ -840,7 +839,6 @@ export const gameObjectTemplates = [
             }),
             displacementScale: 1.0,
             smoothing: false,
-            wireframe: false,
             lod: {
               enabled: false,
               levels: 3,
@@ -849,7 +847,18 @@ export const gameObjectTemplates = [
             },
             uvScale: { x: 1, y: 1 },
             autoRegenerate: true,
-            lastGenerated: new Date()
+            lastGenerated: new Date(),
+            materialRef: {
+              type: 'inline',
+              properties: {
+                type: 'standard',
+                color: '#8b7355',
+                metalness: 0.0,
+                roughness: 0.8
+              }
+            },
+            castShadow: true,
+            receiveShadow: true
           }
         }
       ],
