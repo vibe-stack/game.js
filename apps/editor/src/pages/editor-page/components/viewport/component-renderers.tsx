@@ -9,6 +9,7 @@ import {
   RectAreaLightRenderer 
 } from "./light-renderers";
 import { MeshRenderer } from "./mesh-renderer";
+import HeightfieldRenderer from "./heightfield-renderer";
 
 export const COMPONENT_RENDERERS = {
   PerspectiveCamera: PerspectiveCameraRenderer,
@@ -20,12 +21,14 @@ export const COMPONENT_RENDERERS = {
   HemisphereLight: HemisphereLightRenderer,
   RectAreaLight: RectAreaLightRenderer,
   Mesh: MeshRenderer,
+  heightfield: HeightfieldRenderer,
 };
 
 export function renderComponent(
-  component: GameObjectComponent,
+  component: GameObjectComponent | PhysicsComponent,
   children?: React.ReactNode,
   showHelpers?: boolean,
+  objectId?: string,
 ) {
   const Renderer =
     COMPONENT_RENDERERS[component.type as keyof typeof COMPONENT_RENDERERS];
@@ -35,7 +38,7 @@ export function renderComponent(
     return <>{children}</>;
   }
 
-  return <Renderer component={component} showHelpers={showHelpers}>{children}</Renderer>;
+  return <Renderer component={component as any} showHelpers={showHelpers} objectId={objectId}>{children}</Renderer>;
 }
 
 export * from "./camera-renderers";

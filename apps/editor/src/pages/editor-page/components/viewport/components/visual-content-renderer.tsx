@@ -9,6 +9,7 @@ interface VisualContentRendererProps {
   onSelect: (id: string) => void;
   showHelpers: boolean;
   renderType: string;
+  objectId?: string;
 }
 
 const VisualContentRenderer: React.FC<VisualContentRendererProps> = ({
@@ -18,6 +19,7 @@ const VisualContentRenderer: React.FC<VisualContentRendererProps> = ({
   onSelect,
   showHelpers,
   renderType,
+  objectId,
 }) => {
   // Memoize child elements to prevent unnecessary re-renders
   const childElements = useMemo(() => 
@@ -48,9 +50,9 @@ const VisualContentRenderer: React.FC<VisualContentRendererProps> = ({
   // Memoize visual content rendering
   const visualContent = useMemo(() => {
     return enhancedComponents.reduce((acc, component) => {
-      return renderComponent(component, acc, showHelpers);
+      return renderComponent(component, acc, showHelpers, objectId);
     }, <>{childElements}</> as React.ReactElement);
-  }, [enhancedComponents, showHelpers, childElements]);
+  }, [enhancedComponents, showHelpers, childElements, objectId]);
 
   return visualContent;
 };

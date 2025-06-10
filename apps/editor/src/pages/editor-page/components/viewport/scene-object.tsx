@@ -126,6 +126,7 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({
               onSelect={onSelect}
               showHelpers={shouldShowHelpers}
               renderType={renderType}
+              objectId={obj.id}
             />
           ) : (
             // When pivot controls are not active, use normal physics logic
@@ -142,6 +143,7 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(({
                 onSelect={onSelect}
                 showHelpers={shouldShowHelpers}
                 renderType={renderType}
+                objectId={obj.id}
               />
             </PhysicsWrapper>
           )}

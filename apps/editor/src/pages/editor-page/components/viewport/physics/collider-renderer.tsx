@@ -1,5 +1,5 @@
 import React from 'react';
-import { CuboidCollider, BallCollider, CapsuleCollider, CylinderCollider, ConvexHullCollider, TrimeshCollider } from '@react-three/rapier';
+import { CuboidCollider, BallCollider, CapsuleCollider, CylinderCollider, ConvexHullCollider, TrimeshCollider, HeightfieldCollider } from '@react-three/rapier';
 
 interface ColliderRendererProps {
   colliderComponent: ColliderComponent;
@@ -126,6 +126,32 @@ export default function ColliderRenderer({ colliderComponent, children }: Collid
           >
             {children}
           </TrimeshCollider>
+        );
+      }
+
+      case 'heightfield': {
+        // HeightfieldCollider expects heights as (width + 1) * (depth + 1) values
+        // The 2D array heights[z][x] needs to be flattened to match this format
+        const heights2D = shape.heights || [[0, 0], [0, 0]];
+        const depth = heights2D.length - 1; // number of rows - 1
+        const width = (heights2D[0]?.length || 2) - 1; // number of columns - 1
+        
+        if (depth < 1 || width < 1) {
+          console.warn('Heightfield collider needs at least 2x2 height samples');
+          return <>{children}</>;
+        }
+
+        // Convert 2D array to flat array in row-major order (z outer, x inner)
+        const heightValues = heights2D.flat();
+        const scale = shape.scale;
+
+        return (
+          <HeightfieldCollider
+            args={[depth, width, heightValues, scale]}
+            {...commonProps}
+          >
+            {children}
+          </HeightfieldCollider>
         );
       }
 

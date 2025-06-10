@@ -165,7 +165,85 @@ interface JointComponent {
   };
 }
 
-type PhysicsComponent = RigidBodyComponent | ColliderComponent | JointComponent;
+type PhysicsComponent = RigidBodyComponent | ColliderComponent | JointComponent | HeightfieldComponent;
+
+// Heightfield Component for Terrain Generation
+
+type HeightfieldGenerationAlgorithm = 
+  | 'perlin'
+  | 'simplex' 
+  | 'ridged'
+  | 'fbm' // Fractal Brownian Motion
+  | 'voronoi'
+  | 'diamond-square'
+  | 'random'
+  | 'flat'
+  | 'custom'; // for user-provided height data
+
+interface HeightfieldNoiseSettings {
+  frequency: number;
+  amplitude: number;
+  octaves: number;
+  persistence: number;
+  lacunarity: number;
+  // For ridged noise
+  ridgeOffset?: number;
+  // For voronoi
+  voronoiPoints?: number;
+  voronoiRandomness?: number;
+}
+
+interface HeightfieldLODSettings {
+  enabled: boolean;
+  levels: number;
+  distances: number[]; // Distance thresholds for each LOD level
+  simplificationRatio: number[]; // How much to simplify at each level (0-1)
+}
+
+interface HeightfieldComponent {
+  id: string;
+  type: 'heightfield';
+  enabled: boolean;
+  properties: {
+    // Dimensions
+    width: number; // world units (X axis)
+    depth: number; // world units (Z axis)  
+    rows: number; // number of height samples along depth (Z)
+    columns: number; // number of height samples along width (X)
+    
+    // Elevation
+    minElevation: number;
+    maxElevation: number;
+    
+    // Generation
+    algorithm: HeightfieldGenerationAlgorithm;
+    seed: number;
+    
+    // Algorithm-specific parameters
+    noise: HeightfieldNoiseSettings;
+    
+    // For custom heightfields
+    customHeights?: number[][];
+    
+    // Generated data (computed from parameters)
+    heights: number[][]; // [row][column] = elevation value
+    
+    // Visual properties
+    displacementScale: number; // Multiplier for displacement mapping
+    smoothing: boolean; // Apply smoothing filter to generated heights
+    wireframe: boolean; // Render as wireframe for debugging
+    
+    // LOD settings for performance
+    lod: HeightfieldLODSettings;
+    
+    // Texture coordinate scaling
+    uvScale: Vector2; // How many times to tile textures across the heightfield
+    
+    // Auto-regeneration
+    autoRegenerate: boolean; // Regenerate when parameters change
+    lastGenerated: Date; // Timestamp of last generation
+  };
+}
 
 interface PhysicsWorldConfig {
   gravity: Vector3;

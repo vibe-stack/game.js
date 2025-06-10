@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Box, Zap, Lightbulb, Camera, Magnet } from "lucide-react";
+import { Plus, Box, Zap, Lightbulb, Camera, Magnet, Shapes } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -157,6 +157,42 @@ export default function AddComponentMenu({ onAddComponent }: AddComponentMenuPro
           }
         } as JointComponent;
 
+      case 'heightfield':
+        return {
+          ...baseComponent,
+          type: 'heightfield',
+          properties: {
+            width: 10,
+            depth: 10,
+            rows: 32,
+            columns: 32,
+            minElevation: 0,
+            maxElevation: 2,
+            algorithm: 'perlin' as HeightfieldGenerationAlgorithm,
+            seed: Math.floor(Math.random() * 100000),
+            noise: {
+              frequency: 0.1,
+              amplitude: 1.0,
+              octaves: 4,
+              persistence: 0.5,
+              lacunarity: 2.0
+            },
+            heights: [[]],
+            displacementScale: 1.0,
+            smoothing: false,
+            wireframe: false,
+            lod: {
+              enabled: false,
+              levels: 3,
+              distances: [50, 100, 200],
+              simplificationRatio: [0.5, 0.25, 0.1]
+            },
+            uvScale: { x: 1, y: 1 },
+            autoRegenerate: true,
+            lastGenerated: new Date()
+          }
+        } as HeightfieldComponent;
+
       default:
         return {
           ...baseComponent,
@@ -220,6 +256,14 @@ export default function AddComponentMenu({ onAddComponent }: AddComponentMenuPro
         <DropdownMenuItem onClick={() => handleAddComponent('joint')}>
           <Magnet className="h-4 w-4 mr-2" />
           Joint
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
+        
+        <DropdownMenuLabel className="text-xs">Terrain</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => handleAddComponent('heightfield')}>
+          <Shapes className="h-4 w-4 mr-2" />
+          Heightfield
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

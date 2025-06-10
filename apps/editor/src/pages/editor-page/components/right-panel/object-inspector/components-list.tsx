@@ -4,6 +4,7 @@ import LightComponent from "./component-renderers/light-component";
 import CameraComponent from "./component-renderers/camera-component";
 import RigidBodyComponent from "./component-renderers/rigid-body-component";
 import ColliderComponent from "./component-renderers/collider-component";
+import HeightfieldComponent from "./component-renderers/heightfield-component";
 import AddComponentMenu from "./add-component-menu";
 import CollapsibleSection from "./collapsible-section";
 import CustomToggle from "./custom-toggle";
@@ -42,6 +43,7 @@ export default function ComponentsList({ components, objectId, onUpdate, onAddCo
         case 'rigidBody': return 'Rigid Body';
         case 'collider': return 'Collider';
         case 'joint': return 'Joint';
+        case 'heightfield': return 'Heightfield';
         default: return comp.type;
       }
     };
@@ -64,6 +66,8 @@ export default function ComponentsList({ components, objectId, onUpdate, onAddCo
           return <RigidBodyComponent {...commonProps} component={component as RigidBodyComponent} />;
         case 'collider':
           return <ColliderComponent {...commonProps} component={component as ColliderComponent} />;
+        case 'heightfield':
+          return <HeightfieldComponent objectId={objectId} component={component as HeightfieldComponent} />;
         case 'joint':
           return (
             <div className="text-xs text-muted-foreground">

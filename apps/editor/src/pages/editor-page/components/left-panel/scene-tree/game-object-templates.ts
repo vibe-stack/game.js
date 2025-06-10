@@ -16,6 +16,7 @@ import {
   Shapes,
   Flashlight
 } from "lucide-react";
+import { generateHeightfieldData } from "@/utils/heightfield-generator";
 
 export const gameObjectTemplates = [
   // GEOMETRIES
@@ -775,6 +776,88 @@ export const gameObjectTemplates = [
   },
 
   // CAMERAS
+  {
+    id: 'heightfield',
+    name: 'Heightfield',
+    description: 'Heightfield - Procedural terrain generator with physics support',
+    icon: Shapes,
+    template: {
+      transform: {
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 }
+      },
+      components: [
+        {
+          id: 'heightfield-component',
+          type: 'heightfield',
+          enabled: true,
+          properties: {
+            width: 10,
+            depth: 10,
+            rows: 64,
+            columns: 64,
+            minElevation: -2,
+            maxElevation: 5,
+            algorithm: 'perlin',
+            seed: 12345,
+            noise: {
+              frequency: 0.05,
+              amplitude: 2.0,
+              octaves: 6,
+              persistence: 0.6,
+              lacunarity: 2.0
+            },
+            heights: generateHeightfieldData({
+              width: 10,
+              depth: 10,
+              rows: 64,
+              columns: 64,
+              minElevation: -2,
+              maxElevation: 5,
+              algorithm: 'perlin',
+              seed: 12345,
+              noise: {
+                frequency: 0.05,
+                amplitude: 2.0,
+                octaves: 6,
+                persistence: 0.6,
+                lacunarity: 2.0
+              },
+              heights: [],
+              displacementScale: 1.0,
+              smoothing: false,
+              wireframe: false,
+              lod: {
+                enabled: false,
+                levels: 3,
+                distances: [50, 100, 200],
+                simplificationRatio: [0.5, 0.25, 0.1]
+              },
+              uvScale: { x: 1, y: 1 },
+              autoRegenerate: true,
+              lastGenerated: new Date()
+            }),
+            displacementScale: 1.0,
+            smoothing: false,
+            wireframe: false,
+            lod: {
+              enabled: false,
+              levels: 3,
+              distances: [50, 100, 200],
+              simplificationRatio: [0.5, 0.25, 0.1]
+            },
+            uvScale: { x: 1, y: 1 },
+            autoRegenerate: true,
+            lastGenerated: new Date()
+          }
+        }
+      ],
+      visible: true,
+      tags: ['geometry'],
+      layer: 0
+    }
+  },
   {
     id: 'perspective-camera',
     name: 'Perspective Camera',

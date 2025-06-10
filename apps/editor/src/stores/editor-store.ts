@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { generateHeightfieldData } from '@/utils/heightfield-generator';
 
 interface EditorState {
   // Project State
@@ -51,6 +52,7 @@ interface EditorState {
   updateObjectTransform: (objectId: string, transform: Partial<Transform>) => void;
   updateObjectComponent: (objectId: string, componentId: string, updates: Partial<GameObjectComponent>) => void;
   addObjectComponent: (objectId: string, component: GameObjectComponent | PhysicsComponent) => void;
+  updateHeightfieldComponent: (objectId: string, componentId: string, updates: Partial<HeightfieldComponent['properties']>) => void;
   
   // Scene Configuration
   updateSceneEditorConfig: (config: Partial<SceneEditorConfig>) => void;
@@ -283,9 +285,26 @@ const useEditorStore = create<EditorState>()(
       const updateInObjects = (objects: GameObject[]): GameObject[] => {
         return objects.map(obj => {
           if (obj.id === objectId) {
+            let newComponent = component;
+            
+            // If adding a heightfield collider, sync with existing heightfield component
+            if (component.type === 'collider' && (component as ColliderComponent).properties.shape.type === 'heightfield') {
+              const heightfieldComp = obj.components.find(c => c.type === 'heightfield') as HeightfieldComponent;
+              if (heightfieldComp && heightfieldComp.properties.heights) {
+                const colliderComp = component as ColliderComponent;
+                (colliderComp.properties.shape as any).heights = heightfieldComp.properties.heights;
+                (colliderComp.properties.shape as any).scale = { 
+                  x: heightfieldComp.properties.width / (heightfieldComp.properties.columns - 1),
+                  y: 1,
+                  z: heightfieldComp.properties.depth / (heightfieldComp.properties.rows - 1)
+                };
+                newComponent = colliderComp;
+              }
+            }
+            
             return {
               ...obj,
-              components: [...obj.components, component]
+              components: [...obj.components, newComponent]
             };
           }
           return {
@@ -480,6 +499,49 @@ const useEditorStore = create<EditorState>()(
         set({ currentScene: updatedScene });
       }
     },
+
+    updateHeightfieldComponent: (objectId, componentId, updates) => set((state) => {
+      if (!state.currentScene) return state;
+
+      const findAndUpdate = (objects: GameObject[]): GameObject[] => {
+        return objects.map(obj => {
+          if (obj.id !== objectId) {
+            return { ...obj, children: findAndUpdate(obj.children) };
+          }
+
+          let newHeights: number[][] | undefined;
+          const updatedComponents = obj.components.map(comp => {
+            if (comp.id !== componentId || comp.type !== 'heightfield') {
+              return comp;
+            }
+
+            const hfComp = comp as HeightfieldComponent;
+            const newProps = { ...hfComp.properties, ...updates };
+
+            newHeights = generateHeightfieldData(newProps);
+            newProps.heights = newHeights;
+
+            return { ...hfComp, properties: newProps };
+          });
+
+          let finalComponents = updatedComponents;
+          if (newHeights) {
+            finalComponents = updatedComponents.map(comp => {
+              if (comp.type === 'collider' && (comp as ColliderComponent).properties.shape.type === 'heightfield') {
+                const collComp = comp as ColliderComponent;
+                (collComp.properties.shape as any).heights = newHeights;
+              }
+              return comp;
+            });
+          }
+
+          return { ...obj, components: finalComponents };
+        });
+      };
+
+      const newScene = { ...state.currentScene, objects: findAndUpdate(state.currentScene.objects) };
+      return { currentScene: newScene };
+    }),
   }))
 );
 

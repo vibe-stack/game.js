@@ -31,10 +31,11 @@ export default function ColliderComponent({ component, onUpdate }: ColliderCompo
   };
 
   const updateShape = (updates: Partial<ColliderShape>) => {
-    updateProperty('shape', {
+    const newShape = {
       ...props.shape,
       ...updates
-    });
+    }
+    updateProperty('shape', newShape);
   };
 
   const updateActiveCollisionTypes = (key: keyof typeof props.activeCollisionTypes, value: boolean) => {
@@ -140,6 +141,17 @@ export default function ColliderComponent({ component, onUpdate }: ColliderCompo
             />
           </div>
         );
+      case 'heightfield':
+        return (
+          <Vector3Controls
+            label="Scale"
+            value={shape.scale}
+            onChange={(value) => updateShape({ scale: value })}
+            step={0.1}
+            precision={2}
+            min={0.01}
+          />
+        );
       default:
         return null;
     }
@@ -162,7 +174,7 @@ export default function ColliderComponent({ component, onUpdate }: ColliderCompo
                 cone: { type: 'cone', height: 1, radius: 0.5 },
                 convexHull: { type: 'convexHull', vertices: [] },
                 trimesh: { type: 'trimesh', vertices: [], indices: [] },
-                heightfield: { type: 'heightfield', heights: [[]], scale: { x: 1, y: 1, z: 1 } }
+                heightfield: { type: 'heightfield', heights: [[0, 1], [0, 1]], scale: { x: 0.16, y: 1, z: 0.16 } }
               };
               updateProperty('shape', defaultShapes[type]);
             }}
