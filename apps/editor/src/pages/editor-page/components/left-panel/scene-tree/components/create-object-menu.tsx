@@ -12,7 +12,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { gameObjectTemplates } from "../game-object-templates";
+import { gameObjectTemplates } from "../templates";
 
 interface CreateObjectMenuProps {
   onAddObject: (template: (typeof gameObjectTemplates)[0]) => void;
@@ -37,14 +37,20 @@ const menuCategories = [
     description: "Viewpoint and perspective controls",
     color: "text-green-500",
   },
+  {
+    id: "utility",
+    name: "Utilities",
+    description: "Empty objects, groups, and helpers",
+    color: "text-purple-500",
+  },
 ];
 
 export default function CreateObjectMenu({ onAddObject }: CreateObjectMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-          <Plus className="h-4 w-4" />
+        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+          <Plus className="h-6 w-6" />
           <span className="sr-only">Add object</span>
         </Button>
       </DropdownMenuTrigger>

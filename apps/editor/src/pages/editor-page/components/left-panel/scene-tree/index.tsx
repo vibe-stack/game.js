@@ -21,7 +21,7 @@ import {
 } from "@dnd-kit/sortable";
 import { createPortal } from "react-dom";
 import useEditorStore from "@/stores/editor-store";
-import { gameObjectTemplates } from "./game-object-templates";
+import { gameObjectTemplates } from "./templates";
 import CreateObjectMenu from "./components/create-object-menu";
 import SceneTreeNode from "./components/scene-tree-node";
 import SceneTreeSearch from "./components/scene-tree-search";
@@ -58,7 +58,8 @@ export default function SceneTree({
   selectedObjects,
   onSelectObject,
 }: SceneTreeProps) {
-  const { addObject, removeObject, setCurrentScene, deselectAll } = useEditorStore();
+  const { addObject, removeObject, setCurrentScene, deselectAll } =
+    useEditorStore();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [clipboard, setClipboard] = useState<GameObject | null>(null);
@@ -75,8 +76,8 @@ export default function SceneTree({
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { 
-        delay: 300, 
+      activationConstraint: {
+        delay: 300,
         distance: 15,
       },
     }),
@@ -335,12 +336,15 @@ export default function SceneTree({
     ],
   );
 
-  const handleEmptySpaceClick = useCallback((e: React.MouseEvent) => {
-    // Only clear selection if clicking directly on the container, not on child elements
-    if (e.target === e.currentTarget) {
-      deselectAll();
-    }
-  }, [deselectAll]);
+  const handleEmptySpaceClick = useCallback(
+    (e: React.MouseEvent) => {
+      // Only clear selection if clicking directly on the container, not on child elements
+      if (e.target === e.currentTarget) {
+        deselectAll();
+      }
+    },
+    [deselectAll],
+  );
 
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
@@ -356,18 +360,20 @@ export default function SceneTree({
   }
 
   return (
-    <div className="space-y-1 p-4" data-scene-tree tabIndex={0} onClick={handleEmptySpaceClick}>
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-muted-foreground text-sm font-medium">
-          Scene Objects
-        </h3>
+    <div
+      className="space-y-1 p-4"
+      data-scene-tree
+      tabIndex={0}
+      onClick={handleEmptySpaceClick}
+    >
+      <div className="sticky top-1 flex gap-2 bg-black/30 rounded-lg backdrop-blur-md z-20">
+        <SceneTreeSearch
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
+
         <CreateObjectMenu onAddObject={handleAddObject} />
       </div>
-
-      <SceneTreeSearch
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-      />
 
       <DndContext
         sensors={sensors}
@@ -407,7 +413,11 @@ export default function SceneTree({
                 isCollapsed={collapsedItems.has(id)}
                 indentationWidth={indentationWidth}
                 projected={projected}
-                isOverParent={projected && projected.parentId === id && projected.depth > depth}
+                isOverParent={
+                  projected &&
+                  projected.parentId === id &&
+                  projected.depth > depth
+                }
               />
             ))}
           </div>

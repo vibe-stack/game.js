@@ -18,6 +18,7 @@ interface EditorState {
   
   // Editor UI State
   editorMode: 'select' | 'move' | 'rotate' | 'scale';
+  viewportMode: 'orbit' | 'camera';
   viewportCamera: {
     position: Vector3;
     rotation: Vector3;
@@ -41,6 +42,7 @@ interface EditorState {
   selectObject: (objectId: string, additive?: boolean) => void;
   deselectAll: () => void;
   setEditorMode: (mode: 'select' | 'move' | 'rotate' | 'scale') => void;
+  setViewportMode: (mode: 'orbit' | 'camera') => void;
   
   // Asset Actions
   loadAssets: () => Promise<void>;
@@ -104,6 +106,7 @@ const useEditorStore = create<EditorState>()(
     selectedObjects: [],
     assets: [],
     editorMode: 'select',
+    viewportMode: 'orbit',
     viewportCamera: {
       position: { x: 0, y: 5, z: 10 },
       rotation: { x: -0.2, y: 0, z: 0 },
@@ -809,6 +812,8 @@ const useEditorStore = create<EditorState>()(
       const newScene = { ...state.currentScene, objects: findAndUpdate(state.currentScene.objects) };
       return { currentScene: newScene };
     }),
+
+    setViewportMode: (mode) => set({ viewportMode: mode }),
   }))
 );
 

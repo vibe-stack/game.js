@@ -38,7 +38,7 @@ interface SceneObjectProps {
 
 const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
   ({ obj, selectedObjects, onSelect, renderType = "solid" }, ref) => {
-    const { transform, components, children, visible } = obj;
+    const { transform, components, children, visible, tags } = obj;
     const groupRef = useRef<THREE.Group>(null);
     const matrixRef = useRef<THREE.Matrix4>(new THREE.Matrix4());
     const isManipulatingRef = useRef(false);
@@ -54,6 +54,12 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
       [isSelected, physicsState],
     );
 
+    // Check if this is a utility object that should remain empty
+    const isUtilityObject = useMemo(
+      () => tags?.includes('utility') || false,
+      [tags],
+    );
+
     // Memoize physics component separation
     const { rigidBodyComp, regularComponents } = useMemo(
       () => separatePhysicsComponents(components),
@@ -67,13 +73,22 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
     );
     const isPivotControlsActive = isControlledByPivot;
 
-    // Memoize effective components
+    // Memoize effective components - avoid default mesh for utility objects
     const effectiveComponents = useMemo(
-      () =>
-        components.length > 0
-          ? regularComponents
-          : [createDefaultMeshComponent(isSelected, renderType)],
-      [components.length, regularComponents, isSelected, renderType],
+      () => {
+        if (components.length > 0) {
+          return regularComponents;
+        }
+        
+        // Don't create default mesh for utility objects (empty objects, groups, etc.)
+        if (isUtilityObject) {
+          return [];
+        }
+        
+        // Create default mesh for other objects with no components
+        return [createDefaultMeshComponent(isSelected, renderType)];
+      },
+      [components.length, regularComponents, isUtilityObject, isSelected, renderType],
     );
 
     // Memoize transform for physics wrapper
@@ -106,6 +121,7 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
       return {
         ref: isSelected ? ref || groupRef : groupRef,
         onClick: handleClick,
+        userData: { objectId: obj.id },
         ...(shouldApplyTransform && {
           position: [position.x, position.y, position.z] as [
             number,

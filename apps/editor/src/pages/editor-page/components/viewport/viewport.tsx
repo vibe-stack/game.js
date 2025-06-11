@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useRef } from "react";
-import { Canvas, extend, useThree } from "@react-three/fiber";
+import { Canvas, extend, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment } from "@react-three/drei";
 import {
   ACESFilmicToneMapping,
@@ -56,13 +56,178 @@ function PhysicsCallbackProvider({
   return null;
 }
 
+function CameraController({ scene }: { scene: GameScene }) {
+  const { camera, controls, scene: threeScene } = useThree();
+  const { viewportMode, physicsState } = useEditorStore();
+  const prevActiveCameraRef = useRef<string | undefined>(scene.activeCamera);
+  const cameraFollowRef = useRef<{ camera: GameObject; worldMatrix: THREE.Matrix4 } | null>(null);
+  
+  useEffect(() => {
+    if (!scene.activeCamera) return;
+    
+    // Find the active camera object and calculate its world transform
+    const findCameraWithWorldTransform = (objects: GameObject[], id: string, parentTransform?: THREE.Matrix4): { camera: GameObject; worldMatrix: THREE.Matrix4 } | null => {
+      for (const obj of objects) {
+        // Calculate this object's world matrix
+        const localMatrix = new THREE.Matrix4();
+        const { position, rotation, scale } = obj.transform;
+        localMatrix.makeTranslation(position.x, position.y, position.z);
+        
+        const rotationMatrix = new THREE.Matrix4();
+        rotationMatrix.makeRotationFromEuler(new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ'));
+        localMatrix.multiply(rotationMatrix);
+        
+        const scaleMatrix = new THREE.Matrix4();
+        scaleMatrix.makeScale(scale.x, scale.y, scale.z);
+        localMatrix.multiply(scaleMatrix);
+        
+        // Combine with parent transform if it exists
+        const worldMatrix = parentTransform ? new THREE.Matrix4().multiplyMatrices(parentTransform, localMatrix) : localMatrix;
+        
+        if (obj.id === id) {
+          const hasCameraComponent = obj.components.some(
+            comp => comp.type === 'PerspectiveCamera' || comp.type === 'OrthographicCamera'
+          );
+          if (hasCameraComponent) return { camera: obj, worldMatrix };
+        }
+        
+        // Search children with this object's world transform as parent
+        const found = findCameraWithWorldTransform(obj.children, id, worldMatrix);
+        if (found) return found;
+      }
+      return null;
+    };
+    
+    const result = findCameraWithWorldTransform(scene.objects, scene.activeCamera);
+    cameraFollowRef.current = result;
+    
+    // Handle camera switching logic
+    if (viewportMode === 'orbit' && controls && scene.activeCamera !== prevActiveCameraRef.current) {
+      if (!result) return;
+      
+      const { worldMatrix } = result;
+      
+      // Extract world position from the world matrix
+      const worldPosition = new THREE.Vector3();
+      const worldRotation = new THREE.Quaternion();
+      worldMatrix.decompose(worldPosition, worldRotation, new THREE.Vector3());
+      
+      // If OrbitControls is available, use it for smooth transition
+      if (controls && 'object' in controls) {
+        const orbitControls = controls as any;
+        
+        // Set the target position for smooth animation using world coordinates
+        orbitControls.object.position.copy(worldPosition);
+        orbitControls.target.set(0, 0, 0); // Look at center for now
+        orbitControls.update();
+      }
+    }
+    
+    prevActiveCameraRef.current = scene.activeCamera;
+  }, [scene.activeCamera, scene.objects, camera, controls, viewportMode]);
+  
+  // Update camera transform in camera follow mode
+  useFrame(() => {
+    if (viewportMode === 'camera' && scene.activeCamera && camera) {
+      // During physics, get live transforms from the Three.js scene graph
+      // During non-physics, use GameObject transforms
+      if (physicsState === 'playing') {
+        // Find the camera object in the Three.js scene by traversing the scene graph
+        const findCameraInThreeScene = (object: THREE.Object3D, targetId: string): THREE.Object3D | null => {
+          // Check if this object has the target ID (stored in userData)
+          if (object.userData?.objectId === targetId) {
+            return object;
+          }
+          
+          // Search children
+          for (const child of object.children) {
+            const found = findCameraInThreeScene(child, targetId);
+            if (found) return found;
+          }
+          
+          return null;
+        };
+        
+        const cameraObject = findCameraInThreeScene(threeScene, scene.activeCamera);
+        if (cameraObject) {
+          // Get the world matrix from the live Three.js object
+          cameraObject.updateMatrixWorld(true);
+          const worldMatrix = cameraObject.matrixWorld;
+          
+          // Extract world position and rotation
+          const worldPosition = new THREE.Vector3();
+          const worldRotation = new THREE.Quaternion();
+          const worldScale = new THREE.Vector3();
+          worldMatrix.decompose(worldPosition, worldRotation, worldScale);
+          
+          // Apply to the viewport camera
+          camera.position.copy(worldPosition);
+          camera.quaternion.copy(worldRotation);
+          camera.updateMatrixWorld();
+        }
+      } else {
+        // During non-physics, use the GameObject transforms (existing logic)
+        const findCameraWithWorldTransform = (objects: GameObject[], id: string, parentTransform?: THREE.Matrix4): { camera: GameObject; worldMatrix: THREE.Matrix4 } | null => {
+          for (const obj of objects) {
+            // Calculate this object's world matrix
+            const localMatrix = new THREE.Matrix4();
+            const { position, rotation, scale } = obj.transform;
+            localMatrix.makeTranslation(position.x, position.y, position.z);
+            
+            const rotationMatrix = new THREE.Matrix4();
+            rotationMatrix.makeRotationFromEuler(new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ'));
+            localMatrix.multiply(rotationMatrix);
+            
+            const scaleMatrix = new THREE.Matrix4();
+            scaleMatrix.makeScale(scale.x, scale.y, scale.z);
+            localMatrix.multiply(scaleMatrix);
+            
+            // Combine with parent transform if it exists
+            const worldMatrix = parentTransform ? new THREE.Matrix4().multiplyMatrices(parentTransform, localMatrix) : localMatrix;
+            
+            if (obj.id === id) {
+              const hasCameraComponent = obj.components.some(
+                comp => comp.type === 'PerspectiveCamera' || comp.type === 'OrthographicCamera'
+              );
+              if (hasCameraComponent) return { camera: obj, worldMatrix };
+            }
+            
+            // Search children with this object's world transform as parent
+            const found = findCameraWithWorldTransform(obj.children, id, worldMatrix);
+            if (found) return found;
+          }
+          return null;
+        };
+        
+        const result = findCameraWithWorldTransform(scene.objects, scene.activeCamera);
+        if (result) {
+          const { worldMatrix } = result;
+          
+          // Extract world position and rotation from the world matrix
+          const worldPosition = new THREE.Vector3();
+          const worldRotation = new THREE.Quaternion();
+          const worldScale = new THREE.Vector3();
+          worldMatrix.decompose(worldPosition, worldRotation, worldScale);
+          
+          // Apply to the viewport camera
+          camera.position.copy(worldPosition);
+          camera.quaternion.copy(worldRotation);
+          camera.updateMatrixWorld();
+        }
+      }
+    }
+  });
+  
+  return null;
+}
+
 export default function Viewport({
   scene,
   selectedObjects,
   onSelectObject,
   onPhysicsCallbacks,
 }: ViewportProps) {
-  const { updateObjectTransform, physicsState, importAssetFromData, createMeshFromGLB, setPhysicsState } = useEditorStore();
+  const { updateObjectTransform, physicsState, importAssetFromData, createMeshFromGLB, setPhysicsState, viewportMode } = useEditorStore();
   const viewportRef = useRef<HTMLDivElement>(null);
   const previousSceneIdRef = useRef<string | null>(null);
 
@@ -205,6 +370,7 @@ export default function Viewport({
           >
             <PhysicsCallbackProvider onPhysicsCallbacks={onPhysicsCallbacks} />
             <SceneEffects scene={scene} />
+            <CameraController scene={scene} />
 
             {/* Fog */}
             {scene.editorConfig.enableFog && (
@@ -247,7 +413,9 @@ export default function Viewport({
               />
             )}
 
-            <OrbitControls enablePan enableZoom enableRotate makeDefault />
+            {viewportMode === 'orbit' && (
+              <OrbitControls enablePan enableZoom enableRotate makeDefault />
+            )}
           </PhysicsProvider>
         </Suspense>
       </Canvas>

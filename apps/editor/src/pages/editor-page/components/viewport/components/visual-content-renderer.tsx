@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { renderComponent } from "../component-renderers";
+import { EmptyObjectHelper } from "../custom-helpers";
 import SceneObject from "../scene-object";
 
 interface VisualContentRendererProps {
@@ -49,10 +50,22 @@ const VisualContentRenderer: React.FC<VisualContentRendererProps> = ({
 
   // Memoize visual content rendering
   const visualContent = useMemo(() => {
-    return enhancedComponents.reduce((acc, component) => {
+    const baseContent = enhancedComponents.reduce((acc, component) => {
       return renderComponent(component, acc, showHelpers, objectId);
     }, <>{childElements}</> as React.ReactElement);
-  }, [enhancedComponents, showHelpers, childElements, objectId]);
+
+    // If there are no components and helpers should be shown, show empty object helper
+    if (components.length === 0 && showHelpers) {
+      return (
+        <>
+          <EmptyObjectHelper />
+          {baseContent}
+        </>
+      );
+    }
+
+    return baseContent;
+  }, [enhancedComponents, showHelpers, childElements, objectId, components.length]);
 
   return visualContent;
 };

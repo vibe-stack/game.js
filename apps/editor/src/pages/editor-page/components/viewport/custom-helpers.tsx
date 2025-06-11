@@ -110,3 +110,53 @@ export function HemisphereLightHelper({
     </group>
   );
 }
+
+export function EmptyObjectHelper({
+  size = 0.5,
+  color = "#888888",
+}: {
+  size?: number;
+  color?: string;
+}) {
+  const meshRef = useRef<Mesh>(null);
+
+  const axisGeometry = useMemo(() => {
+    const geometry = new BufferGeometry();
+    const axisPoints = [
+      // X axis (red)
+      new Vector3(0, 0, 0), new Vector3(size, 0, 0),
+      // Y axis (green)
+      new Vector3(0, 0, 0), new Vector3(0, size, 0),
+      // Z axis (blue)
+      new Vector3(0, 0, 0), new Vector3(0, 0, size),
+    ];
+    
+    const positions = new Float32Array(axisPoints.flatMap(p => [p.x, p.y, p.z]));
+    const colors = new Float32Array([
+      // X axis (red)
+      1, 0, 0, 1, 0, 0,
+      // Y axis (green)
+      0, 1, 0, 0, 1, 0,
+      // Z axis (blue)
+      0, 0, 1, 0, 0, 1,
+    ]);
+    
+    geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
+    return geometry;
+  }, [size]);
+
+  return (
+    <group>
+      {/* Small wireframe cube to indicate the object position */}
+      <mesh ref={meshRef}>
+        <boxGeometry args={[size * 0.4, size * 0.4, size * 0.4]} />
+        <meshBasicMaterial color={color} wireframe transparent opacity={0.4} />
+      </mesh>
+      {/* Colored axes */}
+      <lineSegments geometry={axisGeometry}>
+        <lineBasicMaterial vertexColors transparent opacity={0.7} />
+      </lineSegments>
+    </group>
+  );
+}

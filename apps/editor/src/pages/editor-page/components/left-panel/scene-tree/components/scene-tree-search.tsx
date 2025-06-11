@@ -19,7 +19,7 @@ export default function SceneTreeSearch({
   };
 
   return (
-    <div className="sticky top-1 py-1 mb-3 bg-black/30 backdrop-blur-md z-20">
+    <div className="">
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         type="text"
