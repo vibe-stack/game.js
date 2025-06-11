@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Box, Zap, Lightbulb, Camera, Magnet, Shapes } from "lucide-react";
+import { Plus, Box, Zap, Lightbulb, Camera, Magnet, Shapes, Route } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -193,6 +193,30 @@ export default function AddComponentMenu({ onAddComponent }: AddComponentMenuPro
           }
         } as HeightfieldComponent;
 
+      case 'extrudedArc':
+        return {
+          ...baseComponent,
+          type: 'extrudedArc',
+          properties: {
+            arcRadius: 5.0,
+            pitch: 0.0,
+            width: 2.0,
+            height: 0.2,
+            pathLength: 10.0,
+            angle: Math.PI,
+            segments: 32,
+            closed: false,
+            crossSectionSegments: 4,
+            extrusionSegments: 1,
+            uvScale: { x: 1, y: 1 },
+            flipUVs: false,
+            autoRegenerate: true,
+            lastGenerated: new Date(),
+            castShadow: true,
+            receiveShadow: true
+          }
+        } as ExtrudedArcComponent;
+
       default:
         return {
           ...baseComponent,
@@ -264,6 +288,10 @@ export default function AddComponentMenu({ onAddComponent }: AddComponentMenuPro
         <DropdownMenuItem onClick={() => handleAddComponent('heightfield')}>
           <Shapes className="h-4 w-4 mr-2" />
           Heightfield
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleAddComponent('extrudedArc')}>
+          <Route className="h-4 w-4 mr-2" />
+          Extruded Arc
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

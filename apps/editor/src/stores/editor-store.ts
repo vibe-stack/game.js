@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { generateHeightfieldData } from '@/utils/heightfield-generator';
 import { clearTextureCache } from '@/pages/editor-page/components/viewport/enhanced-material-components';
+import { generateExtrudedArcColliderVertices } from "@/utils/extruded-arc-generator";
 
 interface EditorState {
   // Project State
@@ -64,6 +65,7 @@ interface EditorState {
   updateObjectComponent: (objectId: string, componentId: string, updates: Partial<GameObjectComponent>) => void;
   addObjectComponent: (objectId: string, component: GameObjectComponent | PhysicsComponent) => void;
   updateHeightfieldComponent: (objectId: string, componentId: string, updates: Partial<HeightfieldComponent['properties']>) => void;
+  updateExtrudedArcComponent: (objectId: string, componentId: string, updates: Partial<ExtrudedArcComponent['properties']>) => void;
   
   // Scene Configuration
   updateSceneEditorConfig: (config: Partial<SceneEditorConfig>) => void;
@@ -243,6 +245,9 @@ const useEditorStore = create<EditorState>()(
       currentScene: scene,
       selectedObjects: [], // Clear selection when changing scenes
       materials: scene?.materials || [], // Load materials from scene
+      physicsState: 'stopped', // Reset physics state when changing scenes
+      physicsCallbacks: {}, // Clear physics callbacks
+      editorMode: 'select', // Reset editor mode to select
     }),
     
     // Scene switching
@@ -251,6 +256,9 @@ const useEditorStore = create<EditorState>()(
       if (!currentProject) return;
 
       try {
+        // Clear texture cache before switching to avoid conflicts
+        clearTextureCache();
+        
         const scene = await window.projectAPI.loadScene(currentProject.path, sceneName);
         
         // Load assets from filesystem
@@ -259,7 +267,11 @@ const useEditorStore = create<EditorState>()(
         set({ 
           currentScene: scene,
           selectedObjects: [],
-          assets: assets
+          assets: assets,
+          physicsState: 'stopped', // Reset physics state when switching scenes
+          physicsCallbacks: {}, // Clear physics callbacks
+          materials: scene?.materials || [], // Load materials from scene
+          editorMode: 'select', // Reset editor mode to select
         });
         
         // Update project's current scene
@@ -413,6 +425,8 @@ const useEditorStore = create<EditorState>()(
     }),
 
     addObjectComponent: (objectId, component) => set((state) => {
+      console.log('addObjectComponent called:', { objectId, componentType: component.type });
+      
       if (!state.currentScene) return state;
       
       const scene = { ...state.currentScene };
@@ -434,6 +448,42 @@ const useEditorStore = create<EditorState>()(
                   z: heightfieldComp.properties.depth / (heightfieldComp.properties.rows - 1)
                 };
                 newComponent = colliderComp;
+              }
+            }
+            
+            // If adding a convex hull collider, sync with existing extruded arc component
+            if (component.type === 'collider' && (component as ColliderComponent).properties.shape.type === 'convexHull') {
+              const extrudedArcComp = obj.components.find(c => c.type === 'extrudedArc') as ExtrudedArcComponent;
+              console.log('Adding convex hull collider to object:', objectId);
+              console.log('Found extruded arc component:', !!extrudedArcComp);
+              
+              if (extrudedArcComp) {
+                const colliderComp = component as ColliderComponent;
+                const convexHullShape = colliderComp.properties.shape as { type: 'convexHull'; vertices: Vector3[] };
+                
+                console.log('Initial vertices count:', convexHullShape.vertices.length);
+                
+                // Only populate if vertices are empty
+                if (convexHullShape.vertices.length === 0) {
+                  try {
+                    const vertices = generateExtrudedArcColliderVertices(extrudedArcComp.properties);
+                    console.log('Generated vertices count:', vertices.length);
+                    console.log('Generated vertices sample:', vertices.slice(0, 4));
+                    
+                    const updatedShape = { ...convexHullShape, vertices };
+                    const updatedColliderComp = {
+                      ...colliderComp,
+                      properties: {
+                        ...colliderComp.properties,
+                        shape: updatedShape
+                      }
+                    };
+                    newComponent = updatedColliderComp;
+                    console.log('Updated collider component with vertices');
+                  } catch (error) {
+                    console.warn('Failed to generate collider vertices for extruded arc:', error);
+                  }
+                }
               }
             }
             
@@ -597,7 +647,7 @@ const useEditorStore = create<EditorState>()(
               return {
                 ...obj,
                 components: obj.components.map(comp => {
-                  if (comp.type === 'Mesh' || comp.type === 'heightfield') {
+                  if (comp.type === 'Mesh' || comp.type === 'heightfield' || comp.type === 'extrudedArc') {
                     return {
                       ...comp,
                       properties: {
@@ -665,6 +715,88 @@ const useEditorStore = create<EditorState>()(
               if (comp.type === 'collider' && (comp as ColliderComponent).properties.shape.type === 'heightfield') {
                 const collComp = comp as ColliderComponent;
                 (collComp.properties.shape as any).heights = newHeights;
+              }
+              return comp;
+            });
+          }
+
+          return { ...obj, components: finalComponents };
+        });
+      };
+
+      const newScene = { ...state.currentScene, objects: findAndUpdate(state.currentScene.objects) };
+      return { currentScene: newScene };
+    }),
+
+    updateExtrudedArcComponent: (objectId, componentId, updates) => set((state) => {
+      if (!state.currentScene) return state;
+
+      const findAndUpdate = (objects: GameObject[]): GameObject[] => {
+        return objects.map(obj => {
+          if (obj.id !== objectId) {
+            return { ...obj, children: findAndUpdate(obj.children) };
+          }
+
+          let newExtrudedArcProps: ExtrudedArcComponent['properties'] | undefined;
+          const updatedComponents = obj.components.map(comp => {
+            if (comp.id !== componentId || comp.type !== 'extrudedArc') {
+              return comp;
+            }
+
+            const eaComp = comp as ExtrudedArcComponent;
+            const newProps = { ...eaComp.properties, ...updates };
+            newExtrudedArcProps = newProps;
+
+            return { ...eaComp, properties: newProps };
+          });
+
+          let finalComponents = updatedComponents;
+          if (newExtrudedArcProps) {
+            // Update any convex hull colliders that might be attached to this extruded arc
+            finalComponents = updatedComponents.map(comp => {
+              if (comp.type === 'collider') {
+                const collComp = comp as ColliderComponent;
+                if (collComp.properties.shape.type === 'convexHull') {
+                  const convexHullShape = collComp.properties.shape as { type: 'convexHull'; vertices: Vector3[] };
+                  
+                  // Check if the convex hull has empty vertices and populate them from the extruded arc
+                  if (convexHullShape.vertices.length === 0) {
+                    try {
+                      const vertices = generateExtrudedArcColliderVertices(newExtrudedArcProps!);
+                      return {
+                        ...collComp,
+                        properties: {
+                          ...collComp.properties,
+                          shape: {
+                            ...convexHullShape,
+                            vertices
+                          }
+                        }
+                      };
+                    } catch (error) {
+                      console.warn('Failed to generate collider vertices for extruded arc:', error);
+                      return collComp;
+                    }
+                  } else {
+                    // Update existing vertices when extruded arc geometry changes
+                    try {
+                      const vertices = generateExtrudedArcColliderVertices(newExtrudedArcProps!);
+                      return {
+                        ...collComp,
+                        properties: {
+                          ...collComp.properties,
+                          shape: {
+                            ...convexHullShape,
+                            vertices
+                          }
+                        }
+                      };
+                    } catch (error) {
+                      console.warn('Failed to update collider vertices for extruded arc:', error);
+                      return collComp;
+                    }
+                  }
+                }
               }
               return comp;
             });

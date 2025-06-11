@@ -82,16 +82,15 @@ export default function RigidBodyRenderer({
   const props = rigidBodyComponent.properties;
 
   // Dynamically determine body type based on physics state
-  // When not playing, make all rigid bodies static to prevent movement
-  // When playing, use the original body type
-  const originalBodyType =
-    props.bodyType === "static"
-      ? "fixed"
-      : props.bodyType === "kinematic"
-        ? "kinematicPosition"
-        : "dynamic";
+  // When not playing, make dynamic bodies kinematic to prevent movement
+  // Static and kinematic bodies keep their original type
 
-  const effectiveBodyType = physicsState === 'playing' ? originalBodyType : "fixed";
+  // Only change dynamic bodies to kinematic when not playing
+  // Static bodies should remain kinematic regardless of physics state
+  const effectiveBodyType = 
+    physicsState === 'playing' && props.bodyType === "dynamic" 
+      ? "dynamic" 
+      : "kinematicPosition";
 
   // Check if any translation is locked
   const hasLockedTranslations =
@@ -132,6 +131,7 @@ export default function RigidBodyRenderer({
         <ColliderRenderer
           key={colliderComponent.id}
           colliderComponent={colliderComponent}
+          objectId={objectId}
         >
           <></>
         </ColliderRenderer>

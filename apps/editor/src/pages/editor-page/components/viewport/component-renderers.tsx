@@ -10,6 +10,7 @@ import {
 } from "./light-renderers";
 import { MeshRenderer } from "./mesh-renderer";
 import HeightfieldRenderer from "./heightfield-renderer";
+import ExtrudedArcRenderer from "./extruded-arc-renderer";
 
 export const COMPONENT_RENDERERS = {
   PerspectiveCamera: PerspectiveCameraRenderer,
@@ -22,6 +23,7 @@ export const COMPONENT_RENDERERS = {
   RectAreaLight: RectAreaLightRenderer,
   Mesh: MeshRenderer,
   heightfield: HeightfieldRenderer,
+  extrudedArc: ExtrudedArcRenderer,
 };
 
 export function renderComponent(
@@ -30,15 +32,34 @@ export function renderComponent(
   showHelpers?: boolean,
   objectId?: string,
 ) {
-  const Renderer =
-    COMPONENT_RENDERERS[component.type as keyof typeof COMPONENT_RENDERERS];
-
-  if (!Renderer) {
-    console.warn(`No renderer found for component type: ${component.type}`);
-    return <>{children}</>;
+  // Type-safe rendering based on component type
+  switch (component.type) {
+    case 'PerspectiveCamera':
+      return <PerspectiveCameraRenderer component={component as GameObjectComponent} showHelpers={showHelpers}>{children}</PerspectiveCameraRenderer>;
+    case 'OrthographicCamera':
+      return <OrthographicCameraRenderer component={component as GameObjectComponent} showHelpers={showHelpers}>{children}</OrthographicCameraRenderer>;
+    case 'DirectionalLight':
+      return <DirectionalLightRenderer component={component as GameObjectComponent} showHelpers={showHelpers}>{children}</DirectionalLightRenderer>;
+    case 'PointLight':
+      return <PointLightRenderer component={component as GameObjectComponent} showHelpers={showHelpers}>{children}</PointLightRenderer>;
+    case 'SpotLight':
+      return <SpotLightRenderer component={component as GameObjectComponent} showHelpers={showHelpers}>{children}</SpotLightRenderer>;
+    case 'AmbientLight':
+      return <AmbientLightRenderer component={component as GameObjectComponent} showHelpers={showHelpers}>{children}</AmbientLightRenderer>;
+    case 'HemisphereLight':
+      return <HemisphereLightRenderer component={component as GameObjectComponent} showHelpers={showHelpers}>{children}</HemisphereLightRenderer>;
+    case 'RectAreaLight':
+      return <RectAreaLightRenderer component={component as GameObjectComponent} showHelpers={showHelpers}>{children}</RectAreaLightRenderer>;
+    case 'Mesh':
+      return <MeshRenderer component={component as GameObjectComponent} showHelpers={showHelpers}>{children}</MeshRenderer>;
+    case 'heightfield':
+      return <HeightfieldRenderer component={component as HeightfieldComponent} objectId={objectId}>{children}</HeightfieldRenderer>;
+    case 'extrudedArc':
+      return <ExtrudedArcRenderer component={component as ExtrudedArcComponent}>{children}</ExtrudedArcRenderer>;
+    default:
+      console.warn(`No renderer found for component type: ${component.type}`);
+      return <>{children}</>;
   }
-
-  return <Renderer component={component as any} showHelpers={showHelpers} objectId={objectId}>{children}</Renderer>;
 }
 
 export * from "./camera-renderers";

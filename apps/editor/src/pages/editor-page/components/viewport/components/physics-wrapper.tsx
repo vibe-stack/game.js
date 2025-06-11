@@ -91,6 +91,7 @@ const PhysicsWrapper: React.FC<PhysicsWrapperProps> = ({
           <ColliderRenderer 
             colliderComponent={colliderComponent}
             transform={transform}
+            objectId={objectId}
           >
             {acc}
           </ColliderRenderer>

@@ -5,6 +5,7 @@ import CameraComponent from "./component-renderers/camera-component";
 import RigidBodyComponent from "./component-renderers/rigid-body-component";
 import ColliderComponent from "./component-renderers/collider-component";
 import HeightfieldComponent from "./component-renderers/heightfield-component";
+import ExtrudedArcComponent from "./component-renderers/extruded-arc-component";
 import AddComponentMenu from "./add-component-menu";
 import CollapsibleSection from "./collapsible-section";
 import CustomToggle from "./custom-toggle";
@@ -44,6 +45,7 @@ export default function ComponentsList({ components, objectId, onUpdate, onAddCo
         case 'collider': return 'Collider';
         case 'joint': return 'Joint';
         case 'heightfield': return 'Heightfield';
+        case 'extrudedArc': return 'Extruded Arc';
         default: return comp.type;
       }
     };
@@ -68,6 +70,8 @@ export default function ComponentsList({ components, objectId, onUpdate, onAddCo
           return <ColliderComponent {...commonProps} component={component as ColliderComponent} />;
         case 'heightfield':
           return <HeightfieldComponent objectId={objectId} component={component as HeightfieldComponent} />;
+        case 'extrudedArc':
+          return <ExtrudedArcComponent objectId={objectId} component={component as ExtrudedArcComponent} />;
         case 'joint':
           return (
             <div className="text-xs text-muted-foreground">

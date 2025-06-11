@@ -3,6 +3,7 @@ import { DragInput } from "@/components/ui/drag-input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Info } from "lucide-react";
 import Vector3Controls from "../vector3-controls";
 import CollisionGroupsGrid from "./collision-groups-grid";
 
@@ -139,6 +140,43 @@ export default function ColliderComponent({ component, onUpdate }: ColliderCompo
               precision={2}
               min={0.01}
             />
+          </div>
+        );
+      case 'convexHull':
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+              <Info className="h-3 w-3 text-blue-600" />
+              <span className="text-blue-800">
+                {shape.vertices.length > 0 
+                  ? `Auto-synced with extruded arc (${shape.vertices.length} vertices)`
+                  : "Will auto-sync with extruded arc component"
+                }
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Vertices: {shape.vertices.length}
+            </div>
+          </div>
+        );
+      case 'trimesh':
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+              <Info className="h-3 w-3 text-green-600" />
+              <span className="text-green-800">
+                {shape.vertices.length > 0 
+                  ? `Auto-synced with extruded arc (${shape.vertices.length} vertices, ${shape.indices.length / 3} triangles)`
+                  : "Will auto-sync with extruded arc component"
+                }
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Vertices: {shape.vertices.length} | Triangles: {shape.indices.length / 3}
+            </div>
+            <div className="text-xs text-yellow-600">
+              ⚠️ Supports concave shapes (inner holes)
+            </div>
           </div>
         );
       case 'heightfield':
@@ -287,13 +325,13 @@ export default function ColliderComponent({ component, onUpdate }: ColliderCompo
         <CollisionGroupsGrid
           label="Collision Groups"
           value={props.collisionGroups}
-          onChange={(groups) => updateProperty('collisionGroups', groups)}
+          onChange={(groups: CollisionGroups) => updateProperty('collisionGroups', groups)}
         />
 
         <CollisionGroupsGrid
           label="Solver Groups"
           value={props.solverGroups}
-          onChange={(groups) => updateProperty('solverGroups', groups)}
+          onChange={(groups: CollisionGroups) => updateProperty('solverGroups', groups)}
         />
       </div>
 

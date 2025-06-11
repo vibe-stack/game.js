@@ -106,27 +106,36 @@ export function EnhancedMaterial({
   // Load texture data URLs
   const { dataUrls, loading } = useTextureDataUrls(textures, assets, currentProject);
   
-  // Load textures only for data URLs that exist
-  const dataUrlsArray = Object.values(dataUrls).filter(Boolean);
-  const textureMap = dataUrlsArray.length > 0 && !loading ? useLoader(
-    THREE.TextureLoader,
-    dataUrlsArray
-  ) : [];
+  // Memoize dataUrlsArray to prevent unnecessary re-renders
+  const dataUrlsArray = useMemo(() => 
+    Object.values(dataUrls).filter(Boolean), 
+    [dataUrls]
+  );
+  
+  // Memoize the loader input to ensure stability
+  const loaderInput = useMemo(() => {
+    return dataUrlsArray.length > 0 && !loading ? dataUrlsArray : [];
+  }, [dataUrlsArray, loading]);
+  
+  // Always call useLoader with stable input
+  const textureMap = useLoader(THREE.TextureLoader, loaderInput);
   
   const loadedTextures = useMemo(() => {
-    if (loading || dataUrlsArray.length === 0) return {};
+    if (loading || dataUrlsArray.length === 0 || !textureMap.length) return {};
     
     const result: Record<string, THREE.Texture> = {};
     let textureIndex = 0;
     
     Object.entries(dataUrls).forEach(([type, dataUrl]) => {
       if (dataUrl && textureMap[textureIndex]) {
-        const texture = textureMap[textureIndex];
+        // Clone the texture to avoid mutating cached instances
+        const originalTexture = textureMap[textureIndex];
+        const texture = originalTexture.clone();
         
         // Find the texture reference to apply its settings
         const textureRef = textures.find(t => t.type === type);
         if (textureRef) {
-          // Apply texture settings
+          // Apply texture settings to the cloned texture
           texture.wrapS = getWrapMode(textureRef.wrapS || 'repeat');
           texture.wrapT = getWrapMode(textureRef.wrapT || 'repeat');
           texture.repeat.set(textureRef.repeat?.x || 1, textureRef.repeat?.y || 1);
@@ -146,7 +155,7 @@ export function EnhancedMaterial({
     });
     
     return result;
-  }, [dataUrls, textureMap, textures, loading]);
+  }, [dataUrls, textureMap, textures, loading, dataUrlsArray]);
 
   useEffect(() => {
     if (loading) return; // Wait for textures to load
@@ -175,7 +184,7 @@ export function EnhancedMaterial({
     };
 
     createMaterial();
-  }, [materialRef, loadedTextures, uniforms, materials, loading]); // Removed onMaterialReady from dependencies
+  }, [materialRef, loadedTextures, uniforms, materials, loading]);
 
   if (!material || loading) return null;
 

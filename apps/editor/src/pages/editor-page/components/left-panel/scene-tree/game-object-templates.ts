@@ -1,7 +1,6 @@
 import { 
   Box, 
   Camera, 
-  Lightbulb, 
   Circle, 
   Square, 
   Triangle,
@@ -10,11 +9,9 @@ import {
   Cone,
   Diamond,
   Octagon,
-  Sun,
-  Moon,
   Video,
   Shapes,
-  Flashlight
+  Route
 } from "lucide-react";
 import { generateHeightfieldData } from "@/utils/heightfield-generator";
 
@@ -589,193 +586,6 @@ export const gameObjectTemplates = [
       layer: 0
     }
   },
-
-  // LIGHTS
-  {
-    id: 'ambient-light',
-    name: 'Ambient Light',
-    description: 'AmbientLight - Global ambient lighting',
-    icon: Sun,
-    template: {
-      transform: {
-        position: { x: 0, y: 0, z: 0 },
-        rotation: { x: 0, y: 0, z: 0 },
-        scale: { x: 1, y: 1, z: 1 }
-      },
-      components: [
-        {
-          id: 'light-component',
-          type: 'AmbientLight',
-          enabled: true,
-          properties: {
-            color: '#ffffff',
-            intensity: 0.4
-          }
-        }
-      ],
-      visible: true,
-      tags: ['light'],
-      layer: 0
-    }
-  },
-  {
-    id: 'directional-light',
-    name: 'Directional Light',
-    description: 'DirectionalLight - Directional light source (like sunlight)',
-    icon: Lightbulb,
-    template: {
-      transform: {
-        position: { x: 5, y: 10, z: 5 },
-        rotation: { x: -1, y: 0.5, z: 0 },
-        scale: { x: 1, y: 1, z: 1 }
-      },
-      components: [
-        {
-          id: 'light-component',
-          type: 'DirectionalLight',
-          enabled: true,
-          properties: {
-            color: '#ffffff',
-            intensity: 1,
-            castShadow: true,
-            shadowMapSize: 1024,
-            shadowCameraNear: 0.5,
-            shadowCameraFar: 50,
-            shadowCameraLeft: -10,
-            shadowCameraRight: 10,
-            shadowCameraTop: 10,
-            shadowCameraBottom: -10
-          }
-        }
-      ],
-      visible: true,
-      tags: ['light'],
-      layer: 0
-    }
-  },
-  {
-    id: 'point-light',
-    name: 'Point Light',
-    description: 'PointLight - Light that radiates in all directions',
-    icon: Lightbulb,
-    template: {
-      transform: {
-        position: { x: 0, y: 3, z: 0 },
-        rotation: { x: 0, y: 0, z: 0 },
-        scale: { x: 1, y: 1, z: 1 }
-      },
-      components: [
-        {
-          id: 'light-component',
-          type: 'PointLight',
-          enabled: true,
-          properties: {
-            color: '#ffffff',
-            intensity: 1,
-            distance: 100,
-            decay: 2,
-            castShadow: false,
-            shadowMapSize: 512
-          }
-        }
-      ],
-      visible: true,
-      tags: ['light'],
-      layer: 0
-    }
-  },
-  {
-    id: 'spot-light',
-    name: 'Spot Light',
-    description: 'SpotLight - Light emitted from a single point in one direction',
-    icon: Flashlight,
-    template: {
-      transform: {
-        position: { x: 0, y: 5, z: 0 },
-        rotation: { x: -Math.PI / 2, y: 0, z: 0 },
-        scale: { x: 1, y: 1, z: 1 }
-      },
-      components: [
-        {
-          id: 'light-component',
-          type: 'SpotLight',
-          enabled: true,
-          properties: {
-            color: '#ffffff',
-            intensity: 1,
-            distance: 100,
-            angle: Math.PI / 3,
-            penumbra: 0,
-            decay: 2,
-            castShadow: true,
-            shadowMapSize: 1024
-          }
-        }
-      ],
-      visible: true,
-      tags: ['light'],
-      layer: 0
-    }
-  },
-  {
-    id: 'hemisphere-light',
-    name: 'Hemisphere Light',
-    description: 'HemisphereLight - Light source positioned directly above the scene',
-    icon: Moon,
-    template: {
-      transform: {
-        position: { x: 0, y: 0, z: 0 },
-        rotation: { x: 0, y: 0, z: 0 },
-        scale: { x: 1, y: 1, z: 1 }
-      },
-      components: [
-        {
-          id: 'light-component',
-          type: 'HemisphereLight',
-          enabled: true,
-          properties: {
-            skyColor: '#ffffff',
-            groundColor: '#444444',
-            intensity: 0.6
-          }
-        }
-      ],
-      visible: true,
-      tags: ['light'],
-      layer: 0
-    }
-  },
-  {
-    id: 'rect-area-light',
-    name: 'Rect Area Light',
-    description: 'RectAreaLight - Light emitted uniformly across a rectangular plane',
-    icon: Square,
-    template: {
-      transform: {
-        position: { x: 0, y: 5, z: 0 },
-        rotation: { x: -Math.PI / 2, y: 0, z: 0 },
-        scale: { x: 1, y: 1, z: 1 }
-      },
-      components: [
-        {
-          id: 'light-component',
-          type: 'RectAreaLight',
-          enabled: true,
-          properties: {
-            color: '#ffffff',
-            intensity: 1,
-            width: 10,
-            height: 10
-          }
-        }
-      ],
-      visible: true,
-      tags: ['light'],
-      layer: 0
-    }
-  },
-
-  // CAMERAS
   {
     id: 'heightfield',
     name: 'Heightfield',
@@ -855,6 +665,56 @@ export const gameObjectTemplates = [
                 color: '#8b7355',
                 metalness: 0.0,
                 roughness: 0.8
+              }
+            },
+            castShadow: true,
+            receiveShadow: true
+          }
+        }
+      ],
+      visible: true,
+      tags: ['geometry'],
+      layer: 0
+    }
+  },
+  {
+    id: 'extruded-arc',
+    name: 'Extruded Arc',
+    description: 'ExtrudedArc - Curved surface for race tracks, spirals, and paths',
+    icon: Route,
+    template: {
+      transform: {
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 }
+      },
+      components: [
+        {
+          id: 'extruded-arc-component',
+          type: 'extrudedArc',
+          enabled: true,
+          properties: {
+            arcRadius: 5.0,
+            pitch: 0.0,
+            width: 2.0,
+            height: 0.2,
+            pathLength: 10.0,
+            angle: Math.PI,
+            segments: 32,
+            closed: false,
+            crossSectionSegments: 4,
+            extrusionSegments: 1,
+            uvScale: { x: 1, y: 1 },
+            flipUVs: false,
+            autoRegenerate: true,
+            lastGenerated: new Date(),
+            materialRef: {
+              type: 'inline',
+              properties: {
+                type: 'standard',
+                color: '#666666',
+                metalness: 0.0,
+                roughness: 0.7
               }
             },
             castShadow: true,

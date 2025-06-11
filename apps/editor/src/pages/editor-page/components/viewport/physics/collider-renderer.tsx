@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   CuboidCollider,
   BallCollider,
@@ -8,11 +8,15 @@ import {
   TrimeshCollider,
   HeightfieldCollider,
 } from "@react-three/rapier";
+import { generateExtrudedArcColliderVertices } from "@/utils/extruded-arc-generator";
+import { generateExtrudedArcTrimeshData } from "@/utils/extruded-arc-generator";
+import useEditorStore from "@/stores/editor-store";
 
 interface ColliderRendererProps {
   colliderComponent: ColliderComponent;
   children: React.ReactNode;
   transform?: Transform; // Add transform prop for standalone colliders
+  objectId?: string; // Add objectId to access the parent object components
 }
 
 // Map combine rules to rapier constants
@@ -40,13 +44,82 @@ const packCollisionGroups = (membership: number, filter: number): number => {
 export default function ColliderRenderer({
   colliderComponent,
   children,
+  objectId,
 }: ColliderRendererProps) {
+  const { currentScene } = useEditorStore();
+  
   if (!colliderComponent.enabled) {
     return <>{children}</>;
   }
 
   const props = colliderComponent.properties;
   const shape = props.shape;
+
+  // Auto-generate convex hull vertices if missing and extruded arc is available
+  const enhancedShape = useMemo(() => {
+    if (shape.type === 'convexHull' && objectId && currentScene && (!shape.vertices || shape.vertices.length === 0)) {
+      // Find the object in the scene
+      const findObject = (objects: GameObject[]): GameObject | null => {
+        for (const obj of objects) {
+          if (obj.id === objectId) return obj;
+          const found = findObject(obj.children);
+          if (found) return found;
+        }
+        return null;
+      };
+
+      const obj = findObject(currentScene.objects);
+      if (obj) {
+        const extrudedArcComp = obj.components.find(c => c.type === 'extrudedArc') as ExtrudedArcComponent;
+        if (extrudedArcComp) {
+          try {
+            const vertices = generateExtrudedArcColliderVertices(extrudedArcComp.properties);
+            return { ...shape, vertices };
+          } catch (error) {
+            console.warn('Failed to auto-generate vertices in renderer:', error);
+          }
+        }
+      }
+    }
+    
+    if (shape.type === 'trimesh' && objectId && currentScene && (!shape.vertices || shape.vertices.length === 0 || !shape.indices || shape.indices.length === 0)) {
+      // Find the object in the scene
+      const findObject = (objects: GameObject[]): GameObject | null => {
+        for (const obj of objects) {
+          if (obj.id === objectId) return obj;
+          const found = findObject(obj.children);
+          if (found) return found;
+        }
+        return null;
+      };
+
+      const obj = findObject(currentScene.objects);
+      if (obj) {
+        const extrudedArcComp = obj.components.find(c => c.type === 'extrudedArc') as ExtrudedArcComponent;
+        if (extrudedArcComp) {
+          try {
+            const { vertices: flatVertices, indices } = generateExtrudedArcTrimeshData(extrudedArcComp.properties);
+            
+            // Convert flat array to Vector3 objects
+            const vertices = [];
+            for (let i = 0; i < flatVertices.length; i += 3) {
+              vertices.push({
+                x: flatVertices[i],
+                y: flatVertices[i + 1],
+                z: flatVertices[i + 2]
+              });
+            }
+            
+            return { ...shape, vertices, indices };
+          } catch (error) {
+            console.warn('Failed to auto-generate trimesh data:', error);
+          }
+        }
+      }
+    }
+    
+    return shape;
+  }, [shape, objectId, currentScene]);
 
   // Pack collision groups properly
   const packedCollisionGroups = packCollisionGroups(
@@ -122,28 +195,61 @@ export default function ColliderRenderer({
       }
 
       case "convexHull": {
+        // Use enhanced shape which may have auto-generated vertices
+        const convexHullShape = enhancedShape.type === 'convexHull' ? enhancedShape : shape as { type: 'convexHull'; vertices: Vector3[] };
+        
         // Convert Vector3[] to Float32Array
-        const vertices = new Float32Array(
-          shape.vertices.flatMap((v) => [v.x, v.y, v.z]),
-        );
-        return (
-          <ConvexHullCollider args={[vertices]} {...commonProps}>
-            {children}
-          </ConvexHullCollider>
-        );
+        
+        // Validate that we have sufficient vertices for a convex hull (minimum 4 vertices)
+        if (!convexHullShape.vertices || convexHullShape.vertices.length < 4) {
+          console.warn("ConvexHull collider needs at least 4 vertices, skipping rendering. Current count:", convexHullShape.vertices?.length || 0);
+          // Return children without collider to avoid breaking the component tree
+          return <>{children}</>;
+        }
+        
+        try {
+          const vertices = new Float32Array(
+            convexHullShape.vertices.flatMap((v) => [v.x, v.y, v.z]),
+          );
+          
+          return (
+            <ConvexHullCollider args={[vertices]} {...commonProps}>
+              {children}
+            </ConvexHullCollider>
+          );
+        } catch (error) {
+          console.error("Failed to create ConvexHullCollider:", error);
+          return <>{children}</>;
+        }
       }
 
       case "trimesh": {
-        // Convert Vector3[] to Float32Array for vertices
-        const meshVertices = new Float32Array(
-          shape.vertices.flatMap((v) => [v.x, v.y, v.z]),
-        );
-        const indices = new Uint32Array(shape.indices);
-        return (
-          <TrimeshCollider args={[meshVertices, indices]} {...commonProps}>
-            {children}
-          </TrimeshCollider>
-        );
+        // Use enhanced shape which may have auto-generated data
+        const trimeshShape = enhancedShape.type === 'trimesh' ? enhancedShape : shape as { type: 'trimesh'; vertices: Vector3[]; indices: number[] };
+        
+        
+        // Validate that we have sufficient data for a trimesh
+        if (!trimeshShape.vertices || trimeshShape.vertices.length < 3 || !trimeshShape.indices || trimeshShape.indices.length < 3) {
+          console.warn("Trimesh collider needs at least 3 vertices and 3 indices, skipping rendering. Vertices:", trimeshShape.vertices?.length || 0, "Indices:", trimeshShape.indices?.length || 0);
+          return <>{children}</>;
+        }
+        
+        try {
+          // Convert Vector3[] to Float32Array for vertices
+          const meshVertices = new Float32Array(
+            trimeshShape.vertices.flatMap((v) => [v.x, v.y, v.z]),
+          );
+          const indices = new Uint32Array(trimeshShape.indices);
+          
+          return (
+            <TrimeshCollider args={[meshVertices, indices]} {...commonProps}>
+              {children}
+            </TrimeshCollider>
+          );
+        } catch (error) {
+          console.error("Failed to create TrimeshCollider:", error);
+          return <>{children}</>;
+        }
       }
 
       case "heightfield": {
@@ -192,4 +298,4 @@ export default function ColliderRenderer({
     console.warn("Failed to create collider:", error);
     return <>{children}</>;
   }
-}
+} 

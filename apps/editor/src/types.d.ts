@@ -165,7 +165,7 @@ interface JointComponent {
   };
 }
 
-type PhysicsComponent = RigidBodyComponent | ColliderComponent | JointComponent | HeightfieldComponent;
+type PhysicsComponent = RigidBodyComponent | ColliderComponent | JointComponent | HeightfieldComponent | ExtrudedArcComponent;
 
 // Heightfield Component for Terrain Generation
 
@@ -238,6 +238,55 @@ interface HeightfieldComponent {
     
     // Texture coordinate scaling
     uvScale: Vector2; // How many times to tile textures across the heightfield
+    
+    // Auto-regeneration
+    autoRegenerate: boolean; // Regenerate when parameters change
+    lastGenerated: Date; // Timestamp of last generation
+    
+    // Material system (same as mesh components)
+    materialRef?: {
+      type: 'library' | 'inline';
+      materialId?: string;
+      properties?: any;
+    };
+    textures?: Record<string, string>;
+    uniforms?: Record<string, any>;
+    
+    // Legacy material support for compatibility
+    material?: string;
+    materialProps?: Record<string, any>;
+    
+    // Rendering properties
+    castShadow?: boolean;
+    receiveShadow?: boolean;
+    renderType?: string;
+  };
+}
+
+// Extruded Arc Component for Creating Curved Surfaces like Race Tracks
+
+interface ExtrudedArcComponent {
+  id: string;
+  type: 'extrudedArc';
+  enabled: boolean;
+  properties: {
+    // Arc geometry parameters
+    arcRadius: number; // Curvature radius
+    pitch: number; // Vertical curvature (elevation change per full rotation)
+    width: number; // Width of the track/surface
+    height: number; // Extrusion height (thickness)
+    pathLength: number; // Length along the arc path
+    angle: number; // Angular span in radians (0 to 2π for full circle)
+    segments: number; // Number of segments for smoothness
+    closed: boolean; // Whether to create a closed loop regardless of angle
+    
+    // Cross-section parameters
+    crossSectionSegments: number; // Segments across width
+    extrusionSegments: number; // Segments along height
+    
+    // UV mapping
+    uvScale: Vector2; // UV texture coordinate scaling
+    flipUVs: boolean; // Flip UV coordinates
     
     // Auto-regeneration
     autoRegenerate: boolean; // Regenerate when parameters change

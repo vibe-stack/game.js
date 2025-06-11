@@ -62,8 +62,22 @@ export default function Viewport({
   onSelectObject,
   onPhysicsCallbacks,
 }: ViewportProps) {
-  const { updateObjectTransform, physicsState, importAssetFromData, createMeshFromGLB } = useEditorStore();
+  const { updateObjectTransform, physicsState, importAssetFromData, createMeshFromGLB, setPhysicsState } = useEditorStore();
   const viewportRef = useRef<HTMLDivElement>(null);
+  const previousSceneIdRef = useRef<string | null>(null);
+
+  // Only stop physics when scene ID actually changes, not on every render
+  useEffect(() => {
+    const currentSceneId = scene?.id || null;
+    const previousSceneId = previousSceneIdRef.current;
+    
+    // Only stop physics if the scene ID has actually changed
+    if (previousSceneId !== null && currentSceneId !== previousSceneId && physicsState === 'playing') {
+      setPhysicsState('stopped');
+    }
+    
+    previousSceneIdRef.current = currentSceneId;
+  }, [scene?.id, setPhysicsState, physicsState]);
 
   const handleDragOver = (event: React.DragEvent) => {
     event.preventDefault();
@@ -154,6 +168,7 @@ export default function Viewport({
       onDrop={handleDrop}
     >
       <Canvas
+        key={scene.id} // Force complete Canvas remount when scene changes
         camera={{ position: [0, 25, 80], fov: 75 }}
         shadows={shadowConfig}
         // gl={{

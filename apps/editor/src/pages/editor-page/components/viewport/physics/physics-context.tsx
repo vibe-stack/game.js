@@ -218,6 +218,21 @@ function PhysicsInnerProvider({
     };
   }, []);
 
+  // Clean up when scene changes
+  useEffect(() => {
+    // Clear rigid bodies and transforms for new scene
+    rigidBodiesRef.current.clear();
+    initialTransformsRef.current.clear();
+    
+    // Reset scene stability
+    setIsSceneStable(false);
+    const stabilizeTimer = setTimeout(() => {
+      setIsSceneStable(true);
+    }, 100);
+    
+    return () => clearTimeout(stabilizeTimer);
+  }, [scene.id]);
+
   // Store initial transforms when simulation starts
   const storeInitialTransforms = useCallback(() => {
     if (cleanupInProgressRef.current) return;
