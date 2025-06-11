@@ -36,9 +36,17 @@ export default function CollapsibleSection({
 
   return (
     <div className="border-border/30 border-b last:border-b-0">
-      <button
+      <div
         onClick={handleToggle}
-        className="hover:bg-muted/20 group flex w-full items-center justify-between px-3 py-2.5 transition-colors"
+        className="hover:bg-muted/20 group flex w-full items-center justify-between px-3 py-2.5 transition-colors cursor-pointer"
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleToggle();
+          }
+        }}
       >
         <div className="flex items-center gap-2">
           <ChevronRight
@@ -49,7 +57,7 @@ export default function CollapsibleSection({
           <span className="text-foreground text-xs font-medium">{title}</span>
         </div>
         {rightElement}
-      </button>
+      </div>
 
       {isOpen && <div className="px-3 pt-1 pb-3">{children}</div>}
     </div>

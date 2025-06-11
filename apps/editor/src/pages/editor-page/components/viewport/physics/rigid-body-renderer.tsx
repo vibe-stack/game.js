@@ -6,6 +6,7 @@ import {
 import { useFrame } from "@react-three/fiber";
 import { usePhysics } from "./physics-context";
 import ColliderRenderer from "./collider-renderer";
+import * as THREE from "three";
 
 interface RigidBodyRendererProps {
   objectId: string;
@@ -63,12 +64,29 @@ export default function RigidBodyRenderer({
       rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
       rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
     } else if (physicsState === 'stopped') {
-      // When stopped, just prevent any movement - let physics context handle position restoration
+      // When stopped, freeze the rigid body at its initial transform position
+      // This prevents drift due to floating-point precision errors
+      if (frozenPositionRef.current === null) {
+        // Store the current position and rotation when first stopping
+        frozenPositionRef.current = [transform.position.x, transform.position.y, transform.position.z];
+        const euler = new THREE.Euler(transform.rotation.x, transform.rotation.y, transform.rotation.z, 'XYZ');
+        const quaternion = new THREE.Quaternion().setFromEuler(euler);
+        frozenRotationRef.current = [quaternion.x, quaternion.y, quaternion.z, quaternion.w];
+      }
+
+      // Keep the rigid body frozen at the initial transform position
+      rigidBody.setTranslation(
+        { x: frozenPositionRef.current[0], y: frozenPositionRef.current[1], z: frozenPositionRef.current[2] },
+        true
+      );
+      rigidBody.setRotation(
+        { x: frozenRotationRef.current![0], y: frozenRotationRef.current![1], z: frozenRotationRef.current![2], w: frozenRotationRef.current![3] },
+        true
+      );
+      
+      // Reset all velocities to prevent any movement
       rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
       rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-      // Clear frozen state since we're not frozen, just stopped
-      frozenPositionRef.current = null;
-      frozenRotationRef.current = null;
     } else if (physicsState === 'playing') {
       // When playing, clear frozen state so physics can take over
       frozenPositionRef.current = null;

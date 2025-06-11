@@ -25,6 +25,9 @@ export function DirectionalLightRenderer({
     shadowCameraRight = 10,
     shadowCameraTop = 10,
     shadowCameraBottom = -10,
+    shadowBias = -0.01,
+    shadowNormalBias = 0.02,
+    shadowRadius = 4,
   } = component.properties;
 
   if (!component.enabled) return <>{children}</>;
@@ -41,6 +44,9 @@ export function DirectionalLightRenderer({
       shadow-camera-right={shadowCameraRight}
       shadow-camera-top={shadowCameraTop}
       shadow-camera-bottom={shadowCameraBottom}
+      shadow-bias={shadowBias}
+      shadow-normalBias={shadowNormalBias}
+      shadow-radius={shadowRadius}
     >
       {showHelpers && (
         <Helper type={DirectionalLightHelper} args={[intensity, "#00ff00"]} />
@@ -62,6 +68,9 @@ export function PointLightRenderer({
     decay = 2,
     castShadow = false,
     shadowMapSize = 512,
+    shadowBias = -0.01,
+    shadowNormalBias = 0.02,
+    shadowRadius = 4,
   } = component.properties;
 
   if (!component.enabled) return <>{children}</>;
@@ -74,6 +83,9 @@ export function PointLightRenderer({
       decay={decay}
       castShadow={castShadow}
       shadow-mapSize={[shadowMapSize, shadowMapSize]}
+      shadow-bias={shadowBias}
+      shadow-normalBias={shadowNormalBias}
+      shadow-radius={shadowRadius}
     >
       {showHelpers && (
         <Helper type={PointLightHelper} args={[intensity, "#00ff00"]} />
@@ -97,6 +109,9 @@ export function SpotLightRenderer({
     decay = 2,
     castShadow = false,
     shadowMapSize = 1024,
+    shadowBias = -0.01,
+    shadowNormalBias = 0.02,
+    shadowRadius = 4,
   } = component.properties;
 
   if (!component.enabled) return <>{children}</>;
@@ -111,6 +126,9 @@ export function SpotLightRenderer({
       decay={decay}
       castShadow={castShadow}
       shadow-mapSize={[shadowMapSize, shadowMapSize]}
+      shadow-bias={shadowBias}
+      shadow-normalBias={shadowNormalBias}
+      shadow-radius={shadowRadius}
     >
       {showHelpers && (
         <Helper type={SpotLightHelper} args={[]} />

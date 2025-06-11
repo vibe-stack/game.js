@@ -1,6 +1,7 @@
 import React from 'react';
 import { getMaterialComponent } from './material-components';
 import { EnhancedMaterial } from './enhanced-material-components';
+import useEditorStore from '@/stores/editor-store';
 
 interface NewMaterialProps {
   materialRef: {
@@ -47,6 +48,7 @@ interface MaterialRendererProps {
 
 export function MaterialRenderer({ component, renderType = "solid" }: MaterialRendererProps) {
   const isLegacy = isLegacyMaterial(component);
+  const { materials } = useEditorStore();
   
   if (isLegacy) {
     // Handle legacy materials with compatibility layer
@@ -127,11 +129,40 @@ export function MaterialRenderer({ component, renderType = "solid" }: MaterialRe
 
       return materialRef;
     }, [materialRef, renderType]);
+
+    // Get textures from the appropriate source
+    const textureReferences = React.useMemo(() => {
+      if (materialRef.type === 'library' && materialRef.materialId) {
+        // Get textures from the material library definition
+        const materialDefinition = materials.find(m => m.id === materialRef.materialId);
+        return materialDefinition?.textures || [];
+      } else {
+        // Use textures from component properties or convert from legacy format
+        if (Array.isArray(textures)) {
+          return textures;
+        } else {
+          // Convert old format Record<string, string> to TextureReference[]
+          return Object.entries(textures).map(([type, assetId]) => ({
+            id: `texture_${Date.now()}_${type}`,
+            type,
+            assetId,
+            wrapS: 'repeat',
+            wrapT: 'repeat',
+            repeat: { x: 1, y: 1 },
+            offset: { x: 0, y: 0 },
+            rotation: 0,
+            flipY: true,
+            generateMipmaps: true,
+            anisotropy: 1
+          }));
+        }
+      }
+    }, [materialRef, textures, materials]);
     
     return (
       <EnhancedMaterial 
         materialRef={enhancedMaterialRef}
-        textures={textures}
+        textures={textureReferences}
         uniforms={uniforms}
       />
     );
@@ -160,7 +191,8 @@ export function upgradeMaterialComponent(component: GameObjectComponent): GameOb
     return component; // Already using new format
   }
 
-  const { material: _material, materialProps: _materialProps, ...restProps } = component.properties;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { material, materialProps, ...restProps } = component.properties;
   const migratedMaterial = migrateLegacyMaterial(component);
 
   return {

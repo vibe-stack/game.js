@@ -22,7 +22,7 @@ export default function RightPanel({ scene, selectedObjects }: RightPanelProps) 
       }`}
     >
       <Tabs defaultValue="inspector" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 rounded-b-none">
+        <TabsList className="grid w-full grid-cols-3 h-12 rounded-b-none">
           <TabsTrigger value="inspector">Inspector</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="physics">Physics</TabsTrigger>

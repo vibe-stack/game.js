@@ -229,7 +229,7 @@ export default function LightComponent({ component, onUpdate }: LightComponentPr
         step={0.1}
         precision={1}
         min={0}
-        max={10}
+        max={100}
       />
 
       {renderLightSpecificControls()}

@@ -1,566 +1,200 @@
-import { ipcMain, dialog, shell } from 'electron';
-import fs from 'fs/promises';
-import path from 'path';
-import os from 'os';
+import { ipcMain } from "electron";
+import { ProjectManager } from "./project-manager";
+import { SceneManager } from "./scene-manager";
+import { AssetManager } from "./asset-manager";
+import { FileSystemManager } from "./file-system-manager";
 
 export class ProjectService {
-  private projectsDirectory: string;
+  private projectManager: ProjectManager;
+  private sceneManager: SceneManager;
+  private assetManager: AssetManager;
+  private fileSystemManager: FileSystemManager;
 
   constructor() {
-    this.projectsDirectory = path.join(os.homedir(), 'GameJS-Projects');
-    this.ensureProjectsDirectory();
+    this.projectManager = new ProjectManager();
+    this.sceneManager = new SceneManager(this.projectManager);
+    this.assetManager = new AssetManager();
+    this.fileSystemManager = new FileSystemManager();
   }
 
-  private async ensureProjectsDirectory() {
-    try {
-      await fs.access(this.projectsDirectory);
-    } catch {
-      await fs.mkdir(this.projectsDirectory, { recursive: true });
-    }
-  }
-
+  // Project Management - delegate to ProjectManager
   async loadProjects(): Promise<GameProject[]> {
-    try {
-      await this.ensureProjectsDirectory();
-      const entries = await fs.readdir(this.projectsDirectory, { withFileTypes: true });
-      const projects: GameProject[] = [];
-
-      for (const entry of entries) {
-        if (entry.isDirectory()) {
-          const projectPath = path.join(this.projectsDirectory, entry.name);
-          const configPath = path.join(projectPath, 'gamejs.config.json');
-          
-          try {
-            const configContent = await fs.readFile(configPath, 'utf-8');
-            const project = JSON.parse(configContent) as GameProject;
-            
-            const stats = await fs.stat(projectPath);
-            project.lastModified = stats.mtime;
-            project.path = projectPath;
-            
-            projects.push(project);
-          } catch {
-            // Skip invalid projects
-          }
-        }
-      }
-
-      return projects.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
-    } catch (error) {
-      console.error('Failed to load projects:', error);
-      return [];
-    }
+    return this.projectManager.loadProjects();
   }
 
-  async createProject(projectName: string, customPath?: string): Promise<GameProject> {
-    const projectPath = customPath 
-      ? path.join(customPath, projectName)
-      : path.join(this.projectsDirectory, projectName);
-
-    // Check if project already exists
-    try {
-      await fs.access(projectPath);
-      throw new Error(`Project "${projectName}" already exists`);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw error;
-      }
-    }
-
-    // Create project directory structure
-    await fs.mkdir(projectPath, { recursive: true });
-    await fs.mkdir(path.join(projectPath, 'scenes'), { recursive: true });
-    await fs.mkdir(path.join(projectPath, 'assets'), { recursive: true });
-    await fs.mkdir(path.join(projectPath, 'scripts'), { recursive: true });
-    await fs.mkdir(path.join(projectPath, 'src'), { recursive: true });
-
-    const now = new Date();
+  async createProject(
+    projectName: string,
+    customPath?: string,
+  ): Promise<GameProject> {
+    const project = await this.projectManager.createProject(projectName, customPath);
     
-    // Create default editor config
-    const editorConfig: EditorConfig = {
-      appTitle: projectName,
-      shortcuts: {
-        'ctrl+s': 'save',
-        'ctrl+n': 'new-scene',
-        'delete': 'delete-object',
-        'f': 'focus-object',
-        'w': 'move-tool',
-        'e': 'rotate-tool',
-        'r': 'scale-tool'
-      },
-      theme: 'system',
-      autoSave: true,
-      autoSaveInterval: 30,
-      gridSize: 1,
-      snapToGrid: false,
-      showGrid: true,
-      showGizmos: true,
-      cameraSpeed: 5,
-      viewportBackground: '#2a2a2a'
-    };
-
-    // Create project configuration
-    const project: GameProject = {
-      name: projectName,
-      path: projectPath,
-      lastModified: now,
-      scenes: ['main-scene'],
-      currentScene: 'main-scene',
-      editorConfig,
-      packageJson: this.createPackageJson(projectName),
-      metadata: {
-        created: now,
-        version: '1.0.0',
-        description: `A GameJS project: ${projectName}`,
-        author: os.userInfo().username
-      }
-    };
-
-    // Create default scene
-    const defaultScene = this.createDefaultScene();
+    // Create default scene using SceneManager
+    const defaultScene = this.sceneManager.createDefaultScene();
+    await this.sceneManager.saveScene(project.path, defaultScene);
     
-    // Write files
-    await this.saveProjectConfig(projectPath, project);
-    await this.saveScene(projectPath, defaultScene);
-    await this.savePackageJson(projectPath, project.packageJson);
-
     return project;
   }
 
   async selectProjectDirectory(): Promise<string | undefined> {
-    const result = await dialog.showOpenDialog({
-      title: 'Select Project Directory',
-      properties: ['openDirectory'],
-      defaultPath: this.projectsDirectory
-    });
-
-    return result.canceled ? undefined : result.filePaths[0];
+    return this.projectManager.selectProjectDirectory();
   }
 
   async openProject(projectPath: string): Promise<GameProject> {
-    const configPath = path.join(projectPath, 'gamejs.config.json');
-    const configContent = await fs.readFile(configPath, 'utf-8');
-    const project = JSON.parse(configContent) as GameProject;
-    
-    const stats = await fs.stat(projectPath);
-    project.lastModified = stats.mtime;
-    project.path = projectPath;
-    
-    return project;
+    return this.projectManager.openProject(projectPath);
   }
 
   async saveProject(project: GameProject): Promise<void> {
-    await this.saveProjectConfig(project.path, project);
+    return this.projectManager.saveProject(project);
   }
 
   async openProjectFolder(projectPath: string): Promise<void> {
-    await shell.openPath(projectPath);
+    return this.projectManager.openProjectFolder(projectPath);
   }
 
-  private async saveProjectConfig(projectPath: string, project: GameProject): Promise<void> {
-    const configPath = path.join(projectPath, 'gamejs.config.json');
-    const configData = JSON.stringify(project, null, 2);
-    await fs.writeFile(configPath, configData, 'utf-8');
-  }
-
-  private async savePackageJson(projectPath: string, packageJsonData: unknown): Promise<void> {
-    const packageJsonPath = path.join(projectPath, 'package.json');
-    const packageJsonContent = JSON.stringify(packageJsonData, null, 2);
-    await fs.writeFile(packageJsonPath, packageJsonContent, 'utf-8');
-  }
-
-  private createPackageJson(projectName: string) {
-    return {
-      name: projectName.toLowerCase().replace(/\s+/g, '-'),
-      version: '1.0.0',
-      description: `GameJS project: ${projectName}`,
-      main: 'src/index.js',
-      type: 'module',
-      scripts: {
-        build: 'gamejs build',
-        dev: 'gamejs dev',
-        preview: 'gamejs preview'
-      },
-      dependencies: {
-        three: '^0.177.0'
-      },
-      devDependencies: {},
-      private: true
-    };
-  }
-
-  private createDefaultScene(): GameScene {
-    const now = new Date();
-    
-    return {
-      id: 'main-scene',
-      name: 'Main Scene',
-      objects: [
-        {
-          id: 'main-camera',
-          name: 'Main Camera',
-          transform: {
-            position: { x: 0, y: 5, z: 10 },
-            rotation: { x: -0.2, y: 0, z: 0 },
-            scale: { x: 1, y: 1, z: 1 }
-          },
-          components: [
-            {
-              id: 'camera-component',
-              type: 'PerspectiveCamera',
-              enabled: true,
-              properties: {
-                fov: 75,
-                near: 0.1,
-                far: 1000,
-                isMain: true
-              }
-            }
-          ],
-          children: [],
-          visible: true,
-          tags: ['camera'],
-          layer: 0
-        },
-        {
-          id: 'directional-light',
-          name: 'Directional Light',
-          transform: {
-            position: { x: 5, y: 10, z: 5 },
-            rotation: { x: -1, y: 0.5, z: 0 },
-            scale: { x: 1, y: 1, z: 1 }
-          },
-          components: [
-            {
-              id: 'light-component',
-              type: 'DirectionalLight',
-              enabled: true,
-              properties: {
-                color: '#ffffff',
-                intensity: 1,
-                castShadow: true,
-                shadowMapSize: 1024,
-                shadowCameraNear: 0.5,
-                shadowCameraFar: 50,
-                shadowCameraLeft: -10,
-                shadowCameraRight: 10,
-                shadowCameraTop: 10,
-                shadowCameraBottom: -10
-              }
-            }
-          ],
-          children: [],
-          visible: true,
-          tags: ['light'],
-          layer: 0
-        }
-      ],
-      materials: [],
-      editorConfig: {
-        showHelperGrid: true,
-        gridSize: 1,
-        backgroundColor: '#2a2a2a',
-        renderType: 'solid',
-        showLights: true,
-        showCameras: true,
-        enableFog: false,
-        fogColor: '#ffffff',
-        fogNear: 1,
-        fogFar: 100
-      },
-      runtimeConfig: {
-        backgroundColor: '#87CEEB',
-        environment: 'none',
-        shadowsEnabled: true,
-        shadowType: 'pcf',
-        antialias: true,
-        physicallyCorrectLights: true,
-        toneMapping: 'aces',
-        exposure: 1
-      },
-      physicsWorld: {
-        gravity: { x: 0, y: -9.81, z: 0 },
-        integrationParameters: {
-          dt: 1/60,
-          minCcdDt: 1/60/100,
-          erp: 0.8,
-          damping: 0.99,
-          jointErp: 1.0,
-          jointDamping: 1.0,
-          allowedLinearError: 0.001,
-          allowedAngularError: 0.0087,
-          maxVelocityIterations: 4,
-          maxVelocityFrictionIterations: 8,
-          maxStabilizationIterations: 1,
-          interleaveRestitutionAndFrictionResolution: true,
-          minIslandSize: 128,
-          maxCcdSubsteps: 1
-        },
-        collisionDetection: {
-          predictionDistance: 0.002,
-          allowedLinearError: 0.001
-        },
-        debugRender: {
-          enabled: false,
-          renderBodies: true,
-          renderShapes: true,
-          renderJoints: true,
-          renderMultibodyJoints: false,
-          renderContacts: false,
-          renderCollisionEvents: false,
-          contactPointLength: 0.1,
-          contactNormalLength: 0.1
-        }
-      },
-      assets: [],
-      activeCamera: 'main-camera',
-      lightingSetup: {},
-      metadata: {
-        created: now,
-        modified: now,
-        version: '1.0.0'
-      }
-    };
-  }
-
+  // Scene Management - delegate to SceneManager
   async loadScene(projectPath: string, sceneName: string): Promise<GameScene> {
-    const scenePath = path.join(projectPath, 'scenes', `${sceneName}.json`);
-    const sceneContent = await fs.readFile(scenePath, 'utf-8');
-    return JSON.parse(sceneContent) as GameScene;
+    return this.sceneManager.loadScene(projectPath, sceneName);
   }
 
   async saveScene(projectPath: string, scene: GameScene): Promise<void> {
-    const scenePath = path.join(projectPath, 'scenes', `${scene.id}.json`);
-    scene.metadata.modified = new Date();
-    const sceneData = JSON.stringify(scene, null, 2);
-    await fs.writeFile(scenePath, sceneData, 'utf-8');
+    return this.sceneManager.saveScene(projectPath, scene);
   }
 
-  async createScene(projectPath: string, sceneName: string): Promise<GameScene> {
-    const sluggedName = sceneName.toLowerCase().replace(/\s+/g, '-');
-    const scenePath = path.join(projectPath, 'scenes', `${sluggedName}.json`);
-    
-    // Check if scene already exists
-    try {
-      await fs.access(scenePath);
-      throw new Error(`Scene "${sceneName}" already exists`);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw error;
-      }
-    }
-
-    const now = new Date();
-    
-    // Create minimal scene with a cube at 0,0,0
-    const scene: GameScene = {
-      id: sluggedName,
-      name: sceneName,
-      objects: [
-        {
-          id: 'main-camera',
-          name: 'Main Camera',
-          transform: {
-            position: { x: 0, y: 5, z: 10 },
-            rotation: { x: -0.2, y: 0, z: 0 },
-            scale: { x: 1, y: 1, z: 1 }
-          },
-          components: [
-            {
-              id: 'camera-component',
-              type: 'PerspectiveCamera',
-              enabled: true,
-              properties: {
-                fov: 75,
-                near: 0.1,
-                far: 1000,
-                isMain: true
-              }
-            }
-          ],
-          children: [],
-          visible: true,
-          tags: ['camera'],
-          layer: 0
-        },
-        {
-          id: 'directional-light',
-          name: 'Directional Light',
-          transform: {
-            position: { x: 5, y: 10, z: 5 },
-            rotation: { x: -1, y: 0.5, z: 0 },
-            scale: { x: 1, y: 1, z: 1 }
-          },
-          components: [
-            {
-              id: 'light-component',
-              type: 'DirectionalLight',
-              enabled: true,
-              properties: {
-                color: '#ffffff',
-                intensity: 1,
-                castShadow: true,
-                shadowMapSize: 1024,
-                shadowCameraNear: 0.5,
-                shadowCameraFar: 50,
-                shadowCameraLeft: -10,
-                shadowCameraRight: 10,
-                shadowCameraTop: 10,
-                shadowCameraBottom: -10
-              }
-            }
-          ],
-          children: [],
-          visible: true,
-          tags: ['light'],
-          layer: 0
-        },
-        {
-          id: 'cube',
-          name: 'Cube',
-          transform: {
-            position: { x: 0, y: 0, z: 0 },
-            rotation: { x: 0, y: 0, z: 0 },
-            scale: { x: 1, y: 1, z: 1 }
-          },
-          components: [
-            {
-              id: 'mesh-component',
-              type: 'Mesh',
-              enabled: true,
-              properties: {
-                geometry: 'box',
-                material: 'standard',
-                geometryProps: {
-                  width: 1,
-                  height: 1,
-                  depth: 1,
-                  widthSegments: 1,
-                  heightSegments: 1,
-                  depthSegments: 1
-                },
-                materialProps: {
-                  color: '#ffffff',
-                  metalness: 0.1,
-                  roughness: 0.3
-                },
-                castShadow: true,
-                receiveShadow: true
-              }
-            }
-          ],
-          children: [],
-          visible: true,
-          tags: ['geometry'],
-          layer: 0
-        }
-      ],
-      materials: [],
-      editorConfig: {
-        showHelperGrid: true,
-        gridSize: 1,
-        backgroundColor: '#2a2a2a',
-        renderType: 'solid',
-        showLights: true,
-        showCameras: true,
-        enableFog: false,
-        fogColor: '#ffffff',
-        fogNear: 1,
-        fogFar: 100
-      },
-      runtimeConfig: {
-        backgroundColor: '#87CEEB',
-        environment: 'none',
-        shadowsEnabled: true,
-        shadowType: 'pcf',
-        antialias: true,
-        physicallyCorrectLights: true,
-        toneMapping: 'aces',
-        exposure: 1
-      },
-      physicsWorld: {
-        gravity: { x: 0, y: -9.81, z: 0 },
-        integrationParameters: {
-          dt: 1/60,
-          minCcdDt: 1/60/100,
-          erp: 0.8,
-          damping: 0.99,
-          jointErp: 1.0,
-          jointDamping: 1.0,
-          allowedLinearError: 0.001,
-          allowedAngularError: 0.0087,
-          maxVelocityIterations: 4,
-          maxVelocityFrictionIterations: 8,
-          maxStabilizationIterations: 1,
-          interleaveRestitutionAndFrictionResolution: true,
-          minIslandSize: 128,
-          maxCcdSubsteps: 1
-        },
-        collisionDetection: {
-          predictionDistance: 0.002,
-          allowedLinearError: 0.001
-        },
-        debugRender: {
-          enabled: false,
-          renderBodies: true,
-          renderShapes: true,
-          renderJoints: true,
-          renderMultibodyJoints: false,
-          renderContacts: false,
-          renderCollisionEvents: false,
-          contactPointLength: 0.1,
-          contactNormalLength: 0.1
-        }
-      },
-      assets: [],
-      activeCamera: 'main-camera',
-      lightingSetup: {},
-      metadata: {
-        created: now,
-        modified: now,
-        version: '1.0.0'
-      }
-    };
-
-    await this.saveScene(projectPath, scene);
-
-    // Update project's scenes list
-    const project = await this.openProject(projectPath);
-    if (!project.scenes.includes(sluggedName)) {
-      project.scenes.push(sluggedName);
-      await this.saveProject(project);
-    }
-
-    return scene;
+  async createScene(
+    projectPath: string,
+    sceneName: string,
+  ): Promise<GameScene> {
+    return this.sceneManager.createScene(projectPath, sceneName);
   }
 
   async listScenes(projectPath: string): Promise<string[]> {
-    const scenesDir = path.join(projectPath, 'scenes');
-    try {
-      const files = await fs.readdir(scenesDir);
-      return files
-        .filter(file => file.endsWith('.json'))
-        .map(file => file.replace('.json', ''));
-    } catch {
-      return [];
-    }
+    return this.sceneManager.listScenes(projectPath);
   }
 
-  registerIpcHandlers() {
-    ipcMain.handle('project:load-projects', () => this.loadProjects());
-    ipcMain.handle('project:create-project', (_, projectName: string, projectPath?: string) => 
-      this.createProject(projectName, projectPath));
-    ipcMain.handle('project:select-directory', () => this.selectProjectDirectory());
-    ipcMain.handle('project:open-project', (_, projectPath: string) => this.openProject(projectPath));
-    ipcMain.handle('project:save-project', (_, project: GameProject) => this.saveProject(project));
-    ipcMain.handle('project:open-folder', (_, projectPath: string) => this.openProjectFolder(projectPath));
-    ipcMain.handle('project:load-scene', (_, projectPath: string, sceneName: string) => 
-      this.loadScene(projectPath, sceneName));
-    ipcMain.handle('project:save-scene', (_, projectPath: string, scene: GameScene) => 
-      this.saveScene(projectPath, scene));
-    ipcMain.handle('project:create-scene', (_, projectPath: string, sceneName: string) => 
-      this.createScene(projectPath, sceneName));
-    ipcMain.handle('project:list-scenes', (_, projectPath: string) => 
-      this.listScenes(projectPath));
+  // Asset Management - delegate to AssetManager
+  async selectAssetFiles(): Promise<string[]> {
+    return this.assetManager.selectAssetFiles();
   }
-} 
+
+  async importAssetFromData(
+    projectPath: string,
+    fileName: string,
+    fileData: Buffer,
+  ): Promise<AssetReference> {
+    return this.assetManager.importAssetFromData(projectPath, fileName, fileData);
+  }
+
+  async importAsset(
+    projectPath: string,
+    assetPath: string,
+  ): Promise<AssetReference> {
+    return this.assetManager.importAsset(projectPath, assetPath);
+  }
+
+  async deleteAsset(projectPath: string, assetId: string): Promise<void> {
+    return this.assetManager.deleteAsset(projectPath, assetId);
+  }
+
+  async getAssets(projectPath: string): Promise<AssetReference[]> {
+    return this.assetManager.getAssets(projectPath);
+  }
+
+  async getAssetDataUrl(
+    projectPath: string,
+    assetPath: string,
+  ): Promise<string | null> {
+    return this.assetManager.getAssetDataUrl(projectPath, assetPath);
+  }
+
+  // File System Operations - delegate to FileSystemManager
+  async readFile(filePath: string): Promise<string> {
+    return this.fileSystemManager.readFile(filePath);
+  }
+
+  async writeFile(filePath: string, content: string): Promise<void> {
+    return this.fileSystemManager.writeFile(filePath, content);
+  }
+
+  async fileExists(filePath: string): Promise<boolean> {
+    return this.fileSystemManager.fileExists(filePath);
+  }
+
+  // IPC Registration - unchanged
+  registerIpcHandlers() {
+    ipcMain.handle("project:load-projects", () => this.loadProjects());
+    ipcMain.handle(
+      "project:create-project",
+      (_, projectName: string, projectPath?: string) =>
+        this.createProject(projectName, projectPath),
+    );
+    ipcMain.handle("project:select-directory", () =>
+      this.selectProjectDirectory(),
+    );
+    ipcMain.handle("project:open-project", (_, projectPath: string) =>
+      this.openProject(projectPath),
+    );
+    ipcMain.handle("project:save-project", (_, project: GameProject) =>
+      this.saveProject(project),
+    );
+    ipcMain.handle("project:open-folder", (_, projectPath: string) =>
+      this.openProjectFolder(projectPath),
+    );
+    ipcMain.handle(
+      "project:load-scene",
+      (_, projectPath: string, sceneName: string) =>
+        this.loadScene(projectPath, sceneName),
+    );
+    ipcMain.handle(
+      "project:save-scene",
+      (_, projectPath: string, scene: GameScene) =>
+        this.saveScene(projectPath, scene),
+    );
+    ipcMain.handle(
+      "project:create-scene",
+      (_, projectPath: string, sceneName: string) =>
+        this.createScene(projectPath, sceneName),
+    );
+    ipcMain.handle("project:list-scenes", (_, projectPath: string) =>
+      this.listScenes(projectPath),
+    );
+
+    // Asset Management
+    ipcMain.handle("project:select-asset-files", () => this.selectAssetFiles());
+    ipcMain.handle(
+      "project:import-asset-from-data",
+      (_, projectPath: string, fileName: string, fileData: Buffer) =>
+        this.importAssetFromData(projectPath, fileName, fileData),
+    );
+    ipcMain.handle(
+      "project:import-asset",
+      (_, projectPath: string, assetPath: string) =>
+        this.importAsset(projectPath, assetPath),
+    );
+    ipcMain.handle(
+      "project:delete-asset",
+      (_, projectPath: string, assetId: string) =>
+        this.deleteAsset(projectPath, assetId),
+    );
+    ipcMain.handle("project:get-assets", (_, projectPath: string) =>
+      this.getAssets(projectPath),
+    );
+    ipcMain.handle(
+      "project:get-asset-data-url",
+      (_, projectPath: string, assetPath: string) =>
+        this.getAssetDataUrl(projectPath, assetPath),
+    );
+
+    // File System Operations
+    ipcMain.handle("project:read-file", (_, filePath: string) =>
+      this.readFile(filePath),
+    );
+    ipcMain.handle(
+      "project:write-file",
+      (_, filePath: string, content: string) =>
+        this.writeFile(filePath, content),
+    );
+    ipcMain.handle("project:file-exists", (_, filePath: string) =>
+      this.fileExists(filePath),
+    );
+  }
+}

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { generateHeightfieldData } from '@/utils/heightfield-generator';
+import { clearTextureCache } from '@/pages/editor-page/components/viewport/enhanced-material-components';
 
 interface EditorState {
   // Project State
@@ -10,6 +11,9 @@ interface EditorState {
   // Scene State
   currentScene: GameScene | null;
   selectedObjects: string[];
+  
+  // Asset State
+  assets: AssetReference[];
   
   // Editor UI State
   editorMode: 'select' | 'move' | 'rotate' | 'scale';
@@ -36,6 +40,13 @@ interface EditorState {
   selectObject: (objectId: string, additive?: boolean) => void;
   deselectAll: () => void;
   setEditorMode: (mode: 'select' | 'move' | 'rotate' | 'scale') => void;
+  
+  // Asset Actions
+  loadAssets: () => Promise<void>;
+  importAsset: (filePath: string) => Promise<AssetReference>;
+  importAssetFromData: (fileName: string, fileData: ArrayBuffer) => Promise<AssetReference>;
+  deleteAsset: (assetId: string) => Promise<void>;
+  createMeshFromGLB: (assetReference: AssetReference, position?: Vector3) => void;
   
   // Physics Actions
   setPhysicsState: (state: 'stopped' | 'playing' | 'paused') => void;
@@ -89,6 +100,7 @@ const useEditorStore = create<EditorState>()(
     projects: [],
     currentScene: null,
     selectedObjects: [],
+    assets: [],
     editorMode: 'select',
     viewportCamera: {
       position: { x: 0, y: 5, z: 10 },
@@ -105,14 +117,132 @@ const useEditorStore = create<EditorState>()(
     editingMeshId: null,
 
     // Project Actions
-    setCurrentProject: (project) => set({ currentProject: project }),
+    setCurrentProject: (project) => {
+      // Clear texture cache when switching projects to avoid conflicts
+      clearTextureCache();
+      set({ currentProject: project });
+    },
     setProjects: (projects) => set({ projects }),
+    
+    // Asset Actions
+    loadAssets: async () => {
+      const { currentProject } = useEditorStore.getState();
+      if (!currentProject) return;
+      
+      try {
+        const assets = await window.projectAPI.getAssets(currentProject.path);
+        set({ assets });
+      } catch (error) {
+        console.error('Failed to load assets:', error);
+        set({ assets: [] });
+      }
+    },
+    
+    importAsset: async (filePath: string) => {
+      const { currentProject } = useEditorStore.getState();
+      if (!currentProject) throw new Error('No project loaded');
+      
+      try {
+        const assetReference = await window.projectAPI.importAsset(currentProject.path, filePath);
+        
+        // Update store with new asset
+        set({ 
+          assets: [...useEditorStore.getState().assets, assetReference]
+        });
+        
+        return assetReference;
+      } catch (error) {
+        console.error('Failed to import asset:', error);
+        throw error;
+      }
+    },
+    
+    importAssetFromData: async (fileName: string, fileData: ArrayBuffer) => {
+      const { currentProject } = useEditorStore.getState();
+      if (!currentProject) throw new Error('No project loaded');
+      
+      try {
+        const assetReference = await window.projectAPI.importAssetFromData(currentProject.path, fileName, fileData);
+        
+        // Update store with new asset
+        set({ 
+          assets: [...useEditorStore.getState().assets, assetReference]
+        });
+        
+        return assetReference;
+      } catch (error) {
+        console.error('Failed to import asset from data:', error);
+        throw error;
+      }
+    },
+    
+    deleteAsset: async (assetId: string) => {
+      const { currentProject, assets } = useEditorStore.getState();
+      if (!currentProject) return;
+      
+      try {
+        await window.projectAPI.deleteAsset(currentProject.path, assetId);
+        
+        // Update store to remove asset
+        set({ 
+          assets: assets.filter(asset => asset.id !== assetId)
+        });
+      } catch (error) {
+        console.error('Failed to delete asset:', error);
+      }
+    },
+    
+    createMeshFromGLB: (assetReference: AssetReference, position?: Vector3) => {
+      const { currentScene, addObject } = useEditorStore.getState();
+      if (!currentScene || assetReference.type !== 'model') return;
+      
+      const meshObject: GameObject = {
+        id: `mesh_${Date.now()}`,
+        name: assetReference.name,
+        transform: {
+          position: position || { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 }
+        },
+        components: [
+          {
+            id: `mesh_component_${Date.now()}`,
+            type: 'Mesh',
+            enabled: true,
+            properties: {
+              geometry: 'external',
+              geometryProps: {
+                assetId: assetReference.id,
+                assetPath: assetReference.path
+              },
+              materialRef: {
+                type: 'inline',
+                properties: {
+                  type: 'standard',
+                  color: '#ffffff',
+                  metalness: 0.1,
+                  roughness: 0.3
+                }
+              },
+              castShadow: true,
+              receiveShadow: true
+            }
+          }
+        ],
+        children: [],
+        visible: true,
+        tags: ['model', 'imported'],
+        layer: 0
+      };
+      
+      addObject(meshObject);
+    },
     
     // Scene Actions
     setCurrentScene: (scene) => set({ 
       currentScene: scene,
       selectedObjects: [], // Clear selection when changing scenes
-      materials: scene?.materials || [] // Load materials from scene
+      materials: scene?.materials || [], // Load materials from scene
     }),
     
     // Scene switching
@@ -122,9 +252,14 @@ const useEditorStore = create<EditorState>()(
 
       try {
         const scene = await window.projectAPI.loadScene(currentProject.path, sceneName);
+        
+        // Load assets from filesystem
+        const assets = await window.projectAPI.getAssets(currentProject.path);
+        
         set({ 
           currentScene: scene,
-          selectedObjects: []
+          selectedObjects: [],
+          assets: assets
         });
         
         // Update project's current scene

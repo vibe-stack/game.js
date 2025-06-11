@@ -430,9 +430,12 @@ interface ProjectAPI {
   listScenes: (projectPath: string) => Promise<string[]>;
   
   // Asset Management
+  selectAssetFiles: () => Promise<string[]>;
+  importAssetFromData: (projectPath: string, fileName: string, fileData: ArrayBuffer) => Promise<AssetReference>;
   importAsset: (projectPath: string, assetPath: string) => Promise<AssetReference>;
   deleteAsset: (projectPath: string, assetId: string) => Promise<void>;
   getAssets: (projectPath: string) => Promise<AssetReference[]>;
+  getAssetDataUrl: (projectPath: string, assetPath: string) => Promise<string | null>;
   
   // File System Operations
   readFile: (filePath: string) => Promise<string>;

@@ -21,6 +21,7 @@ export default function EditorPage() {
     setCurrentScene,
     selectObject,
     setPhysicsCallbacks,
+    loadAssets,
   } = useEditorStore();
 
   useEffect(() => {
@@ -45,6 +46,9 @@ export default function EditorPage() {
         );
         setCurrentScene(scene);
       }
+      
+      // Load assets from filesystem
+      await loadAssets();
     } catch (error) {
       setError(
         `Failed to load project: ${error instanceof Error ? error.message : "Unknown error"}`,

@@ -1,6 +1,6 @@
-import React, { Suspense, useEffect } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Environment, Grid } from "@react-three/drei";
+import React, { Suspense, useEffect, useRef } from "react";
+import { Canvas, extend, useThree } from "@react-three/fiber";
+import { OrbitControls, Environment } from "@react-three/drei";
 import {
   ACESFilmicToneMapping,
   LinearToneMapping,
@@ -11,10 +11,11 @@ import {
 import SceneObject from "./scene-object";
 import { PhysicsProvider, usePhysics } from "./physics/physics-context";
 import useEditorStore from "@/stores/editor-store";
+import Grid2 from "./components/grid2";
 // import WebGPUGrid from "./components/webgpu-grid";
-// import * as THREE from "three/webgpu";
+import * as THREE from "three/webgpu";
 
-// extend(THREE as any)
+extend(THREE as any)
 interface ViewportProps {
   scene: GameScene | null;
   selectedObjects: string[];
@@ -61,7 +62,45 @@ export default function Viewport({
   onSelectObject,
   onPhysicsCallbacks,
 }: ViewportProps) {
-  const { updateObjectTransform, physicsState } = useEditorStore();
+  const { updateObjectTransform, physicsState, importAssetFromData, createMeshFromGLB } = useEditorStore();
+  const viewportRef = useRef<HTMLDivElement>(null);
+
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDrop = async (event: React.DragEvent) => {
+    event.preventDefault();
+    
+    const files = event.dataTransfer.files;
+    if (!files) return;
+
+    for (const file of Array.from(files)) {
+      const fileName = file.name.toLowerCase();
+      
+      // Only handle GLB files for direct mesh creation
+      if (fileName.endsWith('.glb') || fileName.endsWith('.gltf')) {
+        try {
+          // Read file data
+          const fileData = await file.arrayBuffer();
+          
+          // Import the asset first
+          const assetReference = await importAssetFromData(file.name, fileData);
+          
+          // Calculate drop position (simplified - drop at center for now)
+          // In a more advanced implementation, you could calculate the 3D position
+          // based on the mouse position and camera view
+          const position = { x: 0, y: 0, z: 0 };
+          
+          // Create mesh from GLB
+          createMeshFromGLB(assetReference, position);
+        } catch (error) {
+          console.error('Failed to create mesh from dropped GLB:', error);
+        }
+      }
+    }
+  };
 
   if (!scene) {
     return (
@@ -108,27 +147,37 @@ export default function Viewport({
 
   return (
     <div
+      ref={viewportRef}
       className="h-screen"
       style={{ backgroundColor: scene.editorConfig.backgroundColor }}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       <Canvas
         camera={{ position: [0, 25, 80], fov: 75 }}
         shadows={shadowConfig}
-        gl={{
-          antialias: scene.runtimeConfig.antialias,
-          toneMapping: getToneMapping(scene.runtimeConfig.toneMapping),
-          toneMappingExposure: scene.runtimeConfig.exposure,
-        }}
-        // gl={async (props) => {
-        //   const renderer = new THREE.WebGPURenderer({
-        //     ...(props as any),
-        //     antialias: scene.runtimeConfig.antialias,
-        //     toneMapping: getToneMapping(scene.runtimeConfig.toneMapping),
-        //     toneMappingExposure: scene.runtimeConfig.exposure,
-        //   })
-        //   await renderer.init()
-        //   return renderer
+        // gl={{
+        //   antialias: scene.runtimeConfig.antialias,
+        //   toneMapping: getToneMapping(scene.runtimeConfig.toneMapping),
+        //   toneMappingExposure: scene.runtimeConfig.exposure,
         // }}
+        gl={async (props) => {
+          const renderer = new THREE.WebGPURenderer({
+            ...(props as any),
+            antialias: scene.runtimeConfig.antialias,
+            toneMapping: getToneMapping(scene.runtimeConfig.toneMapping),
+            toneMappingExposure: scene.runtimeConfig.exposure,
+          })
+          await renderer.init()
+          
+          // WebGPU-specific shadow configuration
+          if (renderer.shadowMap) {
+            renderer.shadowMap.enabled = scene.runtimeConfig.shadowsEnabled;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Better for WebGPU
+          }
+          
+          return renderer
+        }}
       >
         <Suspense>
           <PhysicsProvider
@@ -174,9 +223,7 @@ export default function Viewport({
 
             {/* Grid */}
             {shouldShowHelpers && scene.editorConfig.showHelperGrid && (
-              <Grid
-                // cellSize={scene.editorConfig.gridSize * 20}
-                // sectionSize={scene.editorConfig.gridSize * 20}
+              <Grid2
                 args={[scene.editorConfig.gridSize * 20, scene.editorConfig.gridSize * 20]}
                 cellColor="#666666"
                 sectionColor="#111111"

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useLoader } from '@react-three/fiber';
 import { getGeometryComponent } from './geometry-components';
@@ -12,39 +12,145 @@ interface MaterialReference {
   properties?: any; // For inline materials
 }
 
+interface TextureReference {
+  type: string;
+  assetId: string;
+  wrapS?: string;
+  wrapT?: string;
+  repeat?: { x: number; y: number };
+  offset?: { x: number; y: number };
+  rotation?: number;
+  flipY?: boolean;
+  generateMipmaps?: boolean;
+  anisotropy?: number;
+}
+
 interface EnhancedMaterialProps {
   materialRef: MaterialReference;
-  textures?: Record<string, string>; // texture type -> asset path
+  textures?: TextureReference[]; // Updated to use TextureReference array
   uniforms?: Record<string, any>; // For shader materials
   onMaterialReady?: (material: THREE.Material) => void;
 }
 
+// Texture cache to avoid repeated data URL requests
+const textureCache = new Map<string, Promise<string | null>>();
+
+// Function to clear texture cache (useful when switching projects)
+export function clearTextureCache() {
+  textureCache.clear();
+}
+
+// Helper hook to load texture data URLs
+function useTextureDataUrls(textures: TextureReference[], assets: AssetReference[], currentProject: GameProject | null) {
+  const [dataUrls, setDataUrls] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!currentProject || textures.length === 0) {
+      setDataUrls({});
+      return;
+    }
+
+    setLoading(true);
+    
+    const loadDataUrls = async () => {
+      const urls: Record<string, string> = {};
+      
+      await Promise.all(
+        textures.map(async (textureRef) => {
+          const asset = assets.find(a => a.id === textureRef.assetId);
+          if (asset) {
+            const cacheKey = `${currentProject.path}:${asset.path}`;
+            
+            // Check cache first
+            let dataUrlPromise = textureCache.get(cacheKey);
+            if (!dataUrlPromise) {
+              dataUrlPromise = window.projectAPI.getAssetDataUrl(currentProject.path, asset.path);
+              textureCache.set(cacheKey, dataUrlPromise);
+            }
+            
+            const dataUrl = await dataUrlPromise;
+            if (dataUrl) {
+              urls[textureRef.type] = dataUrl;
+            }
+          }
+        })
+      );
+      
+      setDataUrls(urls);
+      setLoading(false);
+    };
+
+    loadDataUrls().catch(error => {
+      console.error('Failed to load texture data URLs:', error);
+      setLoading(false);
+    });
+  }, [textures, assets, currentProject]);
+
+  return { dataUrls, loading };
+}
+
 export function EnhancedMaterial({ 
   materialRef, 
-  textures = {}, 
+  textures = [], 
   uniforms = {},
   onMaterialReady 
 }: EnhancedMaterialProps) {
   const [material, setMaterial] = useState<THREE.Material | null>(null);
-  const { materials } = useEditorStore();
+  const { materials, assets, currentProject } = useEditorStore();
   
-  // Load textures
-  const textureMap = useLoader(
+  // Use ref to avoid dependency issues with callback
+  const onMaterialReadyRef = useRef(onMaterialReady);
+  onMaterialReadyRef.current = onMaterialReady;
+  
+  // Load texture data URLs
+  const { dataUrls, loading } = useTextureDataUrls(textures, assets, currentProject);
+  
+  // Load textures only for data URLs that exist
+  const dataUrlsArray = Object.values(dataUrls).filter(Boolean);
+  const textureMap = dataUrlsArray.length > 0 && !loading ? useLoader(
     THREE.TextureLoader,
-    Object.values(textures).filter(Boolean)
-  );
+    dataUrlsArray
+  ) : [];
   
   const loadedTextures = useMemo(() => {
+    if (loading || dataUrlsArray.length === 0) return {};
+    
     const result: Record<string, THREE.Texture> = {};
-    Object.entries(textures).forEach(([type, path], index) => {
-      if (path && textureMap[index]) {
-        result[type] = textureMap[index];
+    let textureIndex = 0;
+    
+    Object.entries(dataUrls).forEach(([type, dataUrl]) => {
+      if (dataUrl && textureMap[textureIndex]) {
+        const texture = textureMap[textureIndex];
+        
+        // Find the texture reference to apply its settings
+        const textureRef = textures.find(t => t.type === type);
+        if (textureRef) {
+          // Apply texture settings
+          texture.wrapS = getWrapMode(textureRef.wrapS || 'repeat');
+          texture.wrapT = getWrapMode(textureRef.wrapT || 'repeat');
+          texture.repeat.set(textureRef.repeat?.x || 1, textureRef.repeat?.y || 1);
+          texture.offset.set(textureRef.offset?.x || 0, textureRef.offset?.y || 0);
+          texture.rotation = textureRef.rotation || 0;
+          texture.flipY = textureRef.flipY !== false; // default true
+          texture.generateMipmaps = textureRef.generateMipmaps !== false; // default true
+          
+          if (textureRef.anisotropy) {
+            texture.anisotropy = Math.min(textureRef.anisotropy, 16); // Clamp to max supported
+          }
+        }
+        
+        result[type] = texture;
+        textureIndex++;
       }
     });
+    
     return result;
-  }, [textures, textureMap]);
+  }, [dataUrls, textureMap, textures, loading]);
 
   useEffect(() => {
+    if (loading) return; // Wait for textures to load
+    
     const createMaterial = async () => {
       let mat: THREE.Material;
 
@@ -65,15 +171,25 @@ export function EnhancedMaterial({
       }
 
       setMaterial(mat);
-      onMaterialReady?.(mat);
+      onMaterialReadyRef.current?.(mat);
     };
 
     createMaterial();
-  }, [materialRef, loadedTextures, uniforms, onMaterialReady, materials]);
+  }, [materialRef, loadedTextures, uniforms, materials, loading]); // Removed onMaterialReady from dependencies
 
-  if (!material) return null;
+  if (!material || loading) return null;
 
   return <primitive object={material} />;
+}
+
+// Helper function to convert wrap mode strings to THREE.js constants
+function getWrapMode(mode: string): THREE.Wrapping {
+  switch (mode) {
+    case 'repeat': return THREE.RepeatWrapping;
+    case 'clampToEdge': return THREE.ClampToEdgeWrapping;
+    case 'mirroredRepeat': return THREE.MirroredRepeatWrapping;
+    default: return THREE.RepeatWrapping;
+  }
 }
 
 // Create material from inline properties

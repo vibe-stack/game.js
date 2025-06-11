@@ -32,12 +32,18 @@ export function exposeProjectContext() {
       ipcRenderer.invoke("project:list-scenes", projectPath),
     
     // Asset Management
+    selectAssetFiles: () => 
+      ipcRenderer.invoke("project:select-asset-files"),
+    importAssetFromData: (projectPath: string, fileName: string, fileData: ArrayBuffer) => 
+      ipcRenderer.invoke("project:import-asset-from-data", projectPath, fileName, Buffer.from(fileData)),
     importAsset: (projectPath: string, assetPath: string) => 
       ipcRenderer.invoke("project:import-asset", projectPath, assetPath),
     deleteAsset: (projectPath: string, assetId: string) => 
       ipcRenderer.invoke("project:delete-asset", projectPath, assetId),
     getAssets: (projectPath: string) => 
       ipcRenderer.invoke("project:get-assets", projectPath),
+    getAssetDataUrl: (projectPath: string, assetPath: string) => 
+      ipcRenderer.invoke("project:get-asset-data-url", projectPath, assetPath),
     
     // File System Operations
     readFile: (filePath: string) => 

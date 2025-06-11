@@ -51,7 +51,7 @@ export default function SceneSettings({ scene }: SceneSettingsProps) {
   };
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 max-h-[70vh] overflow-y-auto">
       <h3 className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
         <Settings size={16} />
         Scene Settings
