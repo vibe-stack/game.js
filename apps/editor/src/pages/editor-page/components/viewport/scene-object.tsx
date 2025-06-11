@@ -134,7 +134,6 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
         <PivotControlsWrapper
           isSelected={isSelected}
           objectId={obj.id}
-          matrix={matrixRef.current}
         >
           <group {...groupProps}>
             {isPivotControlsActive ? (

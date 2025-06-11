@@ -3,10 +3,8 @@ import {
   RigidBody,
   RapierRigidBody,
 } from "@react-three/rapier";
-import { useFrame } from "@react-three/fiber";
 import { usePhysics } from "./physics-context";
 import ColliderRenderer from "./collider-renderer";
-import * as THREE from "three";
 
 interface RigidBodyRendererProps {
   objectId: string;
@@ -32,67 +30,6 @@ export default function RigidBodyRenderer({
   const rigidBodyRef = useRef<RapierRigidBody>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const cleanupExecutedRef = useRef(false);
-  const frozenPositionRef = useRef<[number, number, number] | null>(null);
-  const frozenRotationRef = useRef<[number, number, number, number] | null>(null);
-
-  // Control rigid body movement based on physics state
-  useFrame(() => {
-    const rigidBody = rigidBodyRef.current;
-    if (!rigidBody) return;
-
-    if (physicsState === 'paused') {
-      // When paused, freeze the rigid body in place
-      if (frozenPositionRef.current === null) {
-        // Store the current position and rotation when first pausing
-        const pos = rigidBody.translation();
-        const rot = rigidBody.rotation();
-        frozenPositionRef.current = [pos.x, pos.y, pos.z];
-        frozenRotationRef.current = [rot.x, rot.y, rot.z, rot.w];
-      }
-
-      // Reset position and rotation to frozen values
-      rigidBody.setTranslation(
-        { x: frozenPositionRef.current[0], y: frozenPositionRef.current[1], z: frozenPositionRef.current[2] },
-        true
-      );
-      rigidBody.setRotation(
-        { x: frozenRotationRef.current![0], y: frozenRotationRef.current![1], z: frozenRotationRef.current![2], w: frozenRotationRef.current![3] },
-        true
-      );
-      
-      // Reset all velocities to prevent any movement
-      rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-      rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    } else if (physicsState === 'stopped') {
-      // When stopped, freeze the rigid body at its initial transform position
-      // This prevents drift due to floating-point precision errors
-      if (frozenPositionRef.current === null) {
-        // Store the current position and rotation when first stopping
-        frozenPositionRef.current = [transform.position.x, transform.position.y, transform.position.z];
-        const euler = new THREE.Euler(transform.rotation.x, transform.rotation.y, transform.rotation.z, 'XYZ');
-        const quaternion = new THREE.Quaternion().setFromEuler(euler);
-        frozenRotationRef.current = [quaternion.x, quaternion.y, quaternion.z, quaternion.w];
-      }
-
-      // Keep the rigid body frozen at the initial transform position
-      rigidBody.setTranslation(
-        { x: frozenPositionRef.current[0], y: frozenPositionRef.current[1], z: frozenPositionRef.current[2] },
-        true
-      );
-      rigidBody.setRotation(
-        { x: frozenRotationRef.current![0], y: frozenRotationRef.current![1], z: frozenRotationRef.current![2], w: frozenRotationRef.current![3] },
-        true
-      );
-      
-      // Reset all velocities to prevent any movement
-      rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-      rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    } else if (physicsState === 'playing') {
-      // When playing, clear frozen state so physics can take over
-      frozenPositionRef.current = null;
-      frozenRotationRef.current = null;
-    }
-  });
 
   // Register/unregister rigid body with improved cleanup logic
   useEffect(() => {
@@ -144,13 +81,17 @@ export default function RigidBodyRenderer({
 
   const props = rigidBodyComponent.properties;
 
-  // Map body types to @react-three/rapier types
-  const bodyType =
+  // Dynamically determine body type based on physics state
+  // When not playing, make all rigid bodies static to prevent movement
+  // When playing, use the original body type
+  const originalBodyType =
     props.bodyType === "static"
       ? "fixed"
       : props.bodyType === "kinematic"
         ? "kinematicPosition"
         : "dynamic";
+
+  const effectiveBodyType = physicsState === 'playing' ? originalBodyType : "fixed";
 
   // Check if any translation is locked
   const hasLockedTranslations =
@@ -164,7 +105,7 @@ export default function RigidBodyRenderer({
   return (
     <RigidBody
       ref={rigidBodyRef}
-      type={bodyType}
+      type={effectiveBodyType}
       position={[
         transform.position.x,
         transform.position.y,

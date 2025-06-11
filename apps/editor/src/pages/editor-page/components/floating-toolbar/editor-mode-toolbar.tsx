@@ -1,11 +1,9 @@
 import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Square,
-  RotateCw,
-  Move3D,
-  Maximize,
-  RotateCcw
+  Move3D, RotateCcw, MousePointerIcon,
+  Rotate3d,
+  Scale3d
 } from "lucide-react";
 import useEditorStore from "@/stores/editor-store";
 
@@ -57,7 +55,7 @@ export default function EditorModeToolbar() {
         className="h-8 w-8 p-0"
         title="Select Mode (Q)"
       >
-        <Square size={16} />
+        <MousePointerIcon size={16} />
       </Button>
       <Button
         size="sm"
@@ -75,7 +73,7 @@ export default function EditorModeToolbar() {
         className="h-8 w-8 p-0"
         title="Rotate Mode (E)"
       >
-        <RotateCw size={16} />
+        <Rotate3d size={16} />
       </Button>
       <Button
         size="sm"
@@ -84,7 +82,7 @@ export default function EditorModeToolbar() {
         className="h-8 w-8 p-0"
         title="Scale Mode (R)"
       >
-        <Maximize size={16} />
+        <Scale3d size={16} />
       </Button>
       <div className="bg-border h-4 w-px mx-1" />
       <Button 
