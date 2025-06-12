@@ -40,7 +40,7 @@ export default function MeshComponent({
   objectId,
   onUpdate,
 }: MeshComponentProps) {
-  const { materials, openMaterialBrowser } = useEditorStore();
+  const { materials, openMaterialBrowser, assets } = useEditorStore();
   const props = component.properties || {};
   const geometryProps = props.geometryProps || {};
 
@@ -431,6 +431,7 @@ export default function MeshComponent({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="external">External Model</SelectItem>
               <SelectItem value="box">Box</SelectItem>
               <SelectItem value="sphere">Sphere</SelectItem>
               <SelectItem value="plane">Plane</SelectItem>
@@ -449,7 +450,74 @@ export default function MeshComponent({
           </Select>
         </div>
 
-        {renderGeometryControls()}
+        {/* Asset selection for external models */}
+        {props.geometry === "external" && (
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Model Asset</Label>
+              <Select
+                value={geometryProps.assetId || ""}
+                onValueChange={(value) => updateGeometryProp("assetId", value)}
+              >
+                <SelectTrigger className="h-7 w-full text-xs">
+                  <SelectValue placeholder="Select a model asset..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {assets.filter(asset => asset.type === 'model').map((asset) => (
+                    <SelectItem key={asset.id} value={asset.id}>
+                      {asset.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {geometryProps.assetId && (
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Scale</Label>
+                  <div className="grid grid-cols-3 gap-1">
+                    <DragInput
+                      label="X"
+                      value={geometryProps.scale?.x || 1}
+                      onChange={(value) => updateGeometryProp("scale", { 
+                        ...geometryProps.scale,
+                        x: value
+                      })}
+                      step={0.1}
+                      precision={2}
+                      min={0.01}
+                    />
+                    <DragInput
+                      label="Y"
+                      value={geometryProps.scale?.y || 1}
+                      onChange={(value) => updateGeometryProp("scale", { 
+                        ...geometryProps.scale,
+                        y: value
+                      })}
+                      step={0.1}
+                      precision={2}
+                      min={0.01}
+                    />
+                    <DragInput
+                      label="Z"
+                      value={geometryProps.scale?.z || 1}
+                      onChange={(value) => updateGeometryProp("scale", { 
+                        ...geometryProps.scale,
+                        z: value
+                      })}
+                      step={0.1}
+                      precision={2}
+                      min={0.01}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {props.geometry !== "external" && renderGeometryControls()}
       </div>
 
       <div className="space-y-3">

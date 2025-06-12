@@ -34,15 +34,7 @@ export default function FloatingToolbar({
         />
       </div>
 
-      <div 
-        className={`transition-all duration-300 ease-in-out ${
-          physicsState === 'playing' 
-            ? 'opacity-0 scale-95 pointer-events-none' 
-            : 'opacity-100 scale-100'
-        }`}
-      >
-        <EditorModeToolbar />
-      </div>
+      <EditorModeToolbar />
 
       <MainControlsToolbar
         isSaving={isSaving}

@@ -6,7 +6,8 @@ import { Viewport } from "./components/viewport";
 import LeftPanel from "./components/left-panel";
 import RightPanel from "./components/right-panel";
 import FloatingToolbar from "./components/floating-toolbar";
-import MaterialBrowser from '@/components/material-browser';
+import MaterialBrowser from "@/components/material-browser";
+import { GlassContainer } from "@/components/ui/glass-container";
 
 export default function EditorPage() {
   const navigate = useNavigate();
@@ -46,7 +47,7 @@ export default function EditorPage() {
         );
         setCurrentScene(scene);
       }
-      
+
       // Load assets from filesystem
       await loadAssets();
     } catch (error) {
@@ -88,11 +89,11 @@ export default function EditorPage() {
     if (event) {
       const isCtrlOrCmd = event.ctrlKey || event.metaKey;
       const isShift = event.shiftKey;
-      
+
       if (isCtrlOrCmd || isShift) {
         // Multi-selection mode
         const isCurrentlySelected = selectedObjects.includes(objectId);
-        
+
         if (isShift && isCurrentlySelected) {
           // Shift + click on selected item = deselect
           selectObject(objectId, true); // This will toggle it off
@@ -137,7 +138,6 @@ export default function EditorPage() {
 
   return (
     <div className="relative h-screen overflow-hidden">
-
       {/* Full-width Viewport */}
       <Viewport
         scene={currentScene}
@@ -162,10 +162,7 @@ export default function EditorPage() {
       />
 
       {/* Floating Right Panel */}
-      <RightPanel
-        scene={currentScene}
-        selectedObjects={selectedObjects}
-      />
+      <RightPanel scene={currentScene} selectedObjects={selectedObjects} />
 
       {/* Floating Panels */}
       <MaterialBrowser />

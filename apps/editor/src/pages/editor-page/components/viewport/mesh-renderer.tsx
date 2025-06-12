@@ -3,6 +3,7 @@ import React from "react";
 import { BoxHelper } from "three/webgpu";
 import { getGeometryComponent } from "./geometry-components";
 import { MaterialRenderer } from "./material-compatibility";
+import { ModelRenderer } from "./model-renderer";
 
 interface ComponentRendererProps {
   component: GameObjectComponent;
@@ -24,6 +25,11 @@ export function MeshRenderer({
   } = component.properties;
 
   if (!component.enabled) return <>{children}</>;
+
+  // Handle external models (GLB/GLTF files)
+  if (geometry === "external" || geometryProps.assetId || geometryProps.assetPath) {
+    return <ModelRenderer component={component}>{children}</ModelRenderer>;
+  }
 
   const GeometryComponent = getGeometryComponent(geometry);
 

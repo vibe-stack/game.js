@@ -1,16 +1,4 @@
-import { 
-  Box, 
-  Circle, 
-  Square,
-  Cylinder,
-  Cone,
-  Hexagon,
-  Diamond,
-  Octagon,
-  Triangle,
-  Shapes,
-  Route
-} from "lucide-react";
+import { Box, RectangleHorizontal, Cylinder, Cone, Circle, Hexagon, Octagon, Triangle, Shapes, Route, Boxes } from "lucide-react";
 import { generateHeightfieldData } from "@/utils/heightfield-generator";
 
 export const geometryTemplates = [
@@ -103,7 +91,7 @@ export const geometryTemplates = [
     id: 'plane',
     name: 'Plane',
     description: 'PlaneGeometry - A flat rectangular surface',
-    icon: Square,
+    icon: RectangleHorizontal,
     template: {
       transform: {
         position: { x: 0, y: 0, z: 0 },
@@ -473,7 +461,7 @@ export const geometryTemplates = [
     id: 'icosahedron',
     name: 'Icosahedron',
     description: 'IcosahedronGeometry - An icosahedron mesh',
-    icon: Diamond,
+    icon: Octagon,
     template: {
       transform: {
         position: { x: 0, y: 0, z: 0 },
@@ -721,6 +709,47 @@ export const geometryTemplates = [
       ],
       visible: true,
       tags: ['geometry'],
+      layer: 0
+    }
+  },
+  {
+    id: 'model',
+    name: 'Model',
+    description: 'External 3D model (GLB/GLTF)',
+    icon: Boxes,
+    template: {
+      transform: {
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 }
+      },
+      components: [
+        {
+          id: 'mesh-component',
+          type: 'Mesh',
+          enabled: true,
+          properties: {
+            geometry: 'external',
+            geometryProps: {
+              assetId: '',
+              scale: { x: 1, y: 1, z: 1 }
+            },
+            materialRef: {
+              type: 'inline',
+              properties: {
+                type: 'standard',
+                color: '#ffffff',
+                metalness: 0.1,
+                roughness: 0.3
+              }
+            },
+            castShadow: true,
+            receiveShadow: true
+          }
+        }
+      ],
+      visible: true,
+      tags: ['geometry', 'model'],
       layer: 0
     }
   }

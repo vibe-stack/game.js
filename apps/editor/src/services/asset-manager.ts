@@ -1,8 +1,88 @@
 import { dialog } from "electron";
 import fs from "fs/promises";
 import path from "path";
+import express, { Request, Response, NextFunction } from "express";
+import { createServer } from "http";
 
 export class AssetManager {
+  private assetServer: any = null;
+  private assetServerPort: number = 0;
+
+  private async startAssetServer(projectPath: string): Promise<number> {
+    if (this.assetServer) {
+      return this.assetServerPort;
+    }
+
+    const app = express();
+    
+    // Serve assets directory with CORS headers
+    app.use('/assets', (req: Request, res: Response, next: NextFunction) => {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET');
+      res.header('Access-Control-Allow-Headers', 'Content-Type');
+      next();
+    }, express.static(path.join(projectPath, 'assets')));
+
+    const server = createServer(app);
+    
+    // Find available port
+    const port = await new Promise<number>((resolve) => {
+      server.listen(0, () => {
+        const address = server.address();
+        if (address && typeof address === 'object') {
+          resolve(address.port);
+        } else {
+          resolve(3001); // fallback
+        }
+      });
+    });
+
+    this.assetServer = server;
+    this.assetServerPort = port;
+    
+    console.log(`Asset server started on port ${port}`);
+    return port;
+  }
+
+  private stopAssetServer() {
+    if (this.assetServer) {
+      this.assetServer.close();
+      this.assetServer = null;
+      this.assetServerPort = 0;
+      console.log('Asset server stopped');
+    }
+  }
+
+  async getAssetUrl(projectPath: string, assetPath: string): Promise<string | null> {
+    try {
+      const fullAssetPath = path.resolve(projectPath, assetPath);
+      const projectDir = path.resolve(projectPath);
+
+      if (!fullAssetPath.startsWith(projectDir)) {
+        throw new Error("Asset path is outside project directory");
+      }
+
+      if (!(await this.fileExists(fullAssetPath))) {
+        console.warn("Asset file does not exist:", fullAssetPath);
+        return null;
+      }
+
+      const extension = path.extname(assetPath).toLowerCase();
+      
+      // For multi-file formats like GLTF, use HTTP server
+      if (extension === '.gltf') {
+        const port = await this.startAssetServer(projectPath);
+        return `http://localhost:${port}/${assetPath}`;
+      }
+      
+      // For single-file formats like GLB, use data URL (existing behavior)
+      return this.getAssetDataUrl(projectPath, assetPath);
+    } catch (error) {
+      console.error("Error getting asset URL:", error);
+      return null;
+    }
+  }
+
   async selectAssetFiles(): Promise<string[]> {
     const result = await dialog.showOpenDialog({
       properties: ["openFile", "multiSelections"],
@@ -20,6 +100,7 @@ export class AssetManager {
             "exr",
             "glb",
             "gltf",
+            ".bin",
             "fbx",
             "obj",
             "dae",

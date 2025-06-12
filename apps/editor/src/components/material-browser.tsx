@@ -375,7 +375,7 @@ export default function MaterialBrowser() {
   return (
     <div 
       ref={dragRef}
-      className="fixed z-50 bg-background/98 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl ring-1 ring-black/5 dark:ring-white/5"
+      className="fixed z-50 bg-background/50 backdrop-blur-md border border-border/50 rounded-xl shadow-2xl ring-1 ring-black/5 dark:ring-white/5"
       style={{ 
         left: position.x, 
         top: position.y,
@@ -506,7 +506,7 @@ export default function MaterialBrowser() {
         </div>
 
         {/* Right Panel - Material Editor */}
-        <div className="flex-1 flex flex-col bg-background">
+        <div className="flex-1 flex flex-col bg-background/20">
           {selectedMaterial ? (
             <>
               {/* Preview Section */}
@@ -586,6 +586,23 @@ export default function MaterialBrowser() {
                           />
                         </div>
                       </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-muted-foreground">Side Rendering</Label>
+                        <Select
+                          value={String((selectedMaterial.properties as any).side || 0)}
+                          onValueChange={(value) => updateMaterialProperty('side', parseInt(value))}
+                        >
+                          <SelectTrigger className="bg-background border-border/30">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">Front Side Only</SelectItem>
+                            <SelectItem value="1">Back Side Only</SelectItem>
+                            <SelectItem value="2">Both Sides (Double)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
 
                     {(selectedMaterial.properties.type === 'standard' || 
@@ -654,7 +671,7 @@ export default function MaterialBrowser() {
                             checked={uvScalesLocked}
                             onCheckedChange={setUvScalesLocked}
                           />
-                          <Label className="text-sm font-medium">Lock UV Scales</Label>
+                          <Label className="text-sm font-medium">Lock UV Transforms</Label>
                         </div>
                       </div>
                       
@@ -677,7 +694,7 @@ export default function MaterialBrowser() {
                               }}
                               step={0.1}
                               precision={2}
-                              min={0.01}
+                              min={-10}
                               max={10}
                             />
                             <DragInput
@@ -694,8 +711,46 @@ export default function MaterialBrowser() {
                               }}
                               step={0.1}
                               precision={2}
-                              min={0.01}
+                              min={-10}
                               max={10}
+                            />
+                          </div>
+                          
+                          <Label className="text-sm font-semibold text-foreground">Global UV Offset</Label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <DragInput
+                              label="Offset X"
+                              value={getTextureProperty('color', 'offset')?.x || 0}
+                              onChange={(value) => {
+                                const newOffset = { 
+                                  x: value, 
+                                  y: getTextureProperty('color', 'offset')?.y || 0 
+                                };
+                                selectedMaterial.textures?.forEach(tex => {
+                                  updateTextureProperty(tex.type, 'offset', newOffset);
+                                });
+                              }}
+                              step={0.01}
+                              precision={3}
+                              min={-2}
+                              max={2}
+                            />
+                            <DragInput
+                              label="Offset Y"
+                              value={getTextureProperty('color', 'offset')?.y || 0}
+                              onChange={(value) => {
+                                const newOffset = { 
+                                  x: getTextureProperty('color', 'offset')?.x || 0, 
+                                  y: value 
+                                };
+                                selectedMaterial.textures?.forEach(tex => {
+                                  updateTextureProperty(tex.type, 'offset', newOffset);
+                                });
+                              }}
+                              step={0.01}
+                              precision={3}
+                              min={-2}
+                              max={2}
                             />
                           </div>
                         </div>
@@ -750,6 +805,30 @@ export default function MaterialBrowser() {
                                 precision={2}
                                 min={0.01}
                                 max={10}
+                              />
+                              <DragInput
+                                label="Offset X"
+                                value={getTextureProperty('color', 'offset')?.x || 0}
+                                onChange={(value) => updateTextureProperty('color', 'offset', { 
+                                  x: value, 
+                                  y: getTextureProperty('color', 'offset')?.y || 0 
+                                })}
+                                step={0.01}
+                                precision={3}
+                                min={-2}
+                                max={2}
+                              />
+                              <DragInput
+                                label="Offset Y"
+                                value={getTextureProperty('color', 'offset')?.y || 0}
+                                onChange={(value) => updateTextureProperty('color', 'offset', { 
+                                  x: getTextureProperty('color', 'offset')?.x || 0, 
+                                  y: value 
+                                })}
+                                step={0.01}
+                                precision={3}
+                                min={-2}
+                                max={2}
                               />
                             </div>
                           )}
@@ -813,6 +892,30 @@ export default function MaterialBrowser() {
                                     precision={2}
                                     min={0.01}
                                     max={10}
+                                  />
+                                  <DragInput
+                                    label="Offset X"
+                                    value={getTextureProperty('normal', 'offset')?.x || 0}
+                                    onChange={(value) => updateTextureProperty('normal', 'offset', { 
+                                      x: value, 
+                                      y: getTextureProperty('normal', 'offset')?.y || 0 
+                                    })}
+                                    step={0.01}
+                                    precision={3}
+                                    min={-2}
+                                    max={2}
+                                  />
+                                  <DragInput
+                                    label="Offset Y"
+                                    value={getTextureProperty('normal', 'offset')?.y || 0}
+                                    onChange={(value) => updateTextureProperty('normal', 'offset', { 
+                                      x: getTextureProperty('normal', 'offset')?.x || 0, 
+                                      y: value 
+                                    })}
+                                    step={0.01}
+                                    precision={3}
+                                    min={-2}
+                                    max={2}
                                   />
                                 </div>
                               )}
@@ -887,6 +990,30 @@ export default function MaterialBrowser() {
                                     precision={2}
                                     min={0.01}
                                     max={10}
+                                  />
+                                  <DragInput
+                                    label="Offset X"
+                                    value={getTextureProperty('displacement', 'offset')?.x || 0}
+                                    onChange={(value) => updateTextureProperty('displacement', 'offset', { 
+                                      x: value, 
+                                      y: getTextureProperty('displacement', 'offset')?.y || 0 
+                                    })}
+                                    step={0.01}
+                                    precision={3}
+                                    min={-2}
+                                    max={2}
+                                  />
+                                  <DragInput
+                                    label="Offset Y"
+                                    value={getTextureProperty('displacement', 'offset')?.y || 0}
+                                    onChange={(value) => updateTextureProperty('displacement', 'offset', { 
+                                      x: getTextureProperty('displacement', 'offset')?.x || 0, 
+                                      y: value 
+                                    })}
+                                    step={0.01}
+                                    precision={3}
+                                    min={-2}
+                                    max={2}
                                   />
                                 </div>
                               )}

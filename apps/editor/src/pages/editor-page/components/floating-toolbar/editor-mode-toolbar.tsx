@@ -20,7 +20,7 @@ import {
 import useEditorStore from "@/stores/editor-store";
 
 export default function EditorModeToolbar() {
-  const { editorMode, setEditorMode, currentScene, viewportMode, setViewportMode } = useEditorStore();
+  const { editorMode, setEditorMode, currentScene, viewportMode, setViewportMode, physicsState } = useEditorStore();
   const [cameras, setCameras] = useState<GameObject[]>([]);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -228,7 +228,13 @@ export default function EditorModeToolbar() {
         {viewportMode === 'orbit' ? <Navigation size={16} /> : <MousePointer2 size={16} />}
       </Button>
     </div>
-     <div className="flex items-center gap-1 p-1 rounded-lg border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-lg">
+    <div 
+      className={`flex items-center gap-1 p-1 rounded-lg border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-lg transition-all duration-300 ease-in-out ${
+        physicsState === 'playing' 
+          ? 'opacity-0 scale-95 pointer-events-none' 
+          : 'opacity-100 scale-100'
+      }`}
+    >
       <Button
         size="sm"
         variant={editorMode === "select" ? "default" : "ghost"}

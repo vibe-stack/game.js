@@ -120,9 +120,9 @@ export function MaterialRenderer({ component, renderType = "solid" }: MaterialRe
           ...materialRef,
           properties: {
             ...materialRef.properties,
-            envMapIntensity: materialRef.properties?.envMapIntensity || 1,
-            metalness: materialRef.properties?.metalness || 0.1,
-            roughness: materialRef.properties?.roughness || 0.3,
+            envMapIntensity: materialRef.properties?.envMapIntensity,
+            metalness: materialRef.properties?.metalness,
+            roughness: materialRef.properties?.roughness,
           }
         };
       }
