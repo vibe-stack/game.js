@@ -7,7 +7,6 @@ import LeftPanel from "./components/left-panel";
 import RightPanel from "./components/right-panel";
 import FloatingToolbar from "./components/floating-toolbar";
 import MaterialBrowser from "@/components/material-browser";
-import { GlassContainer } from "@/components/ui/glass-container";
 
 export default function EditorPage() {
   const navigate = useNavigate();

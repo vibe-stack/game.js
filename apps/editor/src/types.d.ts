@@ -446,6 +446,13 @@ interface DevServerInfo {
   url?: string;
 }
 
+interface ConfigAPI {
+  readConfigFile: (filePath: string) => Promise<any>;
+  writeConfigFile: (filePath: string, content: any) => Promise<boolean>;
+  installPackages: (projectPath: string, packageManager: string, packages?: string[]) => Promise<{ success: boolean; output: string }>;
+  getPackageInfo: (projectPath: string) => Promise<{ hasPackageJson: boolean; suggestedPackageManager: string }>;
+}
+
 interface ThemeModeContext {
   toggle: () => void;
   dark: () => void;
@@ -507,6 +514,7 @@ declare interface Window {
   themeMode: ThemeModeContext;
   electronWindow: ElectronWindow;
   projectAPI: ProjectAPI;
+  configAPI: ConfigAPI;
 }
 
 // Enhanced Material System with TSL Support
