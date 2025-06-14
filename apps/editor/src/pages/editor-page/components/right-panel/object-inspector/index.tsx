@@ -11,7 +11,14 @@ interface ObjectInspectorProps {
 }
 
 export default function ObjectInspector({ scene, selectedObjects }: ObjectInspectorProps) {
-  const { updateObject, updateObjectTransform, updateObjectComponent, addObjectComponent } = useEditorStore();
+  const { 
+    selectedObjectData, 
+    gameWorld,
+    updateObject, 
+    updateObjectTransform, 
+    updateObjectComponent, 
+    addObjectComponent 
+  } = useEditorStore();
 
   if (selectedObjects.length === 0) {
     return (
@@ -21,31 +28,36 @@ export default function ObjectInspector({ scene, selectedObjects }: ObjectInspec
     );
   }
 
-  const getSelectedObject = (objectId: string): GameObject | null => {
-    if (!scene) return null;
-    
-    const findObject = (objects: GameObject[]): GameObject | null => {
-      for (const obj of objects) {
-        if (obj.id === objectId) return obj;
-        const found = findObject(obj.children);
-        if (found) return found;
-      }
-      return null;
-    };
-    
-    return findObject(scene.objects);
-  };
-
   const handleObjectUpdate = (objectId: string, updates: Partial<GameObject>) => {
-    updateObject(objectId, updates);
+    // Delegate to GameWorld for immediate updates
+    if (gameWorld) {
+      Object.keys(updates).forEach(key => {
+        gameWorld.updateObjectProperty(objectId, key, (updates as any)[key]);
+      });
+    } else {
+      // Fallback to store if GameWorld not available
+      updateObject(objectId, updates);
+    }
   };
 
   const handleTransformUpdate = (objectId: string, transform: Partial<Transform>) => {
-    updateObjectTransform(objectId, transform);
+    // Delegate to GameWorld for immediate updates
+    if (gameWorld) {
+      gameWorld.updateObjectTransform(objectId, transform);
+    } else {
+      // Fallback to store if GameWorld not available
+      updateObjectTransform(objectId, transform);
+    }
   };
 
   const handleComponentUpdate = (objectId: string, componentId: string, updates: Partial<GameObjectComponent | PhysicsComponent>) => {
-    updateObjectComponent(objectId, componentId, updates);
+    // Delegate to GameWorld for immediate updates
+    if (gameWorld) {
+      gameWorld.updateObjectComponent(objectId, componentId, updates);
+    } else {
+      // Fallback to store if GameWorld not available
+      updateObjectComponent(objectId, componentId, updates);
+    }
   };
 
   const handleAddComponent = (objectId: string, component: GameObjectComponent | PhysicsComponent) => {
@@ -53,8 +65,15 @@ export default function ObjectInspector({ scene, selectedObjects }: ObjectInspec
   };
 
   if (selectedObjects.length === 1) {
-    const obj = getSelectedObject(selectedObjects[0]);
-    if (!obj) return null;
+    // Use the snapshot from the store for single selection
+    const obj = selectedObjectData;
+    if (!obj) {
+      return (
+        <div className="p-4 text-center text-muted-foreground">
+          Object not found
+        </div>
+      );
+    }
 
     return (
       <div className="max-h-[calc(90vh-10rem)] overflow-y-auto">
@@ -92,6 +111,27 @@ export default function ObjectInspector({ scene, selectedObjects }: ObjectInspec
     );
   }
 
+  // Multi-selection handling - get objects from GameWorld if available
+  const getSelectedObject = (objectId: string): GameObject | null => {
+    if (gameWorld) {
+      return gameWorld.getObject(objectId);
+    }
+    
+    // Fallback to scene search if GameWorld not available
+    if (!scene) return null;
+    
+    const findObject = (objects: GameObject[]): GameObject | null => {
+      for (const obj of objects) {
+        if (obj.id === objectId) return obj;
+        const found = findObject(obj.children);
+        if (found) return found;
+      }
+      return null;
+    };
+    
+    return findObject(scene.objects);
+  };
+
   // Multi-selection handling
   return (
     <div className="p-4 space-y-4">
@@ -109,6 +149,10 @@ export default function ObjectInspector({ scene, selectedObjects }: ObjectInspec
             </div>
           ) : null;
         })}
+      </div>
+      
+      <div className="text-xs text-muted-foreground mt-4">
+        Multi-selection editing coming soon
       </div>
     </div>
   );

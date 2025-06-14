@@ -27,11 +27,11 @@ interface GameObjectComponent {
 
 // Physics Types for Rapier3D Integration
 
-type RigidBodyType = 'dynamic' | 'static' | 'kinematic';
+type RigidBodyType = "dynamic" | "static" | "kinematic";
 
 interface RigidBodyComponent {
   id: string;
-  type: 'rigidBody';
+  type: "rigidBody";
   enabled: boolean;
   properties: {
     bodyType: RigidBodyType;
@@ -61,21 +61,21 @@ interface RigidBodyComponent {
   };
 }
 
-type ColliderShape = 
-  | { type: 'box'; halfExtents: Vector3 }
-  | { type: 'sphere'; radius: number }
-  | { type: 'capsule'; halfHeight: number; radius: number }
-  | { type: 'cylinder'; height: number; radius: number }
-  | { type: 'cone'; height: number; radius: number }
-  | { type: 'convexHull'; vertices: Vector3[] }
-  | { type: 'trimesh'; vertices: Vector3[]; indices: number[] }
-  | { type: 'heightfield'; heights: number[][]; scale: Vector3 };
+type ColliderShape =
+  | { type: "box"; halfExtents: Vector3 }
+  | { type: "sphere"; radius: number }
+  | { type: "capsule"; halfHeight: number; radius: number }
+  | { type: "cylinder"; height: number; radius: number }
+  | { type: "cone"; height: number; radius: number }
+  | { type: "convexHull"; vertices: Vector3[] }
+  | { type: "trimesh"; vertices: Vector3[]; indices: number[] }
+  | { type: "heightfield"; heights: number[][]; scale: Vector3 };
 
 interface PhysicsMaterial {
   friction: number;
   restitution: number;
-  frictionCombineRule: 'average' | 'min' | 'multiply' | 'max';
-  restitutionCombineRule: 'average' | 'min' | 'multiply' | 'max';
+  frictionCombineRule: "average" | "min" | "multiply" | "max";
+  restitutionCombineRule: "average" | "min" | "multiply" | "max";
 }
 
 interface CollisionGroups {
@@ -85,7 +85,7 @@ interface CollisionGroups {
 
 interface ColliderComponent {
   id: string;
-  type: 'collider';
+  type: "collider";
   enabled: boolean;
   properties: {
     shape: ColliderShape;
@@ -104,18 +104,18 @@ interface ColliderComponent {
       contactForceEvents: boolean;
     };
     contactForceEventThreshold: number;
-    massModification: 'density' | 'mass' | 'massProps';
+    massModification: "density" | "mass" | "massProps";
   };
 }
 
-type JointType = 
-  | 'fixed'
-  | 'revolute' 
-  | 'prismatic'
-  | 'spherical'
-  | 'rope'
-  | 'spring'
-  | 'generic';
+type JointType =
+  | "fixed"
+  | "revolute"
+  | "prismatic"
+  | "spherical"
+  | "rope"
+  | "spring"
+  | "generic";
 
 interface JointLimits {
   min: number;
@@ -132,7 +132,7 @@ interface JointMotor {
 
 interface JointComponent {
   id: string;
-  type: 'joint';
+  type: "joint";
   enabled: boolean;
   properties: {
     jointType: JointType;
@@ -165,20 +165,53 @@ interface JointComponent {
   };
 }
 
-type PhysicsComponent = RigidBodyComponent | ColliderComponent | JointComponent | HeightfieldComponent | ExtrudedArcComponent;
+interface ScriptComponent {
+  id: string;
+  type: "script";
+  enabled: boolean;
+  properties: {
+    scriptPath: string; // relative path to the script file from project root
+    autoStart: boolean; // Whether to automatically start the script when the entity is created
+    // Parameters that can be passed to the script
+    parameters: Record<string, {
+      type: "string" | "number" | "boolean" | "vector3" | "gameobject" | "asset";
+      value: any;
+      description?: string;
+    }>;
+    // Event handlers that the script can listen to
+    eventHandlers: {
+      init?: boolean;
+      update?: boolean;
+      lateUpdate?: boolean;
+      fixedUpdate?: boolean;
+      destroy?: boolean;
+    };
+    // Script-specific configuration
+    timeScale: number; // Time scale multiplier for this script
+    debugMode: boolean; // Enable debug logging for this script
+  };
+}
+
+type PhysicsComponent =
+  | RigidBodyComponent
+  | ColliderComponent
+  | JointComponent
+  | ScriptComponent
+  | HeightfieldComponent
+  | ExtrudedArcComponent;
 
 // Heightfield Component for Terrain Generation
 
-type HeightfieldGenerationAlgorithm = 
-  | 'perlin'
-  | 'simplex' 
-  | 'ridged'
-  | 'fbm' // Fractal Brownian Motion
-  | 'voronoi'
-  | 'diamond-square'
-  | 'random'
-  | 'flat'
-  | 'custom'; // for user-provided height data
+type HeightfieldGenerationAlgorithm =
+  | "perlin"
+  | "simplex"
+  | "ridged"
+  | "fbm" // Fractal Brownian Motion
+  | "voronoi"
+  | "diamond-square"
+  | "random"
+  | "flat"
+  | "custom"; // for user-provided height data
 
 interface HeightfieldNoiseSettings {
   frequency: number;
@@ -202,60 +235,60 @@ interface HeightfieldLODSettings {
 
 interface HeightfieldComponent {
   id: string;
-  type: 'heightfield';
+  type: "heightfield";
   enabled: boolean;
   properties: {
     // Dimensions
     width: number; // world units (X axis)
-    depth: number; // world units (Z axis)  
+    depth: number; // world units (Z axis)
     rows: number; // number of height samples along depth (Z)
     columns: number; // number of height samples along width (X)
-    
+
     // Elevation
     minElevation: number;
     maxElevation: number;
-    
+
     // Generation
     algorithm: HeightfieldGenerationAlgorithm;
     seed: number;
-    
+
     // Algorithm-specific parameters
     noise: HeightfieldNoiseSettings;
-    
+
     // For custom heightfields
     customHeights?: number[][];
-    
+
     // Generated data (computed from parameters)
     heights: number[][]; // [row][column] = elevation value
-    
+
     // Visual properties
     displacementScale: number; // Multiplier for displacement mapping
     smoothing: boolean; // Apply smoothing filter to generated heights
     wireframe: boolean; // Render as wireframe for debugging
-    
+
     // LOD settings for performance
     lod: HeightfieldLODSettings;
-    
+
     // Texture coordinate scaling
     uvScale: Vector2; // How many times to tile textures across the heightfield
-    
+
     // Auto-regeneration
     autoRegenerate: boolean; // Regenerate when parameters change
     lastGenerated: Date; // Timestamp of last generation
-    
+
     // Material system (same as mesh components)
     materialRef?: {
-      type: 'library' | 'inline';
+      type: "library" | "inline";
       materialId?: string;
       properties?: any;
     };
     textures?: Record<string, string>;
     uniforms?: Record<string, any>;
-    
+
     // Legacy material support for compatibility
     material?: string;
     materialProps?: Record<string, any>;
-    
+
     // Rendering properties
     castShadow?: boolean;
     receiveShadow?: boolean;
@@ -267,7 +300,7 @@ interface HeightfieldComponent {
 
 interface ExtrudedArcComponent {
   id: string;
-  type: 'extrudedArc';
+  type: "extrudedArc";
   enabled: boolean;
   properties: {
     // Arc geometry parameters
@@ -279,32 +312,32 @@ interface ExtrudedArcComponent {
     angle: number; // Angular span in radians (0 to 2π for full circle)
     segments: number; // Number of segments for smoothness
     closed: boolean; // Whether to create a closed loop regardless of angle
-    
+
     // Cross-section parameters
     crossSectionSegments: number; // Segments across width
     extrusionSegments: number; // Segments along height
-    
+
     // UV mapping
     uvScale: Vector2; // UV texture coordinate scaling
     flipUVs: boolean; // Flip UV coordinates
-    
+
     // Auto-regeneration
     autoRegenerate: boolean; // Regenerate when parameters change
     lastGenerated: Date; // Timestamp of last generation
-    
+
     // Material system (same as mesh components)
     materialRef?: {
-      type: 'library' | 'inline';
+      type: "library" | "inline";
       materialId?: string;
       properties?: any;
     };
     textures?: Record<string, string>;
     uniforms?: Record<string, any>;
-    
+
     // Legacy material support for compatibility
     material?: string;
     materialProps?: Record<string, any>;
-    
+
     // Rendering properties
     castShadow?: boolean;
     receiveShadow?: boolean;
@@ -360,7 +393,7 @@ interface GameObject {
 
 interface AssetReference {
   id: string;
-  type: 'texture' | 'model' | 'audio' | 'script' | 'shader' | 'material';
+  type: "texture" | "model" | "audio" | "script" | "shader" | "material";
   path: string;
   name: string;
 }
@@ -368,7 +401,7 @@ interface AssetReference {
 interface EditorConfig {
   appTitle: string;
   shortcuts: Record<string, string>;
-  theme: 'light' | 'dark' | 'system';
+  theme: "light" | "dark" | "system";
   autoSave: boolean;
   autoSaveInterval: number;
   gridSize: number;
@@ -383,7 +416,7 @@ interface SceneEditorConfig {
   showHelperGrid: boolean;
   gridSize: number;
   backgroundColor: string;
-  renderType: 'solid' | 'wireframe' | 'normals' | 'realistic';
+  renderType: "solid" | "wireframe" | "normals" | "realistic";
   showLights: boolean;
   showCameras: boolean;
   enableFog: boolean;
@@ -396,10 +429,10 @@ interface SceneRuntimeConfig {
   backgroundColor: string;
   environment: string;
   shadowsEnabled: boolean;
-  shadowType: 'basic' | 'pcf' | 'pcfsoft' | 'vsm';
+  shadowType: "basic" | "pcf" | "pcfsoft" | "vsm";
   antialias: boolean;
   physicallyCorrectLights: boolean;
-  toneMapping: 'none' | 'linear' | 'reinhard' | 'cineon' | 'aces';
+  toneMapping: "none" | "linear" | "reinhard" | "cineon" | "aces";
   exposure: number;
 }
 
@@ -449,8 +482,23 @@ interface DevServerInfo {
 interface ConfigAPI {
   readConfigFile: (filePath: string) => Promise<any>;
   writeConfigFile: (filePath: string, content: any) => Promise<boolean>;
-  installPackages: (projectPath: string, packageManager: string, packages?: string[]) => Promise<{ success: boolean; output: string }>;
-  getPackageInfo: (projectPath: string) => Promise<{ hasPackageJson: boolean; suggestedPackageManager: string }>;
+  installPackages: (
+    projectPath: string,
+    packageManager: string,
+    packages?: string[],
+  ) => Promise<{ success: boolean; output: string }>;
+  getPackageInfo: (
+    projectPath: string,
+  ) => Promise<{ hasPackageJson: boolean; suggestedPackageManager: string }>;
+}
+
+interface ScriptAPI {
+  startWatching: (projectPath: string) => Promise<boolean>;
+  stopWatching: (projectPath: string) => Promise<boolean>;
+  compileScript: (projectPath: string, scriptPath: string) => Promise<{ success: boolean; outputPath?: string; error?: string }>;
+  getCompiledScripts: (projectPath: string) => Promise<Record<string, string>>;
+  getCompilationStatus: (projectPath: string) => Promise<{ isWatching: boolean; compiledCount: number; lastCompilation?: Date }>;
+  getImportMap: (projectPath: string) => Promise<Record<string, any> | null>;
 }
 
 interface ThemeModeContext {
@@ -470,35 +518,56 @@ interface ElectronWindow {
 interface ProjectAPI {
   // Project Management
   loadProjects: () => Promise<GameProject[]>;
-  createProject: (projectName: string, projectPath?: string) => Promise<GameProject>;
+  createProject: (
+    projectName: string,
+    projectPath?: string,
+  ) => Promise<GameProject>;
   openProject: (projectPath: string) => Promise<GameProject>;
   saveProject: (project: GameProject) => Promise<void>;
   deleteProject: (projectPath: string) => Promise<void>;
   openProjectFolder: (projectPath: string) => Promise<void>;
   selectProjectDirectory: () => Promise<string | undefined>;
-  
+
   // Scene Management
   loadScene: (projectPath: string, sceneName: string) => Promise<GameScene>;
   saveScene: (projectPath: string, scene: GameScene) => Promise<void>;
   createScene: (projectPath: string, sceneName: string) => Promise<GameScene>;
   deleteScene: (projectPath: string, sceneName: string) => Promise<void>;
-  duplicateScene: (projectPath: string, sceneName: string, newName: string) => Promise<GameScene>;
+  duplicateScene: (
+    projectPath: string,
+    sceneName: string,
+    newName: string,
+  ) => Promise<GameScene>;
   listScenes: (projectPath: string) => Promise<string[]>;
-  
+
   // Asset Management
   selectAssetFiles: () => Promise<string[]>;
-  importAssetFromData: (projectPath: string, fileName: string, fileData: ArrayBuffer) => Promise<AssetReference>;
-  importAsset: (projectPath: string, assetPath: string) => Promise<AssetReference>;
+  importAssetFromData: (
+    projectPath: string,
+    fileName: string,
+    fileData: ArrayBuffer,
+  ) => Promise<AssetReference>;
+  importAsset: (
+    projectPath: string,
+    assetPath: string,
+  ) => Promise<AssetReference>;
   deleteAsset: (projectPath: string, assetId: string) => Promise<void>;
   getAssets: (projectPath: string) => Promise<AssetReference[]>;
-  getAssetDataUrl: (projectPath: string, assetPath: string) => Promise<string | null>;
-  getAssetUrl: (projectPath: string, assetPath: string) => Promise<string | null>;
-  
+  getAssetDataUrl: (
+    projectPath: string,
+    assetPath: string,
+  ) => Promise<string | null>;
+  getAssetUrl: (
+    projectPath: string,
+    assetPath: string,
+  ) => Promise<string | null>;
+  getAssetServerPort: (projectPath: string) => Promise<number>;
+
   // File System Operations
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   fileExists: (filePath: string) => Promise<boolean>;
-  
+
   // Legacy - keeping for backward compatibility
   installPackages: (projectName: string) => Promise<void>;
   startDevServer: (projectName: string) => Promise<DevServerInfo>;
@@ -506,7 +575,12 @@ interface ProjectAPI {
   isDevServerRunning: (projectName: string) => Promise<boolean>;
   getServerInfo: (projectName: string) => Promise<DevServerInfo | undefined>;
   connectToEditor: (projectName: string) => Promise<void>;
-  sendPropertyUpdate: (projectName: string, property: string, value: unknown, temporary?: boolean) => Promise<void>;
+  sendPropertyUpdate: (
+    projectName: string,
+    property: string,
+    value: unknown,
+    temporary?: boolean,
+  ) => Promise<void>;
   getSceneInfo: (projectName: string) => Promise<unknown>;
 }
 
@@ -515,25 +589,53 @@ declare interface Window {
   electronWindow: ElectronWindow;
   projectAPI: ProjectAPI;
   configAPI: ConfigAPI;
+  scriptAPI: ScriptAPI;
 }
 
 // Enhanced Material System with TSL Support
 
-type TextureType = 'color' | 'normal' | 'roughness' | 'metalness' | 'emissive' | 'ao' | 'displacement' | 'alpha' | 'environment' | 'lightmap' | 'bumpmap' | 'clearcoat' | 'clearcoat-normal' | 'clearcoat-roughness' | 'iridescence' | 'iridescence-thickness' | 'sheen' | 'specular-intensity' | 'specular-color' | 'transmission' | 'thickness';
+type TextureType =
+  | "color"
+  | "normal"
+  | "roughness"
+  | "metalness"
+  | "emissive"
+  | "ao"
+  | "displacement"
+  | "alpha"
+  | "environment"
+  | "lightmap"
+  | "bumpmap"
+  | "clearcoat"
+  | "clearcoat-normal"
+  | "clearcoat-roughness"
+  | "iridescence"
+  | "iridescence-thickness"
+  | "sheen"
+  | "specular-intensity"
+  | "specular-color"
+  | "transmission"
+  | "thickness";
 
 interface TextureReference {
   id: string;
   assetId: string; // Reference to AssetReference
   type: TextureType;
-  wrapS?: 'repeat' | 'clampToEdge' | 'mirroredRepeat';
-  wrapT?: 'repeat' | 'clampToEdge' | 'mirroredRepeat';
+  wrapS?: "repeat" | "clampToEdge" | "mirroredRepeat";
+  wrapT?: "repeat" | "clampToEdge" | "mirroredRepeat";
   repeat: Vector2;
   offset: Vector2;
   rotation: number;
   flipY: boolean;
   generateMipmaps: boolean;
-  minFilter?: 'nearest' | 'linear' | 'nearestMipmapNearest' | 'nearestMipmapLinear' | 'linearMipmapNearest' | 'linearMipmapLinear';
-  magFilter?: 'nearest' | 'linear';
+  minFilter?:
+    | "nearest"
+    | "linear"
+    | "nearestMipmapNearest"
+    | "nearestMipmapLinear"
+    | "linearMipmapNearest"
+    | "linearMipmapLinear";
+  magFilter?: "nearest" | "linear";
   anisotropy: number;
 }
 
@@ -544,25 +646,99 @@ interface Vector2 {
 
 // TSL Node System Types
 
-type TSLNodeType = 
+type TSLNodeType =
   // Input nodes
-  | 'uniform' | 'attribute' | 'varying' | 'texture' | 'cubeTexture' | 'time' | 'deltaTime' | 'frameId'
-  // Math nodes  
-  | 'add' | 'subtract' | 'multiply' | 'divide' | 'power' | 'sqrt' | 'sin' | 'cos' | 'tan' | 'atan2' | 'abs' | 'floor' | 'ceil' | 'round' | 'min' | 'max' | 'clamp' | 'saturate' | 'smoothstep' | 'step' | 'mix' | 'dot' | 'cross' | 'normalize' | 'length' | 'distance' | 'reflect' | 'refract' | 'faceforward'
+  | "uniform"
+  | "attribute"
+  | "varying"
+  | "texture"
+  | "cubeTexture"
+  | "time"
+  | "deltaTime"
+  | "frameId"
+  // Math nodes
+  | "add"
+  | "subtract"
+  | "multiply"
+  | "divide"
+  | "power"
+  | "sqrt"
+  | "sin"
+  | "cos"
+  | "tan"
+  | "atan2"
+  | "abs"
+  | "floor"
+  | "ceil"
+  | "round"
+  | "min"
+  | "max"
+  | "clamp"
+  | "saturate"
+  | "smoothstep"
+  | "step"
+  | "mix"
+  | "dot"
+  | "cross"
+  | "normalize"
+  | "length"
+  | "distance"
+  | "reflect"
+  | "refract"
+  | "faceforward"
   // UV and coordinate nodes
-  | 'uv' | 'screenUV' | 'worldUV' | 'matcap' | 'parallax' | 'rotate' | 'scale' | 'translate'
+  | "uv"
+  | "screenUV"
+  | "worldUV"
+  | "matcap"
+  | "parallax"
+  | "rotate"
+  | "scale"
+  | "translate"
   // Lighting nodes
-  | 'lambert' | 'phong' | 'physical' | 'toon' | 'fresnel' | 'rim'
+  | "lambert"
+  | "phong"
+  | "physical"
+  | "toon"
+  | "fresnel"
+  | "rim"
   // Utility nodes
-  | 'split' | 'join' | 'swizzle' | 'convert' | 'if' | 'switch' | 'loop'
+  | "split"
+  | "join"
+  | "swizzle"
+  | "convert"
+  | "if"
+  | "switch"
+  | "loop"
   // Noise and patterns
-  | 'noise' | 'fbm' | 'voronoi' | 'checker' | 'gradient' | 'stripes'
+  | "noise"
+  | "fbm"
+  | "voronoi"
+  | "checker"
+  | "gradient"
+  | "stripes"
   // Color nodes
-  | 'colorSpace' | 'hue' | 'saturation' | 'brightness' | 'contrast' | 'levels'
+  | "colorSpace"
+  | "hue"
+  | "saturation"
+  | "brightness"
+  | "contrast"
+  | "levels"
   // Output nodes
-  | 'output' | 'materialOutput';
+  | "output"
+  | "materialOutput";
 
-type TSLDataType = 'float' | 'vec2' | 'vec3' | 'vec4' | 'mat3' | 'mat4' | 'sampler2D' | 'samplerCube' | 'bool' | 'int';
+type TSLDataType =
+  | "float"
+  | "vec2"
+  | "vec3"
+  | "vec4"
+  | "mat3"
+  | "mat4"
+  | "sampler2D"
+  | "samplerCube"
+  | "bool"
+  | "int";
 
 interface TSLNodeInput {
   id: string;
@@ -652,7 +828,20 @@ interface TSLShaderGraph {
 
 // Material Type Definitions
 
-type MaterialType = 'basic' | 'lambert' | 'phong' | 'standard' | 'physical' | 'toon' | 'shader' | 'points' | 'line' | 'lineBasic' | 'lineDashed' | 'sprite' | 'shadow';
+type MaterialType =
+  | "basic"
+  | "lambert"
+  | "phong"
+  | "standard"
+  | "physical"
+  | "toon"
+  | "shader"
+  | "points"
+  | "line"
+  | "lineBasic"
+  | "lineDashed"
+  | "sprite"
+  | "shadow";
 
 // Base material properties that all materials share
 interface BaseMaterialProperties {
@@ -664,7 +853,7 @@ interface BaseMaterialProperties {
   visible: boolean;
   depthTest: boolean;
   depthWrite: boolean;
-  blending: 'normal' | 'additive' | 'subtractive' | 'multiply' | 'custom';
+  blending: "normal" | "additive" | "subtractive" | "multiply" | "custom";
   premultipliedAlpha: boolean;
   dithering: boolean;
   fog: boolean;
@@ -674,7 +863,7 @@ interface BaseMaterialProperties {
   clipIntersection: boolean;
   clipShadows: boolean;
   colorWrite: boolean;
-  precision?: 'lowp' | 'mediump' | 'highp';
+  precision?: "lowp" | "mediump" | "highp";
   polygonOffset: boolean;
   polygonOffsetFactor: number;
   polygonOffsetUnits: number;
@@ -690,7 +879,7 @@ interface BaseMaterialProperties {
 }
 
 interface BasicMaterialProperties extends BaseMaterialProperties {
-  type: 'basic';
+  type: "basic";
   color: string;
   map?: string; // TextureReference id
   lightMap?: string;
@@ -700,13 +889,13 @@ interface BasicMaterialProperties extends BaseMaterialProperties {
   specularMap?: string;
   alphaMap?: string;
   envMap?: string;
-  combine: 'multiply' | 'mix' | 'add';
+  combine: "multiply" | "mix" | "add";
   reflectivity: number;
   refractionRatio: number;
 }
 
 interface LambertMaterialProperties extends BaseMaterialProperties {
-  type: 'lambert';
+  type: "lambert";
   color: string;
   emissive: string;
   emissiveIntensity: number;
@@ -719,13 +908,13 @@ interface LambertMaterialProperties extends BaseMaterialProperties {
   specularMap?: string;
   alphaMap?: string;
   envMap?: string;
-  combine: 'multiply' | 'mix' | 'add';
+  combine: "multiply" | "mix" | "add";
   reflectivity: number;
   refractionRatio: number;
 }
 
 interface PhongMaterialProperties extends BaseMaterialProperties {
-  type: 'phong';
+  type: "phong";
   color: string;
   emissive: string;
   emissiveIntensity: number;
@@ -740,7 +929,7 @@ interface PhongMaterialProperties extends BaseMaterialProperties {
   bumpMap?: string;
   bumpScale: number;
   normalMap?: string;
-  normalMapType: 'tangentSpace' | 'objectSpace';
+  normalMapType: "tangentSpace" | "objectSpace";
   normalScale: Vector2;
   displacementMap?: string;
   displacementScale: number;
@@ -748,13 +937,13 @@ interface PhongMaterialProperties extends BaseMaterialProperties {
   specularMap?: string;
   alphaMap?: string;
   envMap?: string;
-  combine: 'multiply' | 'mix' | 'add';
+  combine: "multiply" | "mix" | "add";
   reflectivity: number;
   refractionRatio: number;
 }
 
 interface StandardMaterialProperties extends BaseMaterialProperties {
-  type: 'standard';
+  type: "standard";
   color: string;
   emissive: string;
   emissiveIntensity: number;
@@ -769,7 +958,7 @@ interface StandardMaterialProperties extends BaseMaterialProperties {
   bumpMap?: string;
   bumpScale: number;
   normalMap?: string;
-  normalMapType: 'tangentSpace' | 'objectSpace';
+  normalMapType: "tangentSpace" | "objectSpace";
   normalScale: Vector2;
   displacementMap?: string;
   displacementScale: number;
@@ -782,7 +971,7 @@ interface StandardMaterialProperties extends BaseMaterialProperties {
 }
 
 interface PhysicalMaterialProperties extends BaseMaterialProperties {
-  type: 'physical';
+  type: "physical";
   // Standard material properties
   color: string;
   emissive: string;
@@ -798,7 +987,7 @@ interface PhysicalMaterialProperties extends BaseMaterialProperties {
   bumpMap?: string;
   bumpScale: number;
   normalMap?: string;
-  normalMapType: 'tangentSpace' | 'objectSpace';
+  normalMapType: "tangentSpace" | "objectSpace";
   normalScale: Vector2;
   displacementMap?: string;
   displacementScale: number;
@@ -843,7 +1032,7 @@ interface PhysicalMaterialProperties extends BaseMaterialProperties {
 }
 
 interface ToonMaterialProperties extends BaseMaterialProperties {
-  type: 'toon';
+  type: "toon";
   color: string;
   emissive: string;
   emissiveIntensity: number;
@@ -852,7 +1041,7 @@ interface ToonMaterialProperties extends BaseMaterialProperties {
   bumpMap?: string;
   bumpScale: number;
   normalMap?: string;
-  normalMapType: 'tangentSpace' | 'objectSpace';
+  normalMapType: "tangentSpace" | "objectSpace";
   normalScale: Vector2;
   displacementMap?: string;
   displacementScale: number;
@@ -862,14 +1051,17 @@ interface ToonMaterialProperties extends BaseMaterialProperties {
 }
 
 interface ShaderMaterialProperties extends BaseMaterialProperties {
-  type: 'shader';
+  type: "shader";
   // TSL Shader Graph
   shaderGraph?: string; // TSLShaderGraph id
   // Traditional uniforms for fallback
-  uniforms: Record<string, {
-    type: TSLDataType;
-    value: any;
-  }>;
+  uniforms: Record<
+    string,
+    {
+      type: TSLDataType;
+      value: any;
+    }
+  >;
   vertexShader?: string; // GLSL fallback
   fragmentShader?: string; // GLSL fallback
   // Lighting model for shader materials
@@ -883,13 +1075,13 @@ interface ShaderMaterialProperties extends BaseMaterialProperties {
   };
 }
 
-type MaterialProperties = 
-  | BasicMaterialProperties 
-  | LambertMaterialProperties 
-  | PhongMaterialProperties 
-  | StandardMaterialProperties 
-  | PhysicalMaterialProperties 
-  | ToonMaterialProperties 
+type MaterialProperties =
+  | BasicMaterialProperties
+  | LambertMaterialProperties
+  | PhongMaterialProperties
+  | StandardMaterialProperties
+  | PhysicalMaterialProperties
+  | ToonMaterialProperties
   | ShaderMaterialProperties;
 
 // Centralized Material Definition
@@ -901,8 +1093,8 @@ interface MaterialDefinition {
   textures: TextureReference[];
   shaderGraphs: TSLShaderGraph[];
   previewSettings: {
-    geometry: 'sphere' | 'cube' | 'plane' | 'cylinder';
-    lighting: 'studio' | 'outdoor' | 'indoor' | 'custom';
+    geometry: "sphere" | "cube" | "plane" | "cylinder";
+    lighting: "studio" | "outdoor" | "indoor" | "custom";
     environment?: string; // HDRI environment map
   };
   metadata: {
@@ -935,9 +1127,9 @@ interface MaterialLibrary {
 interface EnhancedAssetReference extends AssetReference {
   // For texture assets
   textureProperties?: {
-    format: 'RGB' | 'RGBA' | 'RGBE' | 'RGBM' | 'sRGB' | 'Linear';
-    type: 'UnsignedByte' | 'Float' | 'HalfFloat';
-    colorSpace: 'sRGB' | 'Linear' | 'Rec2020' | 'DisplayP3';
+    format: "RGB" | "RGBA" | "RGBE" | "RGBM" | "sRGB" | "Linear";
+    type: "UnsignedByte" | "Float" | "HalfFloat";
+    colorSpace: "sRGB" | "Linear" | "Rec2020" | "DisplayP3";
     flipY: boolean;
     generateMipmaps: boolean;
     premultiplyAlpha: boolean;
@@ -945,7 +1137,7 @@ interface EnhancedAssetReference extends AssetReference {
   };
   // For model assets
   modelProperties?: {
-    format: 'GLTF' | 'GLB' | 'FBX' | 'OBJ' | 'DAE' | 'PLY' | 'STL';
+    format: "GLTF" | "GLB" | "FBX" | "OBJ" | "DAE" | "PLY" | "STL";
     animations: string[];
     materials: string[];
     textures: string[];

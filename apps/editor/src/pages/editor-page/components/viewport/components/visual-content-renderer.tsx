@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { renderComponent } from "../component-renderers";
 import { EmptyObjectHelper } from "../custom-helpers";
-import SceneObject from "../scene-object";
+import SceneObject from "../scene-object-new";
 
 interface VisualContentRendererProps {
   components: GameObjectComponent[];
@@ -27,7 +27,7 @@ const VisualContentRenderer: React.FC<VisualContentRendererProps> = ({
     children.map((child) => (
       <SceneObject
         key={child.id}
-        obj={child}
+        objectId={child.id}
         selectedObjects={selectedObjects}
         onSelect={onSelect}
         renderType={renderType as any}

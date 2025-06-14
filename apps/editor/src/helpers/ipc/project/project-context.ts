@@ -46,6 +46,8 @@ export function exposeProjectContext() {
       ipcRenderer.invoke("project:get-asset-data-url", projectPath, assetPath),
     getAssetUrl: (projectPath: string, assetPath: string) => 
       ipcRenderer.invoke("project:get-asset-url", projectPath, assetPath),
+    getAssetServerPort: (projectPath: string) => 
+      ipcRenderer.invoke("project:get-asset-server-port", projectPath),
     
     // File System Operations
     readFile: (filePath: string) => 

@@ -126,6 +126,7 @@ export class ProjectManager {
     // Write files
     await this.saveProjectConfig(projectPath, project);
     await this.savePackageJson(projectPath, project.packageJson);
+    await this.saveTsConfig(projectPath);
 
     return project;
   }
@@ -176,6 +177,51 @@ export class ProjectManager {
     const packageJsonPath = path.join(projectPath, "package.json");
     const packageJsonContent = JSON.stringify(packageJsonData, null, 2);
     await fs.writeFile(packageJsonPath, packageJsonContent, "utf-8");
+  }
+
+  private async saveTsConfig(projectPath: string): Promise<void> {
+    const tsConfigPath = path.join(projectPath, "tsconfig.json");
+    const tsConfig = this.createTsConfig();
+    const tsConfigContent = JSON.stringify(tsConfig, null, 2);
+    await fs.writeFile(tsConfigPath, tsConfigContent, "utf-8");
+  }
+
+  private createTsConfig() {
+    return {
+      compilerOptions: {
+        target: "ES2020",
+        module: "ESNext",
+        moduleResolution: "bundler",
+        allowImportingTsExtensions: true,
+        resolveJsonModule: true,
+        isolatedModules: true,
+        noEmit: true,
+        jsx: "preserve",
+        strict: true,
+        noUnusedLocals: false,
+        noUnusedParameters: false,
+        noFallthroughCasesInSwitch: true,
+        skipLibCheck: true,
+        allowSyntheticDefaultImports: true,
+        forceConsistentCasingInFileNames: true,
+        allowJs: true,
+        esModuleInterop: true,
+        lib: ["ES2020", "DOM", "DOM.Iterable"],
+        baseUrl: ".",
+        paths: {
+          "@/*": ["./src/*"]
+        }
+      },
+      include: [
+        "src/**/*",
+        "scripts/**/*"
+      ],
+      exclude: [
+        "node_modules",
+        "dist",
+        ".gamejs"
+      ]
+    };
   }
 
   private createPackageJson(projectName: string) {

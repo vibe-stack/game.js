@@ -113,6 +113,10 @@ export class ProjectService {
     return this.assetManager.getAssetUrl(projectPath, assetPath);
   }
 
+  async getAssetServerPort(projectPath: string): Promise<number> {
+    return this.assetManager.getAssetServerPort(projectPath);
+  }
+
   // File System Operations - delegate to FileSystemManager
   async readFile(filePath: string): Promise<string> {
     return this.fileSystemManager.readFile(filePath);
@@ -194,6 +198,9 @@ export class ProjectService {
       "project:get-asset-url",
       (_, projectPath: string, assetPath: string) =>
         this.getAssetUrl(projectPath, assetPath),
+    );
+    ipcMain.handle("project:get-asset-server-port", (_, projectPath: string) =>
+      this.getAssetServerPort(projectPath),
     );
 
     // File System Operations

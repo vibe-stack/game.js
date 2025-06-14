@@ -5,6 +5,8 @@ import {
   FolderOpen,
   Loader2Icon,
   Settings,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import useEditorStore from "@/stores/editor-store";
 import PhysicsControlsToolbar from "./physics-controls-toolbar";
@@ -27,10 +29,52 @@ export default function MainControlsToolbar({
     pausePhysics, 
     stopPhysics, 
     resumePhysics,
-    setPhysicsState 
+    setPhysicsState,
+    currentProject
   } = useEditorStore();
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [scriptStatus, setScriptStatus] = useState<{ isWatching: boolean; compiledCount: number } | null>(null);
+  const [isLoadingScripts, setIsLoadingScripts] = useState(false);
+
+  // Load script status when project changes
+  useEffect(() => {
+    if (currentProject) {
+      loadScriptStatus();
+    } else {
+      setScriptStatus(null);
+    }
+  }, [currentProject]);
+
+  const loadScriptStatus = async () => {
+    if (!currentProject) return;
+
+    try {
+      const status = await window.scriptAPI.getCompilationStatus(currentProject.path);
+      setScriptStatus(status);
+    } catch (error) {
+      console.error("Failed to get script status:", error);
+    }
+  };
+
+  const handleToggleScriptWatching = async () => {
+    if (!currentProject) return;
+
+    setIsLoadingScripts(true);
+    try {
+      if (scriptStatus?.isWatching) {
+        await window.scriptAPI.stopWatching(currentProject.path);
+      } else {
+        await window.scriptAPI.startWatching(currentProject.path);
+      }
+      // Wait a bit for the watcher to initialize
+      setTimeout(loadScriptStatus, 500);
+    } catch (error) {
+      console.error("Failed to toggle script watching:", error);
+    } finally {
+      setIsLoadingScripts(false);
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -105,6 +149,23 @@ export default function MainControlsToolbar({
             title="Project Settings"
           >
             <Settings size={16} />
+          </Button>
+          <Button
+            size="sm"
+            variant={scriptStatus?.isWatching ? "default" : "outline"}
+            onClick={handleToggleScriptWatching}
+            disabled={isLoadingScripts}
+            className="gap-2 h-8"
+            title={scriptStatus?.isWatching ? `Stop Script Watching (${scriptStatus.compiledCount} scripts)` : "Start Script Watching"}
+          >
+            {isLoadingScripts ? (
+              <Loader2Icon size={16} className="animate-spin" />
+            ) : scriptStatus?.isWatching ? (
+              <Eye size={16} />
+            ) : (
+              <EyeOff size={16} />
+            )}
+            {scriptStatus?.compiledCount ? scriptStatus.compiledCount : 0}
           </Button>
         </div>
 

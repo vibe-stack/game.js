@@ -1,5 +1,7 @@
-import React, { forwardRef, useRef, useCallback, useMemo } from "react";
+import React, { forwardRef, useRef, useCallback, useMemo, useEffect } from "react";
 import * as THREE from "three";
+import { useFrame } from "@react-three/fiber";
+import { useGameWorld } from "@/services/game-world-context";
 import useEditorStore from "@/stores/editor-store";
 import {
   TransformManager,
@@ -15,45 +17,64 @@ import {
 } from "./utils";
 
 /**
- * SceneObject Component - Optimized for performance
- *
- * PERFORMANCE OPTIMIZATIONS:
- * - Separated concerns into specialized components
- * - Memoized expensive operations
- * - Reduced re-renders through React.memo
- * - Optimized matrix calculations
- * - Eliminated object creation in render cycles
- *
- * TRANSFORM ARCHITECTURE:
- * - Non-physics objects: Transform applied to outer group
- * - Physics objects: Transform controlled by RigidBody
- * - Editor interaction: PivotControls update GameObject.transform
+ * New SceneObject Component - GameWorld Integration
+ * 
+ * This component now reads from the GameWorld service imperatively
+ * for high-frequency updates, avoiding React's reconciliation overhead.
+ * 
+ * DATA FLOW:
+ * - Initial render: Uses GameObject data from props for setup
+ * - High-frequency updates: Reads transforms directly from GameWorld
+ * - UI updates: Uses selectedObjectData snapshot from Zustand
  */
 
 interface SceneObjectProps {
-  obj: GameObject;
+  objectId: string;
   selectedObjects: string[];
   onSelect: (id: string) => void;
   renderType?: "solid" | "wireframe" | "normals" | "realistic";
 }
 
 const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
-  ({ obj, selectedObjects, onSelect, renderType = "solid" }, ref) => {
-    const { transform, components, children, visible, tags } = obj;
+  ({ objectId, selectedObjects, onSelect, renderType = "solid" }, ref) => {
+    const gameWorld = useGameWorld();
     const groupRef = useRef<THREE.Group>(null);
     const matrixRef = useRef<THREE.Matrix4>(new THREE.Matrix4());
     const isManipulatingRef = useRef(false);
     const { editorMode, physicsState, currentScene } = useEditorStore();
 
+    // Get initial object data from GameWorld
+    const obj = gameWorld.getObject(objectId);
+
+    // Register Three.js object with GameWorld
+    useEffect(() => {
+      const group = groupRef.current;
+      if (group) {
+        gameWorld.registerThreeObject(objectId, group);
+        return () => {
+          gameWorld.unregisterThreeObject(objectId);
+        };
+      }
+    }, [gameWorld, objectId]);
+
     // Memoize derived values to prevent recalculation
     const isSelected = useMemo(
-      () => selectedObjects.includes(obj.id),
-      [selectedObjects, obj.id],
+      () => selectedObjects.includes(objectId),
+      [selectedObjects, objectId],
     );
     const shouldShowHelpers = useMemo(
       () => isSelected && physicsState !== "playing",
       [isSelected, physicsState],
     );
+
+    // Get object properties (with fallbacks for when object doesn't exist)
+    const { transform, components, children, visible, tags } = obj || {
+      transform: { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+      components: [],
+      children: [],
+      visible: false,
+      tags: [] as string[]
+    };
 
     // Check if this is a utility object that should remain empty
     const isUtilityObject = useMemo(
@@ -104,9 +125,9 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
     const handleClick = useCallback(
       (event: React.MouseEvent) => {
         event.stopPropagation();
-        onSelect(obj.id);
+        onSelect(objectId);
       },
-      [onSelect, obj.id],
+      [onSelect, objectId],
     );
 
     // Memoize group props
@@ -121,31 +142,56 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
       [components]
     );
 
-    const groupProps = useMemo(() => {
-      const { transform } = obj;
-      const { position, rotation, scale } = transform;
+    const pos = useRef(new THREE.Vector3());
+    const quat = useRef(new THREE.Quaternion());
+    const scl = useRef(new THREE.Vector3());
 
+    // High-frequency transform updates from GameWorld
+    useFrame(() => {
+      const group = groupRef.current;
+      if (!group || !shouldApplyTransform) return;
+
+      // During physics or high-frequency mode, read live transforms from GameWorld
+      if (physicsState === 'playing') {
+        const liveTransform = gameWorld.getLiveTransform(objectId);
+        if (liveTransform) {
+          // Apply live transform directly to Three.js object (bypassing React)
+          const position = pos.current;
+          const quaternion = quat.current;
+          const scale = scl.current;
+          liveTransform.decompose(position, quaternion, scale);
+          
+          // console.log('liveTransform', liveTransform);
+          // console.log('position', position);
+          // console.log('quaternion', quaternion);
+          // console.log('scale', scale);
+          group.position.copy(position);
+          group.quaternion.copy(quaternion);
+          group.scale.copy(scale);
+        }
+      } else {
+        // During editor mode, use GameObject transforms
+        const currentTransform = gameWorld.getObjectTransform(objectId);
+        if (currentTransform) {
+          const { position, rotation, scale } = currentTransform;
+          group.position.set(position.x, position.y, position.z);
+          group.rotation.set(rotation.x, rotation.y, rotation.z);
+          group.scale.set(scale.x, scale.y, scale.z);
+        }
+      }
+    });
+
+    const groupProps = useMemo(() => {
       return {
         ref: isSelected ? ref || groupRef : groupRef,
         onClick: handleClick,
-        userData: { objectId: obj.id },
-        ...(shouldApplyTransform && {
-          position: [position.x, position.y, position.z] as [
-            number,
-            number,
-            number,
-          ],
-          rotation: [rotation.x, rotation.y, rotation.z] as [
-            number,
-            number,
-            number,
-          ],
-          scale: [scale.x, scale.y, scale.z] as [number, number, number],
-        }),
+        userData: { objectId },
+        // Don't set initial transform here - will be handled by useFrame
       };
-    }, [obj, isSelected, ref, handleClick, shouldApplyTransform]);
+    }, [isSelected, ref, handleClick, objectId]);
 
-    if (!visible) return null;
+    // Early returns after all hooks
+    if (!obj || !visible) return null;
 
     return (
       <>
@@ -156,7 +202,7 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
         />
         <PivotControlsWrapper
           isSelected={isSelected}
-          objectId={obj.id}
+          objectId={objectId}
         >
           <group {...groupProps}>
             {/* Add script executor for entities with script components */}
@@ -173,12 +219,12 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
                 onSelect={onSelect}
                 showHelpers={shouldShowHelpers}
                 renderType={renderType}
-                objectId={obj.id}
+                objectId={objectId}
               />
             ) : (
               // When pivot controls are not active, use normal physics logic
               <PhysicsWrapper
-                objectId={obj.id}
+                objectId={objectId}
                 transform={transformForPhysics}
                 components={components}
                 isPivotControlsActive={isPivotControlsActive}
@@ -190,7 +236,7 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
                   onSelect={onSelect}
                   showHelpers={shouldShowHelpers}
                   renderType={renderType}
-                  objectId={obj.id}
+                  objectId={objectId}
                 />
               </PhysicsWrapper>
             )}
@@ -203,4 +249,4 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
 
 SceneObject.displayName = "SceneObject";
 
-export default React.memo(SceneObject);
+export default React.memo(SceneObject); 

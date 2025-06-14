@@ -6,6 +6,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-    }
-  }
+    },
+  },
+  build: {
+    rollupOptions: {
+      external: ["esbuild", "esbuild-wasm", "chokidar"],
+    },
+  },
 });

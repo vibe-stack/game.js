@@ -11,6 +11,7 @@ import {
 import { MeshRenderer } from "./mesh-renderer";
 import HeightfieldRenderer from "./heightfield-renderer";
 import ExtrudedArcRenderer from "./extruded-arc-renderer";
+import { ScriptRenderer } from "./script-renderer";
 
 export const COMPONENT_RENDERERS = {
   PerspectiveCamera: PerspectiveCameraRenderer,
@@ -24,6 +25,7 @@ export const COMPONENT_RENDERERS = {
   Mesh: MeshRenderer,
   heightfield: HeightfieldRenderer,
   extrudedArc: ExtrudedArcRenderer,
+  script: ScriptRenderer,
 };
 
 export function renderComponent(
@@ -56,6 +58,8 @@ export function renderComponent(
       return <HeightfieldRenderer component={component as HeightfieldComponent} objectId={objectId}>{children}</HeightfieldRenderer>;
     case 'extrudedArc':
       return <ExtrudedArcRenderer component={component as ExtrudedArcComponent}>{children}</ExtrudedArcRenderer>;
+    case 'script':
+      return <ScriptRenderer component={component as ScriptComponent} showHelpers={showHelpers} objectId={objectId}>{children}</ScriptRenderer>;
     default:
       console.warn(`No renderer found for component type: ${component.type}`);
       return <>{children}</>;
@@ -68,3 +72,4 @@ export * from "./mesh-renderer";
 export * from "./geometry-components";
 export * from "./material-components";
 export * from "./custom-helpers";
+export * from "./script-renderer";

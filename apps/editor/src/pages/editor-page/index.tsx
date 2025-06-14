@@ -7,6 +7,7 @@ import LeftPanel from "./components/left-panel";
 import RightPanel from "./components/right-panel";
 import FloatingToolbar from "./components/floating-toolbar";
 import MaterialBrowser from "@/components/material-browser";
+import { ScriptManagerProvider } from "./components/script-manager";
 
 export default function EditorPage() {
   const navigate = useNavigate();
@@ -136,35 +137,37 @@ export default function EditorPage() {
   }
 
   return (
-    <div className="relative h-screen overflow-hidden">
-      {/* Full-width Viewport */}
-      <Viewport
-        scene={currentScene}
-        selectedObjects={selectedObjects}
-        onSelectObject={handleObjectSelect}
-        onPhysicsCallbacks={setPhysicsCallbacks}
-      />
+    <ScriptManagerProvider>
+      <div className="relative h-screen overflow-hidden">
+        {/* Full-width Viewport */}
+        <Viewport
+          scene={currentScene}
+          selectedObjects={selectedObjects}
+          onSelectObject={handleObjectSelect}
+          onPhysicsCallbacks={setPhysicsCallbacks}
+        />
 
-      {/* Floating Toolbar */}
-      <FloatingToolbar
-        isSaving={isSaving}
-        onSave={saveScene}
-        onHome={goHome}
-        onOpenFolder={openProjectFolder}
-      />
+        {/* Floating Toolbar */}
+        <FloatingToolbar
+          isSaving={isSaving}
+          onSave={saveScene}
+          onHome={goHome}
+          onOpenFolder={openProjectFolder}
+        />
 
-      {/* Floating Left Panel */}
-      <LeftPanel
-        scene={currentScene}
-        selectedObjects={selectedObjects}
-        onSelectObject={handleObjectSelect}
-      />
+        {/* Floating Left Panel */}
+        <LeftPanel
+          scene={currentScene}
+          selectedObjects={selectedObjects}
+          onSelectObject={handleObjectSelect}
+        />
 
-      {/* Floating Right Panel */}
-      <RightPanel scene={currentScene} selectedObjects={selectedObjects} />
+        {/* Floating Right Panel */}
+        <RightPanel scene={currentScene} selectedObjects={selectedObjects} />
 
-      {/* Floating Panels */}
-      <MaterialBrowser />
-    </div>
+        {/* Floating Panels */}
+        <MaterialBrowser />
+      </div>
+    </ScriptManagerProvider>
   );
 }

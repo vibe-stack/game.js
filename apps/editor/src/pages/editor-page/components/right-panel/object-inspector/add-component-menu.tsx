@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Box, Zap, Lightbulb, Camera, Magnet, Shapes, Route } from "lucide-react";
+import { Plus, Box, Zap, Lightbulb, Camera, Magnet, Shapes, Route, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -217,6 +217,26 @@ export default function AddComponentMenu({ onAddComponent }: AddComponentMenuPro
           }
         } as ExtrudedArcComponent;
 
+      case 'script':
+        return {
+          ...baseComponent,
+          type: 'script',
+          properties: {
+            scriptPath: '',
+            autoStart: true,
+            parameters: {},
+            eventHandlers: {
+              init: true,
+              update: false,
+              lateUpdate: false,
+              fixedUpdate: false,
+              destroy: false
+            },
+            timeScale: 1.0,
+            debugMode: false
+          }
+        } as ScriptComponent;
+
       default:
         return {
           ...baseComponent,
@@ -292,6 +312,14 @@ export default function AddComponentMenu({ onAddComponent }: AddComponentMenuPro
         <DropdownMenuItem onClick={() => handleAddComponent('extrudedArc')}>
           <Route className="h-4 w-4 mr-2" />
           Extruded Arc
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
+        
+        <DropdownMenuLabel className="text-xs">Scripting</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => handleAddComponent('script')}>
+          <Code className="h-4 w-4 mr-2" />
+          Script
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useRef } from "react";
 import { Canvas, extend, useThree, useFrame } from "@react-three/fiber";
-import { OrbitControls, Environment } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import {
   ACESFilmicToneMapping,
   LinearToneMapping,
@@ -8,14 +8,17 @@ import {
   CineonToneMapping,
   NoToneMapping,
 } from "three";
-import SceneObject from "./scene-object";
+import SceneObject from "./scene-object-new";
 import { PhysicsProvider, usePhysics } from "./physics/physics-context";
+import { GameWorldProvider } from "@/services/game-world-context";
+import { gameWorld } from "@/services/game-world";
 import useEditorStore from "@/stores/editor-store";
 import Grid2 from "./components/grid2";
 // import WebGPUGrid from "./components/webgpu-grid";
 import * as THREE from "three/webgpu";
 
 extend(THREE as any)
+
 interface ViewportProps {
   scene: GameScene | null;
   selectedObjects: string[];
@@ -56,8 +59,28 @@ function PhysicsCallbackProvider({
   return null;
 }
 
+function GameWorldUpdater() {
+  const { setGameWorld } = useEditorStore();
+  
+  useEffect(() => {
+    // Initialize GameWorld integration
+    setGameWorld(gameWorld);
+    
+    return () => {
+      gameWorld.dispose();
+    };
+  }, [setGameWorld]);
+
+  // High-frequency game loop
+  useFrame((state) => {
+    gameWorld.update(state.clock.elapsedTime * 1000);
+  });
+
+  return null;
+}
+
 function CameraController({ scene }: { scene: GameScene }) {
-  const { camera, controls, scene: threeScene } = useThree();
+  const { camera, controls } = useThree();
   const { viewportMode, physicsState } = useEditorStore();
   const prevActiveCameraRef = useRef<string | undefined>(scene.activeCamera);
   const cameraFollowRef = useRef<{ camera: GameObject; worldMatrix: THREE.Matrix4 } | null>(null);
@@ -129,36 +152,17 @@ function CameraController({ scene }: { scene: GameScene }) {
   // Update camera transform in camera follow mode
   useFrame(() => {
     if (viewportMode === 'camera' && scene.activeCamera && camera) {
-      // During physics, get live transforms from the Three.js scene graph
+      // During physics, get live transforms from the GameWorld
       // During non-physics, use GameObject transforms
       if (physicsState === 'playing') {
-        // Find the camera object in the Three.js scene by traversing the scene graph
-        const findCameraInThreeScene = (object: THREE.Object3D, targetId: string): THREE.Object3D | null => {
-          // Check if this object has the target ID (stored in userData)
-          if (object.userData?.objectId === targetId) {
-            return object;
-          }
-          
-          // Search children
-          for (const child of object.children) {
-            const found = findCameraInThreeScene(child, targetId);
-            if (found) return found;
-          }
-          
-          return null;
-        };
-        
-        const cameraObject = findCameraInThreeScene(threeScene, scene.activeCamera);
-        if (cameraObject) {
-          // Get the world matrix from the live Three.js object
-          cameraObject.updateMatrixWorld(true);
-          const worldMatrix = cameraObject.matrixWorld;
-          
-          // Extract world position and rotation
+        // Get live transform from GameWorld
+        const liveTransform = gameWorld.getLiveTransform(scene.activeCamera);
+        if (liveTransform) {
+          // Extract world position and rotation from the live transform
           const worldPosition = new THREE.Vector3();
           const worldRotation = new THREE.Quaternion();
           const worldScale = new THREE.Vector3();
-          worldMatrix.decompose(worldPosition, worldRotation, worldScale);
+          liveTransform.decompose(worldPosition, worldRotation, worldScale);
           
           // Apply to the viewport camera
           camera.position.copy(worldPosition);
@@ -166,59 +170,45 @@ function CameraController({ scene }: { scene: GameScene }) {
           camera.updateMatrixWorld();
         }
       } else {
-        // During non-physics, use the GameObject transforms (existing logic)
-        const findCameraWithWorldTransform = (objects: GameObject[], id: string, parentTransform?: THREE.Matrix4): { camera: GameObject; worldMatrix: THREE.Matrix4 } | null => {
-          for (const obj of objects) {
-            // Calculate this object's world matrix
-            const localMatrix = new THREE.Matrix4();
-            const { position, rotation, scale } = obj.transform;
-            localMatrix.makeTranslation(position.x, position.y, position.z);
-            
-            const rotationMatrix = new THREE.Matrix4();
-            rotationMatrix.makeRotationFromEuler(new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ'));
-            localMatrix.multiply(rotationMatrix);
-            
-            const scaleMatrix = new THREE.Matrix4();
-            scaleMatrix.makeScale(scale.x, scale.y, scale.z);
-            localMatrix.multiply(scaleMatrix);
-            
-            // Combine with parent transform if it exists
-            const worldMatrix = parentTransform ? new THREE.Matrix4().multiplyMatrices(parentTransform, localMatrix) : localMatrix;
-            
-            if (obj.id === id) {
-              const hasCameraComponent = obj.components.some(
-                comp => comp.type === 'PerspectiveCamera' || comp.type === 'OrthographicCamera'
-              );
-              if (hasCameraComponent) return { camera: obj, worldMatrix };
-            }
-            
-            // Search children with this object's world transform as parent
-            const found = findCameraWithWorldTransform(obj.children, id, worldMatrix);
-            if (found) return found;
-          }
-          return null;
-        };
-        
-        const result = findCameraWithWorldTransform(scene.objects, scene.activeCamera);
-        if (result) {
-          const { worldMatrix } = result;
-          
-          // Extract world position and rotation from the world matrix
-          const worldPosition = new THREE.Vector3();
-          const worldRotation = new THREE.Quaternion();
-          const worldScale = new THREE.Vector3();
-          worldMatrix.decompose(worldPosition, worldRotation, worldScale);
-          
-          // Apply to the viewport camera
-          camera.position.copy(worldPosition);
-          camera.quaternion.copy(worldRotation);
+        // During non-physics, use the GameObject transforms via GameWorld
+        const cameraObj = gameWorld.getObject(scene.activeCamera);
+        if (cameraObj) {
+          const transform = cameraObj.transform;
+          camera.position.set(transform.position.x, transform.position.y, transform.position.z);
+          camera.rotation.set(transform.rotation.x, transform.rotation.y, transform.rotation.z);
           camera.updateMatrixWorld();
         }
       }
     }
   });
-  
+
   return null;
+}
+
+function SceneRenderer({ scene, selectedObjects, onSelectObject }: {
+  scene: GameScene;
+  selectedObjects: string[];
+  onSelectObject: (id: string, event?: React.MouseEvent) => void;
+}) {
+  const { editorConfig } = scene;
+
+  return (
+    <>
+      {editorConfig.showHelperGrid && (
+        <Grid2 args={[editorConfig.gridSize || 10, editorConfig.gridSize || 10]} />
+      )}
+      
+      {scene.objects.map((obj) => (
+        <SceneObject
+          key={obj.id}
+          objectId={obj.id}
+          selectedObjects={selectedObjects}
+          onSelect={onSelectObject}
+          renderType={editorConfig.renderType}
+        />
+      ))}
+    </>
+  );
 }
 
 export default function Viewport({
@@ -227,55 +217,50 @@ export default function Viewport({
   onSelectObject,
   onPhysicsCallbacks,
 }: ViewportProps) {
-  const { updateObjectTransform, physicsState, importAssetFromData, createMeshFromGLB, setPhysicsState, viewportMode } = useEditorStore();
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const previousSceneIdRef = useRef<string | null>(null);
+  const { viewportCamera } = useEditorStore();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Only stop physics when scene ID actually changes, not on every render
+  // Load scene into GameWorld when scene changes
   useEffect(() => {
-    const currentSceneId = scene?.id || null;
-    const previousSceneId = previousSceneIdRef.current;
-    
-    // Only stop physics if the scene ID has actually changed
-    if (previousSceneId !== null && currentSceneId !== previousSceneId && physicsState === 'playing') {
-      setPhysicsState('stopped');
+    if (scene) {
+      gameWorld.loadScene(scene);
     }
-    
-    previousSceneIdRef.current = currentSceneId;
-  }, [scene?.id, setPhysicsState, physicsState]);
+  }, [scene]);
 
   const handleDragOver = (event: React.DragEvent) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
   };
 
   const handleDrop = async (event: React.DragEvent) => {
     event.preventDefault();
     
-    const files = event.dataTransfer.files;
-    if (!files) return;
-
-    for (const file of Array.from(files)) {
-      const fileName = file.name.toLowerCase();
-      
-      // Only handle GLB files for direct mesh creation
-      if (fileName.endsWith('.glb') || fileName.endsWith('.gltf')) {
+    const files = Array.from(event.dataTransfer.files);
+    
+    for (const file of files) {
+      if (file.type.startsWith('image/')) {
         try {
-          // Read file data
-          const fileData = await file.arrayBuffer();
-          
-          // Import the asset first
-          const assetReference = await importAssetFromData(file.name, fileData);
-          
-          // Calculate drop position (simplified - drop at center for now)
-          // In a more advanced implementation, you could calculate the 3D position
-          // based on the mouse position and camera view
-          const position = { x: 0, y: 0, z: 0 };
-          
-          // Create mesh from GLB
-          createMeshFromGLB(assetReference, position);
+          const arrayBuffer = await file.arrayBuffer();
+          await useEditorStore.getState().importAssetFromData(file.name, arrayBuffer);
         } catch (error) {
-          console.error('Failed to create mesh from dropped GLB:', error);
+          console.error('Failed to import texture:', error);
+        }
+      } else if (file.name.endsWith('.glb') || file.name.endsWith('.gltf')) {
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const assetReference = await useEditorStore.getState().importAssetFromData(file.name, arrayBuffer);
+          
+          // Calculate drop position in 3D space
+          const rect = canvasRef.current?.getBoundingClientRect();
+          if (rect) {
+            const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            // Simple projection to ground plane
+            const dropPosition = { x: x * 5, y: 0, z: y * 5 };
+            useEditorStore.getState().createMeshFromGLB(assetReference, dropPosition);
+          }
+        } catch (error) {
+          console.error('Failed to import model:', error);
         }
       }
     }
@@ -283,141 +268,92 @@ export default function Viewport({
 
   if (!scene) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <p className="text-muted-foreground">No scene loaded</p>
+      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+        No scene loaded
       </div>
     );
   }
 
   const getShadowType = (shadowType: string) => {
     switch (shadowType) {
-      case "pcf":
-        return "percentage";
-      case "pcfsoft":
-        return "soft";
-      case "vsm":
-        return "variance";
-      default:
-        return "basic";
+      case 'basic': return THREE.BasicShadowMap;
+      case 'pcf': return THREE.PCFShadowMap;
+      case 'pcfsoft': return THREE.PCFSoftShadowMap;
+      case 'vsm': return THREE.VSMShadowMap;
+      default: return THREE.PCFShadowMap;
     }
   };
 
   const getToneMapping = (toneMapping: string) => {
     switch (toneMapping) {
-      case "linear":
-        return LinearToneMapping;
-      case "reinhard":
-        return ReinhardToneMapping;
-      case "cineon":
-        return CineonToneMapping;
-      case "aces":
-        return ACESFilmicToneMapping;
-      default:
-        return NoToneMapping;
+      case 'none': return NoToneMapping;
+      case 'linear': return LinearToneMapping;
+      case 'reinhard': return ReinhardToneMapping;
+      case 'cineon': return CineonToneMapping;
+      case 'aces': return ACESFilmicToneMapping;
+      default: return ACESFilmicToneMapping;
     }
   };
 
-  const shadowConfig = scene.runtimeConfig.shadowsEnabled
-    ? getShadowType(scene.runtimeConfig.shadowType)
-    : false;
-
-  // Hide helpers when physics is playing
-  const shouldShowHelpers = physicsState !== "playing";
-
   return (
-    <div
-      ref={viewportRef}
-      className="h-screen"
-      style={{ backgroundColor: scene.editorConfig.backgroundColor }}
+    <div 
+      className="w-full h-full relative"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
       <Canvas
-        key={scene.id} // Force complete Canvas remount when scene changes
-        camera={{ position: [0, 25, 80], fov: 75 }}
-        shadows={shadowConfig}
-        // gl={{
-        //   antialias: scene.runtimeConfig.antialias,
-        //   toneMapping: getToneMapping(scene.runtimeConfig.toneMapping),
-        //   toneMappingExposure: scene.runtimeConfig.exposure,
-        // }}
-        gl={async (props) => {
-          const renderer = new THREE.WebGPURenderer({
-            ...(props as any),
-            antialias: scene.runtimeConfig.antialias,
-            toneMapping: getToneMapping(scene.runtimeConfig.toneMapping),
-            toneMappingExposure: scene.runtimeConfig.exposure,
-          })
-          await renderer.init()
-          
-          // WebGPU-specific shadow configuration
-          if (renderer.shadowMap) {
-            renderer.shadowMap.enabled = scene.runtimeConfig.shadowsEnabled;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Better for WebGPU
-          }
-          
-          return renderer
+        ref={canvasRef}
+        shadows
+        camera={{
+          position: [viewportCamera.position.x, viewportCamera.position.y, viewportCamera.position.z],
+          rotation: [viewportCamera.rotation.x, viewportCamera.rotation.y, viewportCamera.rotation.z],
+          fov: 50,
+          near: 0.1,
+          far: 1000,
         }}
+        gl={{
+          antialias: scene.runtimeConfig.antialias,
+          shadowMapEnabled: scene.runtimeConfig.shadowsEnabled,
+          shadowMapType: getShadowType(scene.runtimeConfig.shadowType),
+          toneMapping: getToneMapping(scene.runtimeConfig.toneMapping),
+          toneMappingExposure: scene.runtimeConfig.exposure,
+        }}
+        style={{ background: scene.editorConfig.backgroundColor }}
       >
-        <Suspense>
-          <PhysicsProvider
-            key={scene.id}
-            scene={scene}
-            onObjectTransformUpdate={updateObjectTransform}
-            debugEnabled={
-              shouldShowHelpers && scene.physicsWorld?.debugRender?.enabled
-            }
-          >
-            <PhysicsCallbackProvider onPhysicsCallbacks={onPhysicsCallbacks} />
-            <SceneEffects scene={scene} />
-            <CameraController scene={scene} />
-
-            {/* Fog */}
-            {scene.editorConfig.enableFog && (
-              <fog
-                attach="fog"
-                args={[
-                  scene.editorConfig.fogColor,
-                  scene.editorConfig.fogNear,
-                  scene.editorConfig.fogFar,
-                ]}
+        <GameWorldProvider gameWorld={gameWorld}>
+          <Suspense fallback={null}>
+            <PhysicsProvider 
+              scene={scene} 
+              onObjectTransformUpdate={(objectId, transform) => {
+                // Update via GameWorld instead of directly to store
+                gameWorld.updateObjectTransform(objectId, transform);
+              }}
+              debugEnabled={scene.physicsWorld.debugRender.enabled}
+            >
+              <GameWorldUpdater />
+              <PhysicsCallbackProvider onPhysicsCallbacks={onPhysicsCallbacks} />
+              <CameraController scene={scene} />
+              <SceneEffects scene={scene} />
+              
+              {/* {scene.runtimeConfig.environment && (
+                <Environment files={scene.runtimeConfig.environment} />
+              )} */}
+              
+              <OrbitControls
+                enablePan={true}
+                enableZoom={true}
+                enableRotate={true}
+                target={[0, 0, 0]}
               />
-            )}
-
-            {/* Environment */}
-            {scene.runtimeConfig.environment !== "none" && (
-              <Environment preset={scene.runtimeConfig.environment as any} />
-            )}
-
-            {/* Scene Objects */}
-            <group>
-              {scene.objects.map((obj) => (
-                <SceneObject
-                  key={obj.id}
-                  obj={obj}
-                  selectedObjects={selectedObjects}
-                  onSelect={onSelectObject}
-                  renderType={scene.editorConfig.renderType}
-                />
-              ))}
-            </group>
-
-            {/* Grid */}
-            {shouldShowHelpers && scene.editorConfig.showHelperGrid && (
-              <Grid2
-                args={[scene.editorConfig.gridSize * 20, scene.editorConfig.gridSize * 20]}
-                cellColor="#666666"
-                sectionColor="#111111"
-                fadeDistance={500}
-                fadeStrength={0.6}
+              
+              <SceneRenderer
+                scene={scene}
+                selectedObjects={selectedObjects}
+                onSelectObject={onSelectObject}
               />
-            )}
-
-            {viewportMode === 'orbit' && (
-              <OrbitControls enablePan enableZoom enableRotate makeDefault />
-            )}
-          </PhysicsProvider>
-        </Suspense>
+            </PhysicsProvider>
+          </Suspense>
+        </GameWorldProvider>
       </Canvas>
     </div>
   );

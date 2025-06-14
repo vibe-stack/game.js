@@ -23,6 +23,15 @@ export class AssetManager {
       next();
     }, express.static(path.join(projectPath, 'assets')));
 
+    // Serve .gamejs directory for compiled scripts and vendor files
+    app.use('/.gamejs', (req: Request, res: Response, next: NextFunction) => {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET');
+      res.header('Access-Control-Allow-Headers', 'Content-Type');
+      res.header('Content-Type', 'application/javascript'); // Set correct MIME type for JS files
+      next();
+    }, express.static(path.join(projectPath, '.gamejs')));
+
     const server = createServer(app);
     
     // Find available port
@@ -40,7 +49,7 @@ export class AssetManager {
     this.assetServer = server;
     this.assetServerPort = port;
     
-    console.log(`Asset server started on port ${port}`);
+    console.log(`Asset server started on port ${port} serving ${projectPath}`);
     return port;
   }
 
@@ -51,6 +60,10 @@ export class AssetManager {
       this.assetServerPort = 0;
       console.log('Asset server stopped');
     }
+  }
+
+  async getAssetServerPort(projectPath: string): Promise<number> {
+    return await this.startAssetServer(projectPath);
   }
 
   async getAssetUrl(projectPath: string, assetPath: string): Promise<string | null> {
