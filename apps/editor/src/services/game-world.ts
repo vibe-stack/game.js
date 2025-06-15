@@ -93,6 +93,10 @@ export class GameWorld extends SimpleEventEmitter {
   private threeObjects: Map<string, THREE.Object3D> = new Map();
   private manipulatingObjects: Set<string> = new Set(); // Track which objects are being manipulated
 
+  // Three.js viewport references
+  private threeRenderer: THREE.WebGLRenderer | null = null;
+  private threeCamera: THREE.Camera | null = null;
+
   constructor() {
     super();
     this.setMaxListeners(100); // Increase limit for editor usage
@@ -162,6 +166,27 @@ export class GameWorld extends SimpleEventEmitter {
 
   unregisterThreeObject(objectId: string): void {
     this.threeObjects.delete(objectId);
+  }
+
+  // Three.js viewport integration
+  setThreeRenderer(renderer: THREE.WebGLRenderer): void {
+    this.threeRenderer = renderer;
+  }
+
+  setThreeCamera(camera: THREE.Camera): void {
+    this.threeCamera = camera;
+  }
+
+  getThreeScene(): THREE.Scene | null {
+    return this.threeScene;
+  }
+
+  getThreeRenderer(): THREE.WebGLRenderer | null {
+    return this.threeRenderer;
+  }
+
+  getThreeCamera(): THREE.Camera | null {
+    return this.threeCamera;
   }
 
   // Object Management
