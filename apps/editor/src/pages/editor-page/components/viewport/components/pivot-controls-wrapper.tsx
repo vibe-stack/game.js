@@ -2,6 +2,7 @@ import React, { useRef, useMemo, useEffect, useCallback } from "react";
 import { TransformControls } from "@react-three/drei";
 import * as THREE from "three";
 import useEditorStore from "@/stores/editor-store";
+import { useThree } from "@react-three/fiber";
 
 interface PivotControlsWrapperProps {
   isSelected: boolean;
@@ -18,6 +19,7 @@ const PivotControlsWrapper: React.FC<PivotControlsWrapperProps> = ({
   const groupRef = useRef<THREE.Group>(null);
   const transformControlsRef = useRef<any>(null);
   const isManipulatingRef = useRef(false);
+  const controls = useThree((state) => state.controls)
 
   // Get the current object from the store
   const currentObject = useMemo(() => {
@@ -54,12 +56,16 @@ const PivotControlsWrapper: React.FC<PivotControlsWrapperProps> = ({
 
   const handleDragStart = useCallback(() => {
     isManipulatingRef.current = true;
+    controls.enabled = false;
+    // (controls as CameraControlsImpl).active = false;
   }, []);
 
   const handleDragEnd = useCallback(() => {
     // Small delay to ensure the final update goes through before clearing the flag
     setTimeout(() => {
       isManipulatingRef.current = false;
+      controls.enabled = true;
+      // (controls as CameraControlsImpl).active = true;
     }, 50);
   }, []);
 

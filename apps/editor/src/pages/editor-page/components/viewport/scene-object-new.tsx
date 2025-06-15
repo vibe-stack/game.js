@@ -114,7 +114,10 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
     );
 
     // Memoize transform for physics wrapper
-    const transformForPhysics = useMemo(() => transform, [transform]);
+    const transformForPhysics = useMemo(() => {
+      const liveTransform = gameWorld.getObjectTransform(objectId);
+      return liveTransform || transform; // Fallback to GameObject transform if not found
+    }, [gameWorld, objectId, transform]);
 
     // Optimized matrix change handler
     const handleMatrixChange = useCallback((matrix: THREE.Matrix4) => {

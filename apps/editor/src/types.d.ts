@@ -515,6 +515,15 @@ interface ElectronWindow {
   isMaximized: () => Promise<boolean>;
 }
 
+interface FileSystemItem {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  extension?: string;
+  size?: number;
+  modified?: Date;
+}
+
 interface ProjectAPI {
   // Project Management
   loadProjects: () => Promise<GameProject[]>;
@@ -567,6 +576,8 @@ interface ProjectAPI {
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   fileExists: (filePath: string) => Promise<boolean>;
+  listDirectory: (dirPath: string) => Promise<FileSystemItem[]>;
+  getFileStats: (filePath: string) => Promise<{ size: number; modified: Date }>;
 
   // Legacy - keeping for backward compatibility
   installPackages: (projectName: string) => Promise<void>;

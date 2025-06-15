@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useCallback } from "react";
 import {
   RigidBody,
   RapierRigidBody,
@@ -29,47 +29,26 @@ export default function RigidBodyRenderer({
     resetKey,
   } = usePhysics();
   const rigidBodyRef = useRef<RapierRigidBody>(null);
-  const [isRegistered, setIsRegistered] = useState(false);
-  const cleanupExecutedRef = useRef(false);
-
-  // Register/unregister rigid body with improved cleanup logic
-  useEffect(() => {
-    const rigidBody = rigidBodyRef.current;
-    
-    if (rigidBody && rigidBodyComponent.enabled && !isRegistered && isInitialized) {
-      registerRigidBody(objectId, rigidBody);
-      setIsRegistered(true);
-      cleanupExecutedRef.current = false;
-    }
-
-    return () => {
-      // Only execute cleanup once and only if we were actually registered
-      if (isRegistered && !cleanupExecutedRef.current) {
-        cleanupExecutedRef.current = true;
-        
-        // Use a timeout to defer cleanup until after React's current render cycle
-        // This prevents conflicts with physics world state changes
-        setTimeout(() => {
-          try {
-            // Only attempt cleanup if physics is still initialized
-            if (isInitialized) {
-              unregisterRigidBody(objectId);
-            }
-          } catch {
-            // Silently ignore cleanup errors - they typically happen when 
-            // the physics world is already being destroyed
-          }
-        }, 0);
-        
-        setIsRegistered(false);
+  
+  // The ref callback pattern is more robust for managing registration and unregistration.
+  // It fires once when the ref is attached, and once with `null` when it's detached (unmounted).
+  const handleRef = useCallback((rb: RapierRigidBody | null) => {
+    rigidBodyRef.current = rb;
+    if (rb) {
+      // Component mounted, register the rigid body.
+      if (rigidBodyComponent.enabled && isInitialized) {
+        registerRigidBody(objectId, rb);
       }
-    };
+    } else {
+      // Component unmounted, unregister the rigid body.
+      // This is safer than useEffect cleanup during complex state transitions.
+      unregisterRigidBody(objectId);
+    }
   }, [
     objectId,
     registerRigidBody,
     unregisterRigidBody,
-    rigidBodyComponent.enabled,
-    isRegistered,
+    rigidBodyComponent.enabled, // Re-run if component is enabled/disabled
     isInitialized,
   ]);
 
@@ -105,7 +84,7 @@ export default function RigidBodyRenderer({
   return (
     <RigidBody
       key={`${objectId}-${resetKey}`}
-      ref={rigidBodyRef}
+      ref={handleRef}
       type={effectiveBodyType}
       position={[
         transform.position.x,

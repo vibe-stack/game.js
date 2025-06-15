@@ -56,6 +56,10 @@ export function exposeProjectContext() {
       ipcRenderer.invoke("project:write-file", filePath, content),
     fileExists: (filePath: string) => 
       ipcRenderer.invoke("project:file-exists", filePath),
+    listDirectory: (dirPath: string) => 
+      ipcRenderer.invoke("project:list-directory", dirPath),
+    getFileStats: (filePath: string) => 
+      ipcRenderer.invoke("project:get-file-stats", filePath),
     
     // Legacy - keeping for backward compatibility
     installPackages: (projectName: string) => 

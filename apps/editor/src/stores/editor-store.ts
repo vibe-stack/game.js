@@ -1,43 +1,43 @@
-import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
-import { GameWorld } from '@/services/game-world';
-import { generateHeightfieldData } from '@/utils/heightfield-generator';
-import { clearTextureCache } from '@/pages/editor-page/components/viewport/enhanced-material-components';
+import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
+import { GameWorld } from "@/services/game-world";
+import { generateHeightfieldData } from "@/utils/heightfield-generator";
+import { clearTextureCache } from "@/pages/editor-page/components/viewport/enhanced-material-components";
 
 interface EditorState {
   // Project State
   currentProject: GameProject | null;
   projects: GameProject[];
-  
+
   // GameWorld Integration
   gameWorld: GameWorld | null;
-  
+
   // Scene State (snapshots for UI)
   currentScene: GameScene | null;
   selectedObjects: string[];
   selectedObjectData: GameObject | null; // Snapshot of selected object for inspector
-  
+
   // Asset State
   assets: AssetReference[];
-  
+
   // Editor UI State
-  editorMode: 'select' | 'move' | 'rotate' | 'scale';
-  viewportMode: 'orbit' | 'camera';
+  editorMode: "select" | "move" | "rotate" | "scale";
+  viewportMode: "orbit" | "camera";
   viewportCamera: {
     position: Vector3;
     rotation: Vector3;
     target: Vector3;
   };
-  
+
   // Physics State
-  physicsState: 'stopped' | 'playing' | 'paused';
+  physicsState: "stopped" | "playing" | "paused";
   physicsCallbacks: {
     play?: () => void;
     pause?: () => void;
     stop?: () => void;
     resume?: () => void;
   };
-  
+
   // Actions
   setCurrentProject: (project: GameProject | null) => void;
   setProjects: (projects: GameProject[]) => void;
@@ -47,61 +47,105 @@ interface EditorState {
   selectObject: (objectId: string, additive?: boolean) => void;
   deselectAll: () => void;
   updateSelectedObjectSnapshot: () => void;
-  setEditorMode: (mode: 'select' | 'move' | 'rotate' | 'scale') => void;
-  setViewportMode: (mode: 'orbit' | 'camera') => void;
-  
+  setEditorMode: (mode: "select" | "move" | "rotate" | "scale") => void;
+  setViewportMode: (mode: "orbit" | "camera") => void;
+
   // Asset Actions
   loadAssets: () => Promise<void>;
   importAsset: (filePath: string) => Promise<AssetReference>;
-  importAssetFromData: (fileName: string, fileData: ArrayBuffer) => Promise<AssetReference>;
+  importAssetFromData: (
+    fileName: string,
+    fileData: ArrayBuffer,
+  ) => Promise<AssetReference>;
   deleteAsset: (assetId: string) => Promise<void>;
-  createMeshFromGLB: (assetReference: AssetReference, position?: Vector3) => void;
-  
+  createMeshFromGLB: (
+    assetReference: AssetReference,
+    position?: Vector3,
+  ) => void;
+
   // Physics Actions
-  setPhysicsState: (state: 'stopped' | 'playing' | 'paused') => void;
-  setPhysicsCallbacks: (callbacks: EditorState['physicsCallbacks']) => void;
+  setPhysicsState: (state: "stopped" | "playing" | "paused") => void;
+  setPhysicsCallbacks: (callbacks: EditorState["physicsCallbacks"]) => void;
   playPhysics: () => void;
   pausePhysics: () => void;
   stopPhysics: () => void;
   resumePhysics: () => void;
-  
+
   // GameWorld Actions (delegated to GameWorld service)
   addObject: (object: GameObject, parentId?: string) => void;
   removeObject: (objectId: string) => void;
   updateObject: (objectId: string, updates: Partial<GameObject>) => void;
-  updateObjectTransform: (objectId: string, transform: Partial<Transform>) => void;
-  updateObjectComponent: (objectId: string, componentId: string, updates: Partial<GameObjectComponent>) => void;
-  addObjectComponent: (objectId: string, component: GameObjectComponent | PhysicsComponent) => void;
-  updateHeightfieldComponent: (objectId: string, componentId: string, updates: Partial<HeightfieldComponent['properties']>) => void;
-  updateExtrudedArcComponent: (objectId: string, componentId: string, updates: Partial<ExtrudedArcComponent['properties']>) => void;
-  
+  updateObjectTransform: (
+    objectId: string,
+    transform: Partial<Transform>,
+  ) => void;
+  updateObjectComponent: (
+    objectId: string,
+    componentId: string,
+    updates: Partial<GameObjectComponent>,
+  ) => void;
+  addObjectComponent: (
+    objectId: string,
+    component: GameObjectComponent | PhysicsComponent,
+  ) => void;
+  updateHeightfieldComponent: (
+    objectId: string,
+    componentId: string,
+    updates: Partial<HeightfieldComponent["properties"]>,
+  ) => void;
+  updateExtrudedArcComponent: (
+    objectId: string,
+    componentId: string,
+    updates: Partial<ExtrudedArcComponent["properties"]>,
+  ) => void;
+
   // Scene Configuration
   updateSceneEditorConfig: (config: Partial<SceneEditorConfig>) => void;
   updateSceneRuntimeConfig: (config: Partial<SceneRuntimeConfig>) => void;
   updateScenePhysicsConfig: (config: Partial<PhysicsWorldConfig>) => void;
-  
+
   // Viewport
-  setViewportCamera: (camera: Partial<EditorState['viewportCamera']>) => void;
-  
+  setViewportCamera: (camera: Partial<EditorState["viewportCamera"]>) => void;
+
   // Scene switching
   switchScene: (sceneName: string) => Promise<void>;
-  
+
   // Material management
   materials: MaterialDefinition[];
   selectedMaterialId: string | null;
   isMaterialBrowserOpen: boolean;
   editingMeshId: string | null;
-  
+
   // Material Management Actions
   setMaterials: (materials: MaterialDefinition[]) => void;
   addMaterial: (material: MaterialDefinition) => void;
-  updateMaterial: (materialId: string, updatedMaterial: MaterialDefinition) => void;
+  updateMaterial: (
+    materialId: string,
+    updatedMaterial: MaterialDefinition,
+  ) => void;
   deleteMaterial: (materialId: string) => void;
   setSelectedMaterial: (materialId: string | null) => void;
   openMaterialBrowser: (meshId?: string) => void;
   closeMaterialBrowser: () => void;
   assignMaterialToMesh: (meshId: string, materialId: string) => void;
 }
+
+// Helper function to update scene state atomically and synchronously
+const _updateSceneState = (
+  set: (updater: (state: EditorState) => Partial<EditorState>) => void,
+  get: () => EditorState,
+  scene: GameScene | null
+) => {
+  set(state => ({
+    ...state,
+    currentScene: scene,
+    materials: scene?.materials || [],
+    selectedObjects: [], // Clear selection on scene change to avoid stale state
+    selectedObjectData: null,
+  }));
+  // Update the inspector immediately after the state is set
+  get().updateSelectedObjectSnapshot();
+};
 
 const useEditorStore = create<EditorState>()(
   subscribeWithSelector((set, get) => ({
@@ -113,16 +157,16 @@ const useEditorStore = create<EditorState>()(
     selectedObjects: [],
     selectedObjectData: null,
     assets: [],
-    editorMode: 'select',
-    viewportMode: 'orbit',
+    editorMode: "select",
+    viewportMode: "orbit",
     viewportCamera: {
       position: { x: 0, y: 5, z: 10 },
       rotation: { x: -0.2, y: 0, z: 0 },
-      target: { x: 0, y: 0, z: 0 }
+      target: { x: 0, y: 0, z: 0 },
     },
-    physicsState: 'stopped',
+    physicsState: "stopped",
     physicsCallbacks: {},
-    
+
     // Material management
     materials: [],
     selectedMaterialId: null,
@@ -135,79 +179,77 @@ const useEditorStore = create<EditorState>()(
       set({ currentProject: project });
     },
     setProjects: (projects) => set({ projects }),
-    
+
     // GameWorld Actions
     setGameWorld: (gameWorld) => {
       const currentGameWorld = get().gameWorld;
-      
+
       // Clean up previous game world listeners
       if (currentGameWorld) {
         currentGameWorld.removeAllListeners();
       }
-      
+
       // Set up new game world with listeners
       if (gameWorld) {
-        // Listen for scene changes from GameWorld (e.g., after restore)
-        gameWorld.on('sceneChanged', ({ scene }) => {
-          set({ currentScene: scene });
+        // Listen for scene changes originating from GameWorld (like snapshot restore)
+        gameWorld.on("sceneChanged", ({ scene }) => {
+          // When GameWorld says the scene changed, we only need to update the store
+          // We DO NOT call gameWorld.loadScene() again, preventing a circular update
+          _updateSceneState(set as any, get, scene);
         });
-        
+
         // Listen for object transform updates
-        gameWorld.on('objectTransformUpdate', () => {
+        gameWorld.on("objectTransformUpdate", () => {
           // Update selected object snapshot when transforms change
           get().updateSelectedObjectSnapshot();
         });
       }
-      
+
       set({ gameWorld });
     },
-    
-    // Scene Actions
+
+    // Scene Actions - This action is for UI-initiated scene changes (e.g., from a dropdown)
     setCurrentScene: (scene) => {
-      const state = get();
-      set({ 
-        currentScene: scene,
-        materials: scene?.materials || [], // Sync materials from scene
-        selectedObjects: [], // Clear selection when changing scenes
-        selectedObjectData: null
-      });
-      
-      // Load scene into GameWorld if available
-      if (state.gameWorld && scene) {
-        state.gameWorld.loadScene(scene);
+      // Update the store's state first
+      _updateSceneState(set as any, get, scene);
+
+      // Then, tell the GameWorld to load this new scene
+      const { gameWorld } = get();
+      if (gameWorld && scene) {
+        gameWorld.loadScene(scene);
       }
     },
-    
+
     // Selection Actions
     setSelectedObjects: (objectIds) => {
       set({ selectedObjects: objectIds });
       // Update selected object snapshot
       get().updateSelectedObjectSnapshot();
     },
-    
+
     selectObject: (objectId: string, additive = false) => {
       const { selectedObjects } = get();
       let newSelection: string[];
-      
+
       if (additive) {
         newSelection = selectedObjects.includes(objectId)
-          ? selectedObjects.filter(id => id !== objectId)
+          ? selectedObjects.filter((id) => id !== objectId)
           : [...selectedObjects, objectId];
       } else {
         newSelection = [objectId];
       }
-      
+
       set({ selectedObjects: newSelection });
       get().updateSelectedObjectSnapshot();
     },
-    
+
     deselectAll: () => {
       set({ selectedObjects: [], selectedObjectData: null });
     },
-    
+
     updateSelectedObjectSnapshot: () => {
       const { selectedObjects, gameWorld } = get();
-      
+
       if (selectedObjects.length === 1 && gameWorld) {
         const objectData = gameWorld.getSelectedObjectData(selectedObjects[0]);
         set({ selectedObjectData: objectData });
@@ -215,64 +257,71 @@ const useEditorStore = create<EditorState>()(
         set({ selectedObjectData: null });
       }
     },
-    
+
     setEditorMode: (mode) => set({ editorMode: mode }),
     setViewportMode: (mode) => set({ viewportMode: mode }),
-    
+
     // Asset Actions
     loadAssets: async () => {
       const { currentProject } = get();
       if (!currentProject) return;
-      
+
       try {
         const assets = await window.projectAPI.getAssets(currentProject.path);
         set({ assets });
       } catch (error) {
-        console.error('Failed to load assets:', error);
+        console.error("Failed to load assets:", error);
         set({ assets: [] });
       }
     },
-    
+
     importAsset: async (filePath: string) => {
       const { currentProject } = get();
-      if (!currentProject) throw new Error('No project loaded');
-      
+      if (!currentProject) throw new Error("No project loaded");
+
       try {
-        const assetReference = await window.projectAPI.importAsset(currentProject.path, filePath);
+        const assetReference = await window.projectAPI.importAsset(
+          currentProject.path,
+          filePath,
+        );
         set({ assets: [...get().assets, assetReference] });
         return assetReference;
       } catch (error) {
-        console.error('Failed to import asset:', error);
+        console.error("Failed to import asset:", error);
         throw error;
       }
     },
-    
+
     importAssetFromData: async (fileName: string, fileData: ArrayBuffer) => {
       const { currentProject } = get();
-      if (!currentProject) throw new Error('No project loaded');
-      
+      if (!currentProject) throw new Error("No project loaded");
+
       try {
-        const assetReference = await window.projectAPI.importAssetFromData(currentProject.path, fileName, fileData);
+        const assetReference = await window.projectAPI.importAssetFromData(
+          currentProject.path,
+          fileName,
+          fileData,
+        );
         set({ assets: [...get().assets, assetReference] });
         return assetReference;
       } catch (error) {
-        console.error('Failed to import asset from data:', error);
+        console.error("Failed to import asset from data:", error);
         throw error;
       }
     },
-    
+
     deleteAsset: async (assetId: string) => {
       const { currentProject, assets } = get();
       if (!currentProject) return;
-      
+
       try {
         await window.projectAPI.deleteAsset(currentProject.path, assetId);
-        set({ assets: assets.filter(asset => asset.id !== assetId) });
+        set({ assets: assets.filter((asset) => asset.id !== assetId) });
       } catch (error) {
-        console.error('Failed to delete asset:', error);
+        console.error("Failed to delete asset:", error);
       }
     },
-    
+
     createMeshFromGLB: (assetReference: AssetReference, position?: Vector3) => {
       const { gameWorld, currentScene } = get();
       if (!gameWorld || !currentScene) return;
@@ -283,54 +332,59 @@ const useEditorStore = create<EditorState>()(
         transform: {
           position: position || { x: 0, y: 0, z: 0 },
           rotation: { x: 0, y: 0, z: 0 },
-          scale: { x: 1, y: 1, z: 1 }
+          scale: { x: 1, y: 1, z: 1 },
         },
-        components: [{
-          id: `component_${Date.now()}`,
-          type: 'MeshRenderer',
-          enabled: true,
-          properties: {
-            geometry: 'model',
-            model: assetReference.path,
-            materialRef: { type: 'library', materialId: 'default' }
-          }
-        }],
+        components: [
+          {
+            id: `component_${Date.now()}`,
+            type: "MeshRenderer",
+            enabled: true,
+            properties: {
+              geometry: "model",
+              model: assetReference.path,
+              materialRef: { type: "library", materialId: "default" },
+            },
+          },
+        ],
         children: [],
         visible: true,
         tags: [],
-        layer: 0
+        layer: 0,
       };
 
       // Add to scene via GameWorld (will emit events)
       get().addObject(newObject);
     },
-    
+
     // Physics Actions
     setPhysicsState: (state) => set({ physicsState: state }),
     setPhysicsCallbacks: (callbacks) => set({ physicsCallbacks: callbacks }),
-    
+
     playPhysics: () => {
       const { physicsCallbacks, gameWorld } = get();
-      
+
       // Create a comprehensive scene snapshot BEFORE starting physics
       if (gameWorld) {
         gameWorld.createSceneSnapshot();
       }
-      
+
       physicsCallbacks.play?.();
       gameWorld?.start();
-      set({ physicsState: 'playing' });
+      set({ physicsState: "playing" });
     },
-    
+
     pausePhysics: () => {
       const { physicsCallbacks, gameWorld } = get();
       physicsCallbacks.pause?.();
       gameWorld?.pause();
-      set({ physicsState: 'paused' });
+      set({ physicsState: "paused" });
     },
-    
+
     stopPhysics: () => {
       const { physicsCallbacks, gameWorld } = get();
+
+      // Immediately update the state to 'stopped'
+      set({ physicsState: "stopped" });
 
       physicsCallbacks.stop?.();
       gameWorld?.stop();
@@ -339,17 +393,16 @@ const useEditorStore = create<EditorState>()(
         gameWorld.restoreSceneSnapshot();
       }
 
-      set({ physicsState: 'stopped' });
       get().updateSelectedObjectSnapshot();
     },
-    
+
     resumePhysics: () => {
       const { physicsCallbacks, gameWorld } = get();
       physicsCallbacks.resume?.();
       gameWorld?.resume();
-      set({ physicsState: 'playing' });
+      set({ physicsState: "playing" });
     },
-    
+
     // GameWorld Delegated Actions
     addObject: (object: GameObject, parentId?: string) => {
       const { gameWorld, currentScene } = get();
@@ -358,7 +411,7 @@ const useEditorStore = create<EditorState>()(
       // Add to scene objects
       if (parentId) {
         const findAndAddToParent = (objects: GameObject[]): GameObject[] => {
-          return objects.map(obj => {
+          return objects.map((obj) => {
             if (obj.id === parentId) {
               return { ...obj, children: [...obj.children, object] };
             }
@@ -368,87 +421,178 @@ const useEditorStore = create<EditorState>()(
             return obj;
           });
         };
-        
+
         const updatedObjects = findAndAddToParent(currentScene.objects);
         const updatedScene = { ...currentScene, objects: updatedObjects };
+
         set({ currentScene: updatedScene });
         gameWorld.loadScene(updatedScene);
       } else {
-        const updatedScene = { 
-          ...currentScene, 
-          objects: [...currentScene.objects, object] 
+        const updatedScene = {
+          ...currentScene,
+          objects: [...currentScene.objects, object],
         };
+
         set({ currentScene: updatedScene });
         gameWorld.loadScene(updatedScene);
       }
     },
-    
+
     removeObject: (objectId: string) => {
       const { gameWorld, currentScene } = get();
       if (!gameWorld || !currentScene) return;
 
       const removeFromObjects = (objects: GameObject[]): GameObject[] => {
-        return objects.filter(obj => obj.id !== objectId)
-          .map(obj => ({
+        return objects
+          .filter((obj) => obj.id !== objectId)
+          .map((obj) => ({
             ...obj,
-            children: removeFromObjects(obj.children)
+            children: removeFromObjects(obj.children),
           }));
       };
 
       const updatedScene = {
         ...currentScene,
-        objects: removeFromObjects(currentScene.objects)
+        objects: removeFromObjects(currentScene.objects),
       };
-      
+
       set({ currentScene: updatedScene });
       gameWorld.loadScene(updatedScene);
     },
-    
+
     updateObject: (objectId: string, updates: Partial<GameObject>) => {
-      const { gameWorld } = get();
+      const { gameWorld, currentScene } = get();
       if (!gameWorld) return;
 
       // Delegate to GameWorld for immediate updates
-      Object.keys(updates).forEach(key => {
+      Object.keys(updates).forEach((key) => {
         gameWorld.updateObjectProperty(objectId, key, (updates as any)[key]);
       });
-      
+
+      // CRITICAL FIX: Also update the scene in the store to keep UI state synchronized
+      if (currentScene) {
+        const updateObjectInScene = (objects: GameObject[]): GameObject[] => {
+          return objects.map((obj) => {
+            if (obj.id === objectId) {
+              return { ...obj, ...updates };
+            }
+            if (obj.children && obj.children.length > 0) {
+              return { ...obj, children: updateObjectInScene(obj.children) };
+            }
+            return obj;
+          });
+        };
+
+        const updatedScene = {
+          ...currentScene,
+          objects: updateObjectInScene(currentScene.objects),
+        };
+
+        set({ currentScene: updatedScene });
+      }
+
       // Update snapshot if selected
       if (get().selectedObjects.includes(objectId)) {
         get().updateSelectedObjectSnapshot();
       }
     },
-    
-    updateObjectTransform: (objectId: string, transform: Partial<Transform>) => {
-      const { gameWorld } = get();
+
+    updateObjectTransform: (
+      objectId: string,
+      transform: Partial<Transform>,
+    ) => {
+      const { gameWorld, currentScene, physicsState } = get();
       if (!gameWorld) return;
 
       gameWorld.updateObjectTransform(objectId, transform);
-      
+
+      // CRITICAL FIX: Only update the scene in the store when physics is NOT running
+      // During physics simulation, GameWorld is the source of truth and we shouldn't update the store's scene
+      // This prevents stale runtime data from overriding the snapshot restoration
+      if (currentScene && physicsState === "stopped") {
+        const updateObjectTransforms = (
+          objects: GameObject[],
+        ): GameObject[] => {
+          return objects.map((obj) => {
+            if (obj.id === objectId) {
+              return { ...obj, transform: { ...obj.transform, ...transform } };
+            }
+            if (obj.children && obj.children.length > 0) {
+              return { ...obj, children: updateObjectTransforms(obj.children) };
+            }
+            return obj;
+          });
+        };
+
+        const updatedScene = {
+          ...currentScene,
+          objects: updateObjectTransforms(currentScene.objects),
+        };
+
+        set({ currentScene: updatedScene });
+      }
+
       // Update snapshot if selected
       if (get().selectedObjects.includes(objectId)) {
         get().updateSelectedObjectSnapshot();
       }
     },
-    
-    updateObjectComponent: (objectId: string, componentId: string, updates: Partial<GameObjectComponent>) => {
-      const { gameWorld } = get();
+
+    updateObjectComponent: (
+      objectId: string,
+      componentId: string,
+      updates: Partial<GameObjectComponent>,
+    ) => {
+      const { gameWorld, currentScene } = get();
       if (!gameWorld) return;
 
       gameWorld.updateObjectComponent(objectId, componentId, updates);
-      
+
+      // CRITICAL FIX: Also update the scene in the store to keep UI state synchronized
+      if (currentScene) {
+        const updateComponentInScene = (
+          objects: GameObject[],
+        ): GameObject[] => {
+          return objects.map((obj) => {
+            if (obj.id === objectId) {
+              const updatedComponents = obj.components.map((comp) => {
+                if (comp.id === componentId) {
+                  return { ...comp, ...updates };
+                }
+                return comp;
+              });
+              return { ...obj, components: updatedComponents };
+            }
+            if (obj.children && obj.children.length > 0) {
+              return { ...obj, children: updateComponentInScene(obj.children) };
+            }
+            return obj;
+          });
+        };
+
+        const updatedScene = {
+          ...currentScene,
+          objects: updateComponentInScene(currentScene.objects),
+        };
+
+        set({ currentScene: updatedScene });
+      }
+
       // Update snapshot if selected
       if (get().selectedObjects.includes(objectId)) {
         get().updateSelectedObjectSnapshot();
       }
     },
-    
-    addObjectComponent: (objectId: string, component: GameObjectComponent | PhysicsComponent) => {
+
+    addObjectComponent: (
+      objectId: string,
+      component: GameObjectComponent | PhysicsComponent,
+    ) => {
       const { gameWorld, currentScene } = get();
       if (!gameWorld || !currentScene) return;
 
       const updateInObjects = (objects: GameObject[]): GameObject[] => {
-        return objects.map(obj => {
+        return objects.map((obj) => {
           if (obj.id === objectId) {
             return { ...obj, components: [...obj.components, component] };
           }
@@ -461,42 +605,50 @@ const useEditorStore = create<EditorState>()(
 
       const updatedScene = {
         ...currentScene,
-        objects: updateInObjects(currentScene.objects)
+        objects: updateInObjects(currentScene.objects),
       };
-      
+
       set({ currentScene: updatedScene });
       gameWorld.loadScene(updatedScene);
-      
+
       // Update snapshot if selected
       if (get().selectedObjects.includes(objectId)) {
         get().updateSelectedObjectSnapshot();
       }
     },
-    
-    updateHeightfieldComponent: (objectId: string, componentId: string, updates: Partial<HeightfieldComponent['properties']>) => {
+
+    updateHeightfieldComponent: (
+      objectId: string,
+      componentId: string,
+      updates: Partial<HeightfieldComponent["properties"]>,
+    ) => {
       const { gameWorld, currentScene } = get();
       if (!gameWorld || !currentScene) return;
 
       const findAndUpdate = (objects: GameObject[]): GameObject[] => {
-        return objects.map(obj => {
+        return objects.map((obj) => {
           if (obj.id === objectId) {
-            const updatedComponents = obj.components.map(comp => {
-              if (comp.id === componentId && comp.type === 'heightfield') {
+            const updatedComponents = obj.components.map((comp) => {
+              if (comp.id === componentId && comp.type === "heightfield") {
                 const heightfieldComp = comp as HeightfieldComponent;
-                const updatedProperties = { ...heightfieldComp.properties, ...updates };
-                
+                const updatedProperties = {
+                  ...heightfieldComp.properties,
+                  ...updates,
+                };
+
                 if (updatedProperties.autoRegenerate) {
-                  updatedProperties.heights = generateHeightfieldData(updatedProperties);
+                  updatedProperties.heights =
+                    generateHeightfieldData(updatedProperties);
                   updatedProperties.lastGenerated = new Date();
                 }
-                
+
                 return { ...heightfieldComp, properties: updatedProperties };
               }
               return comp;
             });
             return { ...obj, components: updatedComponents };
           }
-          
+
           if (obj.children.length > 0) {
             return { ...obj, children: findAndUpdate(obj.children) };
           }
@@ -506,41 +658,48 @@ const useEditorStore = create<EditorState>()(
 
       const updatedScene = {
         ...currentScene,
-        objects: findAndUpdate(currentScene.objects)
+        objects: findAndUpdate(currentScene.objects),
       };
-      
+
       set({ currentScene: updatedScene });
       gameWorld.loadScene(updatedScene);
-      
+
       // Update snapshot if selected
       if (get().selectedObjects.includes(objectId)) {
         get().updateSelectedObjectSnapshot();
       }
     },
-    
-    updateExtrudedArcComponent: (objectId: string, componentId: string, updates: Partial<ExtrudedArcComponent['properties']>) => {
+
+    updateExtrudedArcComponent: (
+      objectId: string,
+      componentId: string,
+      updates: Partial<ExtrudedArcComponent["properties"]>,
+    ) => {
       const { gameWorld, currentScene } = get();
       if (!gameWorld || !currentScene) return;
 
       const findAndUpdate = (objects: GameObject[]): GameObject[] => {
-        return objects.map(obj => {
+        return objects.map((obj) => {
           if (obj.id === objectId) {
-            const updatedComponents = obj.components.map(comp => {
-              if (comp.id === componentId && comp.type === 'extrudedArc') {
+            const updatedComponents = obj.components.map((comp) => {
+              if (comp.id === componentId && comp.type === "extrudedArc") {
                 const extrudedArcComp = comp as ExtrudedArcComponent;
-                const updatedProperties = { ...extrudedArcComp.properties, ...updates };
-                
+                const updatedProperties = {
+                  ...extrudedArcComp.properties,
+                  ...updates,
+                };
+
                 if (updatedProperties.autoRegenerate) {
                   updatedProperties.lastGenerated = new Date();
                 }
-                
+
                 return { ...extrudedArcComp, properties: updatedProperties };
               }
               return comp;
             });
             return { ...obj, components: updatedComponents };
           }
-          
+
           if (obj.children.length > 0) {
             return { ...obj, children: findAndUpdate(obj.children) };
           }
@@ -550,98 +709,108 @@ const useEditorStore = create<EditorState>()(
 
       const updatedScene = {
         ...currentScene,
-        objects: findAndUpdate(currentScene.objects)
+        objects: findAndUpdate(currentScene.objects),
       };
-      
+
       set({ currentScene: updatedScene });
       gameWorld.loadScene(updatedScene);
-      
+
       // Update snapshot if selected
       if (get().selectedObjects.includes(objectId)) {
         get().updateSelectedObjectSnapshot();
       }
     },
-    
+
     // Scene Configuration
     updateSceneEditorConfig: (config: Partial<SceneEditorConfig>) => {
       const { currentScene } = get();
       if (!currentScene) return;
-      
+
       const updatedScene = {
         ...currentScene,
-        editorConfig: { ...currentScene.editorConfig, ...config }
+        editorConfig: { ...currentScene.editorConfig, ...config },
       };
+
       set({ currentScene: updatedScene });
     },
-    
+
     updateSceneRuntimeConfig: (config: Partial<SceneRuntimeConfig>) => {
       const { currentScene } = get();
       if (!currentScene) return;
-      
+
       const updatedScene = {
         ...currentScene,
-        runtimeConfig: { ...currentScene.runtimeConfig, ...config }
+        runtimeConfig: { ...currentScene.runtimeConfig, ...config },
       };
+
       set({ currentScene: updatedScene });
     },
-    
+
     updateScenePhysicsConfig: (config: Partial<PhysicsWorldConfig>) => {
       const { currentScene } = get();
       if (!currentScene) return;
-      
+
       const updatedScene = {
         ...currentScene,
-        physicsWorld: { ...currentScene.physicsWorld, ...config }
+        physicsWorld: { ...currentScene.physicsWorld, ...config },
       };
+
       set({ currentScene: updatedScene });
     },
-    
+
     // Viewport
     setViewportCamera: (camera) => {
       set({ viewportCamera: { ...get().viewportCamera, ...camera } });
     },
-    
+
     // Scene switching
     switchScene: async (sceneName: string) => {
       const { currentProject } = get();
       if (!currentProject) return;
-      
+
       try {
-        const scene = await window.projectAPI.loadScene(currentProject.path, sceneName);
+        const scene = await window.projectAPI.loadScene(
+          currentProject.path,
+          sceneName,
+        );
         get().setCurrentScene(scene);
       } catch (error) {
-        console.error('Failed to switch scene:', error);
+        console.error("Failed to switch scene:", error);
       }
     },
-    
+
     // Material Management Actions
     setMaterials: (materials) => set({ materials }),
-    addMaterial: (material) => set({ materials: [...get().materials, material] }),
+    addMaterial: (material) =>
+      set({ materials: [...get().materials, material] }),
     updateMaterial: (materialId, updatedMaterial) => {
-      const materials = get().materials.map(m => 
-        m.id === materialId ? updatedMaterial : m
+      const materials = get().materials.map((m) =>
+        m.id === materialId ? updatedMaterial : m,
       );
       set({ materials });
     },
     deleteMaterial: (materialId) => {
-      const materials = get().materials.filter(m => m.id !== materialId);
+      const materials = get().materials.filter((m) => m.id !== materialId);
       set({ materials });
     },
-    setSelectedMaterial: (materialId) => set({ selectedMaterialId: materialId }),
-    openMaterialBrowser: (meshId) => set({ 
-      isMaterialBrowserOpen: true, 
-      editingMeshId: meshId || null 
-    }),
-    closeMaterialBrowser: () => set({ 
-      isMaterialBrowserOpen: false, 
-      editingMeshId: null 
-    }),
+    setSelectedMaterial: (materialId) =>
+      set({ selectedMaterialId: materialId }),
+    openMaterialBrowser: (meshId) =>
+      set({
+        isMaterialBrowserOpen: true,
+        editingMeshId: meshId || null,
+      }),
+    closeMaterialBrowser: () =>
+      set({
+        isMaterialBrowserOpen: false,
+        editingMeshId: null,
+      }),
     assignMaterialToMesh: (meshId, materialId) => {
       // This would typically update the mesh component's material reference
       // Implementation depends on your specific component structure
-      console.log('Assigning material', materialId, 'to mesh', meshId);
+      console.log("Assigning material", materialId, "to mesh", meshId);
     },
-  }))
+  })),
 );
 
-export default useEditorStore; 
+export default useEditorStore;

@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from "three";
 
 // Simple browser-compatible EventEmitter implementation
 type EventListener = (...args: any[]) => void;
@@ -17,11 +17,13 @@ class SimpleEventEmitter {
       this.listeners.set(event, new Set());
     }
     const eventListeners = this.listeners.get(event)!;
-    
+
     if (eventListeners.size >= this.maxListeners) {
-      console.warn(`MaxListenersExceededWarning: Possible EventEmitter memory leak detected. ${eventListeners.size + 1} ${event} listeners added.`);
+      console.warn(
+        `MaxListenersExceededWarning: Possible EventEmitter memory leak detected. ${eventListeners.size + 1} ${event} listeners added.`,
+      );
     }
-    
+
     eventListeners.add(listener);
     return this;
   }
@@ -32,7 +34,7 @@ class SimpleEventEmitter {
       return false;
     }
 
-    eventListeners.forEach(listener => {
+    eventListeners.forEach((listener) => {
       try {
         listener(...args);
       } catch (error) {
@@ -69,10 +71,10 @@ class SimpleEventEmitter {
 }
 
 export interface GameWorldEvent {
-  'objectTransformUpdate': { objectId: string; transform: Transform };
-  'objectUpdate': { objectId: string; updates: Partial<GameObject> };
-  'physicsStep': { deltaTime: number };
-  'sceneChanged': { scene: GameScene };
+  objectTransformUpdate: { objectId: string; transform: Transform };
+  objectUpdate: { objectId: string; updates: Partial<GameObject> };
+  physicsStep: { deltaTime: number };
+  sceneChanged: { scene: GameScene };
 }
 
 export class GameWorld extends SimpleEventEmitter {
@@ -111,25 +113,37 @@ export class GameWorld extends SimpleEventEmitter {
       this.buildObjectMap(this.scene.objects);
     }
 
-    this.emit('sceneChanged', { scene });
+    this.emit("sceneChanged", { scene });
   }
 
-  private buildObjectMap(objects: GameObject[], parentTransform = new THREE.Matrix4()): void {
+  private buildObjectMap(
+    objects: GameObject[],
+    parentTransform = new THREE.Matrix4(),
+  ): void {
     for (const obj of objects) {
       this.objects.set(obj.id, obj);
       this.transforms.set(obj.id, { ...obj.transform });
       this.originalTransforms.set(obj.id, { ...obj.transform }); // Store original transform
-      
+
       const localMatrix = new THREE.Matrix4();
       const { position, rotation, scale } = obj.transform;
-      
-      const rotQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ'));
-      localMatrix.compose(new THREE.Vector3(position.x, position.y, position.z), rotQuat, new THREE.Vector3(scale.x, scale.y, scale.z));
-      
-      const worldMatrix = new THREE.Matrix4().multiplyMatrices(parentTransform, localMatrix);
+
+      const rotQuat = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(rotation.x, rotation.y, rotation.z, "XYZ"),
+      );
+      localMatrix.compose(
+        new THREE.Vector3(position.x, position.y, position.z),
+        rotQuat,
+        new THREE.Vector3(scale.x, scale.y, scale.z),
+      );
+
+      const worldMatrix = new THREE.Matrix4().multiplyMatrices(
+        parentTransform,
+        localMatrix,
+      );
       this.liveTransforms.set(obj.id, worldMatrix.clone());
-      
-      if(obj.children && obj.children.length > 0) {
+
+      if (obj.children && obj.children.length > 0) {
         this.buildObjectMap(obj.children, worldMatrix);
       }
     }
@@ -167,14 +181,14 @@ export class GameWorld extends SimpleEventEmitter {
     if (!obj) return;
 
     (obj as any)[property] = value;
-    
+
     const threeObj = this.threeObjects.get(objectId);
     if (threeObj) {
-      if (property === 'visible') threeObj.visible = value;
-      else if (property === 'name') threeObj.name = value;
+      if (property === "visible") threeObj.visible = value;
+      else if (property === "name") threeObj.name = value;
     }
 
-    this.emit('objectUpdate', { objectId, updates: { [property]: value } });
+    this.emit("objectUpdate", { objectId, updates: { [property]: value } });
   }
 
   updateObjectTransform(objectId: string, transform: Partial<Transform>): void {
@@ -182,47 +196,88 @@ export class GameWorld extends SimpleEventEmitter {
     if (!currentTransform) return;
 
     if (this._isRunning && this.rigidBodies.has(objectId)) {
-      console.warn(`Cannot directly update transform of physics object ${objectId} while simulation is running.`);
+      console.warn(
+        `Cannot directly update transform of physics object ${objectId} while simulation is running.`,
+      );
       return;
     }
 
     const newTransform = { ...currentTransform, ...transform };
     this.transforms.set(objectId, newTransform);
 
-    // Rebuild object map to update world transforms for all children
-    if(this.scene){
-        this.buildObjectMap(this.scene.objects);
+    // CRITICAL FIX: When physics is stopped, any editor transforms should become the new "original" state
+    // This prevents the system from reverting to old snapshot data when objects are moved during stopped physics
+    if (!this._isRunning) {
+      this.originalTransforms.set(objectId, { ...newTransform });
+
+      // Also update the scene snapshot if it exists to reflect the new state
+      if (this.sceneSnapshot) {
+        const updateSnapshotTransforms = (objects: GameObject[]) => {
+          objects.forEach((obj) => {
+            if (obj.id === objectId) {
+              obj.transform = { ...newTransform };
+            }
+            if (obj.children && obj.children.length > 0) {
+              updateSnapshotTransforms(obj.children);
+            }
+          });
+        };
+        updateSnapshotTransforms(this.sceneSnapshot.objects);
+      }
     }
-    
+
+    // Rebuild object map to update world transforms for all children
+    if (this.scene) {
+      this.buildObjectMap(this.scene.objects);
+    }
+
     const threeObj = this.threeObjects.get(objectId);
     if (threeObj) {
-        const { position, rotation, scale } = newTransform;
-        threeObj.position.set(position.x, position.y, position.z);
-        threeObj.rotation.set(rotation.x, rotation.y, rotation.z);
-        threeObj.scale.set(scale.x, scale.y, scale.z);
+      const { position, rotation, scale } = newTransform;
+      threeObj.position.set(position.x, position.y, position.z);
+      threeObj.rotation.set(rotation.x, rotation.y, rotation.z);
+      threeObj.scale.set(scale.x, scale.y, scale.z);
     }
 
     const obj = this.objects.get(objectId);
     if (obj) obj.transform = newTransform;
-    this.emit('objectTransformUpdate', { objectId, transform: newTransform });
+    this.emit("objectTransformUpdate", { objectId, transform: newTransform });
   }
 
-  updateObjectComponent(objectId: string, componentId: string, updates: Partial<GameObjectComponent>): void {
+  updateObjectComponent(
+    objectId: string,
+    componentId: string,
+    updates: Partial<GameObjectComponent>,
+  ): void {
     const obj = this.objects.get(objectId);
     if (!obj) return;
 
-    const componentIndex = obj.components.findIndex(c => c.id === componentId);
+    const componentIndex = obj.components.findIndex(
+      (c) => c.id === componentId,
+    );
     if (componentIndex === -1) return;
 
-    obj.components[componentIndex] = { ...obj.components[componentIndex], ...updates };
+    obj.components[componentIndex] = {
+      ...obj.components[componentIndex],
+      ...updates,
+    };
 
-    this.emit('objectUpdate', { objectId, updates: { components: obj.components } });
+    this.emit("objectUpdate", {
+      objectId,
+      updates: { components: obj.components },
+    });
   }
 
   // Physics Integration
-  setPhysicsWorld(world: any): void { this.physicsWorld = world; }
-  registerRigidBody(objectId: string, rigidBody: any): void { this.rigidBodies.set(objectId, rigidBody); }
-  unregisterRigidBody(objectId: string): void { this.rigidBodies.delete(objectId); }
+  setPhysicsWorld(world: any): void {
+    this.physicsWorld = world;
+  }
+  registerRigidBody(objectId: string, rigidBody: any): void {
+    this.rigidBodies.set(objectId, rigidBody);
+  }
+  unregisterRigidBody(objectId: string): void {
+    this.rigidBodies.delete(objectId);
+  }
 
   // Physics Control Methods
   applyForce(objectId: string, force: Vector3, point?: Vector3): void {
@@ -271,8 +326,12 @@ export class GameWorld extends SimpleEventEmitter {
     this._isRunning = true;
     this.lastUpdateTime = performance.now();
   }
-  stop(): void { this._isRunning = false; }
-  pause(): void { this._isRunning = false; }
+  stop(): void {
+    this._isRunning = false;
+  }
+  pause(): void {
+    this._isRunning = false;
+  }
   resume(): void {
     if (this._isRunning) return;
     this._isRunning = true;
@@ -282,14 +341,14 @@ export class GameWorld extends SimpleEventEmitter {
   // Scene Snapshot Management
   createSceneSnapshot(): void {
     if (!this.scene) return;
-    
+
     // Create a deep copy of the scene, but ensure we capture the original transforms
     // not any runtime modifications that may have occurred
     const sceneWithOriginalTransforms = JSON.parse(JSON.stringify(this.scene));
-    
+
     // Recursively restore original transforms in the snapshot
     const restoreOriginalTransforms = (objects: GameObject[]) => {
-      objects.forEach(obj => {
+      objects.forEach((obj) => {
         const originalTransform = this.originalTransforms.get(obj.id);
         if (originalTransform) {
           obj.transform = { ...originalTransform };
@@ -299,7 +358,7 @@ export class GameWorld extends SimpleEventEmitter {
         }
       });
     };
-    
+
     restoreOriginalTransforms(sceneWithOriginalTransforms.objects);
     this.sceneSnapshot = sceneWithOriginalTransforms;
     console.log("Scene snapshot created with original transforms.");
@@ -313,19 +372,25 @@ export class GameWorld extends SimpleEventEmitter {
 
     // 1. Restore the scene data model.
     this.scene = JSON.parse(JSON.stringify(this.sceneSnapshot));
-    
+
     // 2. Rebuild data maps from the restored scene data, preserving physics/visual object maps.
     this.objects.clear();
     this.transforms.clear();
     this.liveTransforms.clear();
-    
+
     if (this.scene) {
       // This correctly calculates the initial world matrices for all objects
       // based on the snapshot data and stores them in `this.liveTransforms`.
       this.buildObjectMap(this.scene.objects);
     }
 
-    // 3. Iterate over all objects and imperatively reset their states.
+    // 3. CRITICAL FIX: Synchronize originalTransforms with the restored state
+    // This ensures that the restored state becomes the new baseline for any subsequent manual edits during stopped physics
+    this.objects.forEach((obj, objectId) => {
+      this.originalTransforms.set(objectId, { ...obj.transform });
+    });
+
+    // 4. Iterate over all objects and imperatively reset their states.
     this.objects.forEach((obj, objectId) => {
       const { transform } = obj;
 
@@ -347,31 +412,38 @@ export class GameWorld extends SimpleEventEmitter {
             // Apply the WORLD position and rotation to the physics body.
             rigidBody.setTranslation(worldPosition, true);
             rigidBody.setRotation(worldQuaternion, true);
-            
+
             // CRITICAL: Reset all motion to zero.
             rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
             rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-            
+
             rigidBody.wakeUp();
           } catch (error) {
-            console.error(`Failed to reset rigid body for object ${objectId}:`, error);
+            console.error(
+              `Failed to reset rigid body for object ${objectId}:`,
+              error,
+            );
           }
         } else {
-          console.warn(`Could not find world matrix for object ${objectId} on restore.`);
+          console.warn(
+            `Could not find world matrix for object ${objectId} on restore.`,
+          );
         }
       }
-      
+
       // Emit an update for the UI (like the inspector) to refresh with restored local transform.
-      this.emit('objectTransformUpdate', { objectId, transform });
+      this.emit("objectTransformUpdate", { objectId, transform });
     });
 
-    console.log("Scene snapshot restored.");
+    console.log(
+      "Scene snapshot restored with synchronized original transforms.",
+    );
     // This will trigger a re-render for UI consistency.
     if (this.scene) {
-      this.emit('sceneChanged', { scene: this.scene });
+      console.log("sending scene event", this.scene);
+      this.emit("sceneChanged", { scene: this.scene });
     }
   }
-
 
   update(currentTime: number): void {
     if (!this._isRunning) return;
@@ -380,8 +452,8 @@ export class GameWorld extends SimpleEventEmitter {
     this.lastUpdateTime = currentTime;
 
     this.updatePhysicsTransforms();
-    this.updateCallbacks.forEach(callback => callback(deltaTime));
-    this.emit('physicsStep', { deltaTime });
+    this.updateCallbacks.forEach((callback) => callback(deltaTime));
+    this.emit("physicsStep", { deltaTime });
   }
 
   private updatePhysicsTransforms(): void {
@@ -390,7 +462,7 @@ export class GameWorld extends SimpleEventEmitter {
 
       const position = rigidBody.translation();
       const rotation = rigidBody.rotation();
-      
+
       const threeObj = this.threeObjects.get(objectId);
       if (threeObj) {
         threeObj.position.set(position.x, position.y, position.z);
@@ -400,21 +472,45 @@ export class GameWorld extends SimpleEventEmitter {
       const transform = this.transforms.get(objectId);
       if (transform) {
         transform.position = { x: position.x, y: position.y, z: position.z };
-        const euler = new THREE.Euler().setFromQuaternion(new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w));
+        const euler = new THREE.Euler().setFromQuaternion(
+          new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
+        );
         transform.rotation = { x: euler.x, y: euler.y, z: euler.z };
       }
     });
   }
 
-  addUpdateCallback(callback: (deltaTime: number) => void): void { this.updateCallbacks.add(callback); }
-  removeUpdateCallback(callback: (deltaTime: number) => void): void { this.updateCallbacks.delete(callback); }
-  getSelectedObjectData(objectId: string): GameObject | null { return this.objects.get(objectId) || null; }
-  getAllObjects(): GameObject[] { return this.scene ? this.scene.objects : []; }
-  findObjectById(objectId: string): GameObject | null { return this.objects.get(objectId) || null; }
-  findObjectsByTag(tag: string): GameObject[] { return Array.from(this.objects.values()).filter(obj => obj.tags?.includes(tag)); }
-  findObjectsByComponent(type: string): GameObject[] { return Array.from(this.objects.values()).filter(obj => obj.components.some(c => c.type === type)); }
-  isRunning(): boolean { return this._isRunning; }
-  getScene(): GameScene | null { return this.scene; }
+  addUpdateCallback(callback: (deltaTime: number) => void): void {
+    this.updateCallbacks.add(callback);
+  }
+  removeUpdateCallback(callback: (deltaTime: number) => void): void {
+    this.updateCallbacks.delete(callback);
+  }
+  getSelectedObjectData(objectId: string): GameObject | null {
+    return this.objects.get(objectId) || null;
+  }
+  getAllObjects(): GameObject[] {
+    return this.scene ? this.scene.objects : [];
+  }
+  findObjectById(objectId: string): GameObject | null {
+    return this.objects.get(objectId) || null;
+  }
+  findObjectsByTag(tag: string): GameObject[] {
+    return Array.from(this.objects.values()).filter((obj) =>
+      obj.tags?.includes(tag),
+    );
+  }
+  findObjectsByComponent(type: string): GameObject[] {
+    return Array.from(this.objects.values()).filter((obj) =>
+      obj.components.some((c) => c.type === type),
+    );
+  }
+  isRunning(): boolean {
+    return this._isRunning;
+  }
+  getScene(): GameScene | null {
+    return this.scene;
+  }
 
   dispose(): void {
     this.stop();

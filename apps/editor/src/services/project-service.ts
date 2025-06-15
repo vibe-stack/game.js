@@ -130,6 +130,14 @@ export class ProjectService {
     return this.fileSystemManager.fileExists(filePath);
   }
 
+  async listDirectory(dirPath: string): Promise<import('./file-system-manager').FileSystemItem[]> {
+    return this.fileSystemManager.listDirectory(dirPath);
+  }
+
+  async getFileStats(filePath: string): Promise<{ size: number; modified: Date }> {
+    return this.fileSystemManager.getFileStats(filePath);
+  }
+
   // IPC Registration - unchanged
   registerIpcHandlers() {
     ipcMain.handle("project:load-projects", () => this.loadProjects());
@@ -214,6 +222,12 @@ export class ProjectService {
     );
     ipcMain.handle("project:file-exists", (_, filePath: string) =>
       this.fileExists(filePath),
+    );
+    ipcMain.handle("project:list-directory", (_, dirPath: string) =>
+      this.listDirectory(dirPath),
+    );
+    ipcMain.handle("project:get-file-stats", (_, filePath: string) =>
+      this.getFileStats(filePath),
     );
   }
 }

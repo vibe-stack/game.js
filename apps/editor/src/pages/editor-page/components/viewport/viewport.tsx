@@ -17,7 +17,7 @@ import Grid2 from "./components/grid2";
 // import WebGPUGrid from "./components/webgpu-grid";
 import * as THREE from "three/webgpu";
 
-extend(THREE as any)
+extend(THREE as any);
 
 interface ViewportProps {
   scene: GameScene | null;
@@ -61,11 +61,11 @@ function PhysicsCallbackProvider({
 
 function GameWorldUpdater() {
   const { setGameWorld } = useEditorStore();
-  
+
   useEffect(() => {
     // Initialize GameWorld integration
     setGameWorld(gameWorld);
-    
+
     return () => {
       gameWorld.dispose();
     };
@@ -83,78 +83,102 @@ function CameraController({ scene }: { scene: GameScene }) {
   const { camera, controls } = useThree();
   const { viewportMode, physicsState } = useEditorStore();
   const prevActiveCameraRef = useRef<string | undefined>(scene.activeCamera);
-  const cameraFollowRef = useRef<{ camera: GameObject; worldMatrix: THREE.Matrix4 } | null>(null);
-  
+  const cameraFollowRef = useRef<{
+    camera: GameObject;
+    worldMatrix: THREE.Matrix4;
+  } | null>(null);
+
   useEffect(() => {
     if (!scene.activeCamera) return;
-    
+
     // Find the active camera object and calculate its world transform
-    const findCameraWithWorldTransform = (objects: GameObject[], id: string, parentTransform?: THREE.Matrix4): { camera: GameObject; worldMatrix: THREE.Matrix4 } | null => {
+    const findCameraWithWorldTransform = (
+      objects: GameObject[],
+      id: string,
+      parentTransform?: THREE.Matrix4,
+    ): { camera: GameObject; worldMatrix: THREE.Matrix4 } | null => {
       for (const obj of objects) {
         // Calculate this object's world matrix
         const localMatrix = new THREE.Matrix4();
         const { position, rotation, scale } = obj.transform;
         localMatrix.makeTranslation(position.x, position.y, position.z);
-        
+
         const rotationMatrix = new THREE.Matrix4();
-        rotationMatrix.makeRotationFromEuler(new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ'));
+        rotationMatrix.makeRotationFromEuler(
+          new THREE.Euler(rotation.x, rotation.y, rotation.z, "XYZ"),
+        );
         localMatrix.multiply(rotationMatrix);
-        
+
         const scaleMatrix = new THREE.Matrix4();
         scaleMatrix.makeScale(scale.x, scale.y, scale.z);
         localMatrix.multiply(scaleMatrix);
-        
+
         // Combine with parent transform if it exists
-        const worldMatrix = parentTransform ? new THREE.Matrix4().multiplyMatrices(parentTransform, localMatrix) : localMatrix;
-        
+        const worldMatrix = parentTransform
+          ? new THREE.Matrix4().multiplyMatrices(parentTransform, localMatrix)
+          : localMatrix;
+
         if (obj.id === id) {
           const hasCameraComponent = obj.components.some(
-            comp => comp.type === 'PerspectiveCamera' || comp.type === 'OrthographicCamera'
+            (comp) =>
+              comp.type === "PerspectiveCamera" ||
+              comp.type === "OrthographicCamera",
           );
           if (hasCameraComponent) return { camera: obj, worldMatrix };
         }
-        
+
         // Search children with this object's world transform as parent
-        const found = findCameraWithWorldTransform(obj.children, id, worldMatrix);
+        const found = findCameraWithWorldTransform(
+          obj.children,
+          id,
+          worldMatrix,
+        );
         if (found) return found;
       }
       return null;
     };
-    
-    const result = findCameraWithWorldTransform(scene.objects, scene.activeCamera);
+
+    const result = findCameraWithWorldTransform(
+      scene.objects,
+      scene.activeCamera,
+    );
     cameraFollowRef.current = result;
-    
+
     // Handle camera switching logic
-    if (viewportMode === 'orbit' && controls && scene.activeCamera !== prevActiveCameraRef.current) {
+    if (
+      viewportMode === "orbit" &&
+      controls &&
+      scene.activeCamera !== prevActiveCameraRef.current
+    ) {
       if (!result) return;
-      
+
       const { worldMatrix } = result;
-      
+
       // Extract world position from the world matrix
       const worldPosition = new THREE.Vector3();
       const worldRotation = new THREE.Quaternion();
       worldMatrix.decompose(worldPosition, worldRotation, new THREE.Vector3());
-      
+
       // If OrbitControls is available, use it for smooth transition
-      if (controls && 'object' in controls) {
+      if (controls && "object" in controls) {
         const orbitControls = controls as any;
-        
+
         // Set the target position for smooth animation using world coordinates
         orbitControls.object.position.copy(worldPosition);
         orbitControls.target.set(0, 0, 0); // Look at center for now
         orbitControls.update();
       }
     }
-    
+
     prevActiveCameraRef.current = scene.activeCamera;
   }, [scene.activeCamera, scene.objects, camera, controls, viewportMode]);
-  
+
   // Update camera transform in camera follow mode
   useFrame(() => {
-    if (viewportMode === 'camera' && scene.activeCamera && camera) {
+    if (viewportMode === "camera" && scene.activeCamera && camera) {
       // During physics, get live transforms from the GameWorld
       // During non-physics, use GameObject transforms
-      if (physicsState === 'playing') {
+      if (physicsState === "playing") {
         // Get live transform from GameWorld
         const liveTransform = gameWorld.getLiveTransform(scene.activeCamera);
         if (liveTransform) {
@@ -163,7 +187,7 @@ function CameraController({ scene }: { scene: GameScene }) {
           const worldRotation = new THREE.Quaternion();
           const worldScale = new THREE.Vector3();
           liveTransform.decompose(worldPosition, worldRotation, worldScale);
-          
+
           // Apply to the viewport camera
           camera.position.copy(worldPosition);
           camera.quaternion.copy(worldRotation);
@@ -174,8 +198,16 @@ function CameraController({ scene }: { scene: GameScene }) {
         const cameraObj = gameWorld.getObject(scene.activeCamera);
         if (cameraObj) {
           const transform = cameraObj.transform;
-          camera.position.set(transform.position.x, transform.position.y, transform.position.z);
-          camera.rotation.set(transform.rotation.x, transform.rotation.y, transform.rotation.z);
+          camera.position.set(
+            transform.position.x,
+            transform.position.y,
+            transform.position.z,
+          );
+          camera.rotation.set(
+            transform.rotation.x,
+            transform.rotation.y,
+            transform.rotation.z,
+          );
           camera.updateMatrixWorld();
         }
       }
@@ -185,7 +217,11 @@ function CameraController({ scene }: { scene: GameScene }) {
   return null;
 }
 
-function SceneRenderer({ scene, selectedObjects, onSelectObject }: {
+function SceneRenderer({
+  scene,
+  selectedObjects,
+  onSelectObject,
+}: {
   scene: GameScene;
   selectedObjects: string[];
   onSelectObject: (id: string, event?: React.MouseEvent) => void;
@@ -195,9 +231,11 @@ function SceneRenderer({ scene, selectedObjects, onSelectObject }: {
   return (
     <>
       {editorConfig.showHelperGrid && (
-        <Grid2 args={[editorConfig.gridSize || 10, editorConfig.gridSize || 10]} />
+        <Grid2
+          args={[editorConfig.gridSize || 10, editorConfig.gridSize || 10]}
+        />
       )}
-      
+
       {scene.objects.map((obj) => (
         <SceneObject
           key={obj.id}
@@ -220,7 +258,7 @@ export default function Viewport({
   const { viewportCamera } = useEditorStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Load scene into GameWorld when scene changes
+  // Load scene into GameWorld when scene changes, but only if NOT updating from GameWorld
   useEffect(() => {
     if (scene) {
       gameWorld.loadScene(scene);
@@ -233,34 +271,40 @@ export default function Viewport({
 
   const handleDrop = async (event: React.DragEvent) => {
     event.preventDefault();
-    
+
     const files = Array.from(event.dataTransfer.files);
-    
+
     for (const file of files) {
-      if (file.type.startsWith('image/')) {
+      if (file.type.startsWith("image/")) {
         try {
           const arrayBuffer = await file.arrayBuffer();
-          await useEditorStore.getState().importAssetFromData(file.name, arrayBuffer);
+          await useEditorStore
+            .getState()
+            .importAssetFromData(file.name, arrayBuffer);
         } catch (error) {
-          console.error('Failed to import texture:', error);
+          console.error("Failed to import texture:", error);
         }
-      } else if (file.name.endsWith('.glb') || file.name.endsWith('.gltf')) {
+      } else if (file.name.endsWith(".glb") || file.name.endsWith(".gltf")) {
         try {
           const arrayBuffer = await file.arrayBuffer();
-          const assetReference = await useEditorStore.getState().importAssetFromData(file.name, arrayBuffer);
-          
+          const assetReference = await useEditorStore
+            .getState()
+            .importAssetFromData(file.name, arrayBuffer);
+
           // Calculate drop position in 3D space
           const rect = canvasRef.current?.getBoundingClientRect();
           if (rect) {
             const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-            
+
             // Simple projection to ground plane
             const dropPosition = { x: x * 5, y: 0, z: y * 5 };
-            useEditorStore.getState().createMeshFromGLB(assetReference, dropPosition);
+            useEditorStore
+              .getState()
+              .createMeshFromGLB(assetReference, dropPosition);
           }
         } catch (error) {
-          console.error('Failed to import model:', error);
+          console.error("Failed to import model:", error);
         }
       }
     }
@@ -268,7 +312,7 @@ export default function Viewport({
 
   if (!scene) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+      <div className="text-muted-foreground flex h-full w-full items-center justify-center">
         No scene loaded
       </div>
     );
@@ -276,28 +320,39 @@ export default function Viewport({
 
   const getShadowType = (shadowType: string) => {
     switch (shadowType) {
-      case 'basic': return THREE.BasicShadowMap;
-      case 'pcf': return THREE.PCFShadowMap;
-      case 'pcfsoft': return THREE.PCFSoftShadowMap;
-      case 'vsm': return THREE.VSMShadowMap;
-      default: return THREE.PCFShadowMap;
+      case "basic":
+        return THREE.BasicShadowMap;
+      case "pcf":
+        return THREE.PCFShadowMap;
+      case "pcfsoft":
+        return THREE.PCFSoftShadowMap;
+      case "vsm":
+        return THREE.VSMShadowMap;
+      default:
+        return THREE.PCFShadowMap;
     }
   };
 
   const getToneMapping = (toneMapping: string) => {
     switch (toneMapping) {
-      case 'none': return NoToneMapping;
-      case 'linear': return LinearToneMapping;
-      case 'reinhard': return ReinhardToneMapping;
-      case 'cineon': return CineonToneMapping;
-      case 'aces': return ACESFilmicToneMapping;
-      default: return ACESFilmicToneMapping;
+      case "none":
+        return NoToneMapping;
+      case "linear":
+        return LinearToneMapping;
+      case "reinhard":
+        return ReinhardToneMapping;
+      case "cineon":
+        return CineonToneMapping;
+      case "aces":
+        return ACESFilmicToneMapping;
+      default:
+        return ACESFilmicToneMapping;
     }
   };
 
   return (
-    <div 
-      className="w-full h-full relative"
+    <div
+      className="relative h-full w-full"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
@@ -305,8 +360,16 @@ export default function Viewport({
         ref={canvasRef}
         shadows
         camera={{
-          position: [viewportCamera.position.x, viewportCamera.position.y, viewportCamera.position.z],
-          rotation: [viewportCamera.rotation.x, viewportCamera.rotation.y, viewportCamera.rotation.z],
+          position: [
+            viewportCamera.position.x,
+            viewportCamera.position.y,
+            viewportCamera.position.z,
+          ],
+          rotation: [
+            viewportCamera.rotation.x,
+            viewportCamera.rotation.y,
+            viewportCamera.rotation.z,
+          ],
           fov: 50,
           near: 0.1,
           far: 1000,
@@ -322,30 +385,33 @@ export default function Viewport({
       >
         <GameWorldProvider gameWorld={gameWorld}>
           <Suspense fallback={null}>
-            <PhysicsProvider 
-              scene={scene} 
-              onObjectTransformUpdate={(objectId, transform) => {
-                // Update via GameWorld instead of directly to store
-                gameWorld.updateObjectTransform(objectId, transform);
-              }}
+            <PhysicsProvider
+              scene={scene}
+              // onObjectTransformUpdate={(objectId, transform) => {
+              //   // Update via GameWorld instead of directly to store
+              //   gameWorld.updateObjectTransform(objectId, transform);
+              // }}
               debugEnabled={scene.physicsWorld.debugRender.enabled}
             >
               <GameWorldUpdater />
-              <PhysicsCallbackProvider onPhysicsCallbacks={onPhysicsCallbacks} />
+              <PhysicsCallbackProvider
+                onPhysicsCallbacks={onPhysicsCallbacks}
+              />
               <CameraController scene={scene} />
               <SceneEffects scene={scene} />
-              
+
               {/* {scene.runtimeConfig.environment && (
                 <Environment files={scene.runtimeConfig.environment} />
               )} */}
-              
+
               <OrbitControls
                 enablePan={true}
                 enableZoom={true}
                 enableRotate={true}
                 target={[0, 0, 0]}
+                makeDefault
               />
-              
+
               <SceneRenderer
                 scene={scene}
                 selectedObjects={selectedObjects}

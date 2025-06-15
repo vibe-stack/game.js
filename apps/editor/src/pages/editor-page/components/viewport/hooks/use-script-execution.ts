@@ -141,7 +141,11 @@ export function useScriptExecution(entity: GameObject, scene: GameScene) {
   }, [physicsState]);
 
   useFrame((state, deltaTime) => {
-    if (physicsState !== "playing" || !lifecycleRef.current) return;
+    if (
+      physicsState !== "playing" ||
+      !lifecycleRef.current ||
+      !gameWorld.isRunning()
+    ) return;
 
     const totalTime = (Date.now() - startTimeRef.current) / 1000;
     try {
