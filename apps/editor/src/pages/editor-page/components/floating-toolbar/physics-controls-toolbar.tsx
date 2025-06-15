@@ -1,7 +1,6 @@
 import React from "react";
-import { Play, Pause, Square, RotateCcw } from "lucide-react";
+import { Play, Pause, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/utils/tailwind";
 
 type PhysicsState = 'stopped' | 'playing' | 'paused';

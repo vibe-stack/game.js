@@ -79,8 +79,9 @@ export class GameWorld extends SimpleEventEmitter {
   private scene: GameScene | null = null;
   private objects: Map<string, GameObject> = new Map();
   private transforms: Map<string, Transform> = new Map();
+  private originalTransforms: Map<string, Transform> = new Map(); // Store original transforms for reset
   private liveTransforms: Map<string, THREE.Matrix4> = new Map();
-  private originalTransforms: Map<string, Transform> = new Map(); // Store original transforms before physics
+  private sceneSnapshot: GameScene | null = null; // Full scene snapshot
   private physicsWorld: any = null;
   private rigidBodies: Map<string, any> = new Map();
   private _isRunning = false;
@@ -96,44 +97,41 @@ export class GameWorld extends SimpleEventEmitter {
 
   // Scene Management
   loadScene(scene: GameScene): void {
+    this.stop();
     this.scene = scene;
     this.objects.clear();
     this.transforms.clear();
+    this.originalTransforms.clear();
     this.liveTransforms.clear();
     this.threeObjects.clear();
-    
-    // Build object map and initial transforms
-    this.buildObjectMap(scene.objects);
-    
+    this.rigidBodies.clear();
+    this.sceneSnapshot = null;
+
+    if (this.scene) {
+      this.buildObjectMap(this.scene.objects);
+    }
+
     this.emit('sceneChanged', { scene });
   }
 
-  private buildObjectMap(objects: GameObject[], parentTransform?: THREE.Matrix4): void {
+  private buildObjectMap(objects: GameObject[], parentTransform = new THREE.Matrix4()): void {
     for (const obj of objects) {
       this.objects.set(obj.id, obj);
       this.transforms.set(obj.id, { ...obj.transform });
+      this.originalTransforms.set(obj.id, { ...obj.transform }); // Store original transform
       
-      // Calculate world transform
       const localMatrix = new THREE.Matrix4();
       const { position, rotation, scale } = obj.transform;
       
-      localMatrix.makeTranslation(position.x, position.y, position.z);
-      const rotationMatrix = new THREE.Matrix4();
-      rotationMatrix.makeRotationFromEuler(new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ'));
-      localMatrix.multiply(rotationMatrix);
+      const rotQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ'));
+      localMatrix.compose(new THREE.Vector3(position.x, position.y, position.z), rotQuat, new THREE.Vector3(scale.x, scale.y, scale.z));
       
-      const scaleMatrix = new THREE.Matrix4();
-      scaleMatrix.makeScale(scale.x, scale.y, scale.z);
-      localMatrix.multiply(scaleMatrix);
-      
-      const worldMatrix = parentTransform 
-        ? new THREE.Matrix4().multiplyMatrices(parentTransform, localMatrix)
-        : localMatrix;
-      
+      const worldMatrix = new THREE.Matrix4().multiplyMatrices(parentTransform, localMatrix);
       this.liveTransforms.set(obj.id, worldMatrix.clone());
       
-      // Process children
-      this.buildObjectMap(obj.children, worldMatrix);
+      if(obj.children && obj.children.length > 0) {
+        this.buildObjectMap(obj.children, worldMatrix);
+      }
     }
   }
 
@@ -168,18 +166,12 @@ export class GameWorld extends SimpleEventEmitter {
     const obj = this.objects.get(objectId);
     if (!obj) return;
 
-    // Update the object
     (obj as any)[property] = value;
     
-    // Update the Three.js object if it exists
     const threeObj = this.threeObjects.get(objectId);
     if (threeObj) {
-      // Apply property updates to Three.js object
-      if (property === 'visible') {
-        threeObj.visible = value;
-      } else if (property === 'name') {
-        threeObj.name = value;
-      }
+      if (property === 'visible') threeObj.visible = value;
+      else if (property === 'name') threeObj.name = value;
     }
 
     this.emit('objectUpdate', { objectId, updates: { [property]: value } });
@@ -189,46 +181,29 @@ export class GameWorld extends SimpleEventEmitter {
     const currentTransform = this.transforms.get(objectId);
     if (!currentTransform) return;
 
-    // Prevent direct transform updates on physics objects
-    if (this.rigidBodies.has(objectId)) {
-      console.warn(`Cannot directly update transform of physics object ${objectId}. Use physics forces/impulses instead.`);
+    if (this._isRunning && this.rigidBodies.has(objectId)) {
+      console.warn(`Cannot directly update transform of physics object ${objectId} while simulation is running.`);
       return;
     }
 
     const newTransform = { ...currentTransform, ...transform };
     this.transforms.set(objectId, newTransform);
 
-    // Update live transform matrix
-    const matrix = new THREE.Matrix4();
-    const { position, rotation, scale } = newTransform;
+    // Rebuild object map to update world transforms for all children
+    if(this.scene){
+        this.buildObjectMap(this.scene.objects);
+    }
     
-    matrix.makeTranslation(position.x, position.y, position.z);
-    const rotationMatrix = new THREE.Matrix4();
-    rotationMatrix.makeRotationFromEuler(new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ'));
-    matrix.multiply(rotationMatrix);
-    
-    const scaleMatrix = new THREE.Matrix4();
-    scaleMatrix.makeScale(scale.x, scale.y, scale.z);
-    matrix.multiply(scaleMatrix);
-    
-    this.liveTransforms.set(objectId, matrix);
-
-    // Update the Three.js object immediately (this fixes the visual update issue)
     const threeObj = this.threeObjects.get(objectId);
-    
     if (threeObj) {
-      // Always update the Three.js object for immediate visual feedback
-      threeObj.position.set(position.x, position.y, position.z);
-      threeObj.rotation.set(rotation.x, rotation.y, rotation.z);
-      threeObj.scale.set(scale.x, scale.y, scale.z);
+        const { position, rotation, scale } = newTransform;
+        threeObj.position.set(position.x, position.y, position.z);
+        threeObj.rotation.set(rotation.x, rotation.y, rotation.z);
+        threeObj.scale.set(scale.x, scale.y, scale.z);
     }
 
-    // Update the GameObject for consistency
     const obj = this.objects.get(objectId);
-    if (obj) {
-      obj.transform = newTransform;
-    }
-
+    if (obj) obj.transform = newTransform;
     this.emit('objectTransformUpdate', { objectId, transform: newTransform });
   }
 
@@ -236,167 +211,167 @@ export class GameWorld extends SimpleEventEmitter {
     const obj = this.objects.get(objectId);
     if (!obj) return;
 
-    const component = obj.components.find(c => c.id === componentId);
-    if (!component) return;
+    const componentIndex = obj.components.findIndex(c => c.id === componentId);
+    if (componentIndex === -1) return;
 
-    Object.assign(component, updates);
-    
-    // Emit update for UI synchronization
+    obj.components[componentIndex] = { ...obj.components[componentIndex], ...updates };
+
     this.emit('objectUpdate', { objectId, updates: { components: obj.components } });
   }
 
   // Physics Integration
-  setPhysicsWorld(world: any): void {
-    this.physicsWorld = world;
-  }
-
-  registerRigidBody(objectId: string, rigidBody: any): void {
-    this.rigidBodies.set(objectId, rigidBody);
-  }
-
-  unregisterRigidBody(objectId: string): void {
-    this.rigidBodies.delete(objectId);
-  }
+  setPhysicsWorld(world: any): void { this.physicsWorld = world; }
+  registerRigidBody(objectId: string, rigidBody: any): void { this.rigidBodies.set(objectId, rigidBody); }
+  unregisterRigidBody(objectId: string): void { this.rigidBodies.delete(objectId); }
 
   // Physics Control Methods
   applyForce(objectId: string, force: Vector3, point?: Vector3): void {
     const rigidBody = this.rigidBodies.get(objectId);
-    if (!rigidBody) {
-      console.warn(`No rigid body found for object ${objectId}`);
-      return;
-    }
-
-    if (point) {
-      // Apply force at specific point
-      rigidBody.applyForceAtPoint(force, point, true);
-    } else {
-      // Apply force at center of mass
-      rigidBody.applyForce(force, true);
-    }
+    if (!rigidBody) return;
+    if (point) rigidBody.applyForceAtPoint(force, point, true);
+    else rigidBody.applyForce(force, true);
   }
 
   applyImpulse(objectId: string, impulse: Vector3, point?: Vector3): void {
     const rigidBody = this.rigidBodies.get(objectId);
-    if (!rigidBody) {
-      console.warn(`No rigid body found for object ${objectId}`);
-      return;
-    }
-
-    if (point) {
-      // Apply impulse at specific point
-      rigidBody.applyImpulseAtPoint(impulse, point, true);
-    } else {
-      // Apply impulse at center of mass
-      rigidBody.applyImpulse(impulse, true);
-    }
+    if (!rigidBody) return;
+    if (point) rigidBody.applyImpulseAtPoint(impulse, point, true);
+    else rigidBody.applyImpulse(impulse, true);
   }
 
   setVelocity(objectId: string, velocity: Vector3): void {
     const rigidBody = this.rigidBodies.get(objectId);
-    if (!rigidBody) {
-      console.warn(`No rigid body found for object ${objectId}`);
-      return;
-    }
-
+    if (!rigidBody) return;
     rigidBody.setLinvel(velocity, true);
   }
 
   setAngularVelocity(objectId: string, angularVelocity: Vector3): void {
     const rigidBody = this.rigidBodies.get(objectId);
-    if (!rigidBody) {
-      console.warn(`No rigid body found for object ${objectId}`);
-      return;
-    }
-
+    if (!rigidBody) return;
     rigidBody.setAngvel(angularVelocity, true);
   }
 
   getVelocity(objectId: string): Vector3 | null {
     const rigidBody = this.rigidBodies.get(objectId);
     if (!rigidBody) return null;
-
-    const velocity = rigidBody.linvel();
-    return { x: velocity.x, y: velocity.y, z: velocity.z };
+    const v = rigidBody.linvel();
+    return { x: v.x, y: v.y, z: v.z };
   }
 
   getAngularVelocity(objectId: string): Vector3 | null {
     const rigidBody = this.rigidBodies.get(objectId);
     if (!rigidBody) return null;
-
-    const angularVelocity = rigidBody.angvel();
-    return { x: angularVelocity.x, y: angularVelocity.y, z: angularVelocity.z };
+    const av = rigidBody.angvel();
+    return { x: av.x, y: av.y, z: av.z };
   }
 
   // Game Loop
   start(): void {
+    if (this._isRunning) return;
     this._isRunning = true;
     this.lastUpdateTime = performance.now();
-    
-    // Save original transforms before physics starts
-    this.saveOriginalTransforms();
   }
-
-  stop(): void {
-    this._isRunning = false;
-    
-    // Restore original transforms when stopping physics
-    this.restoreOriginalTransforms();
-  }
-
-  pause(): void {
-    this._isRunning = false;
-  }
-
+  stop(): void { this._isRunning = false; }
+  pause(): void { this._isRunning = false; }
   resume(): void {
+    if (this._isRunning) return;
     this._isRunning = true;
     this.lastUpdateTime = performance.now();
   }
 
-  private saveOriginalTransforms(): void {
-    this.originalTransforms.clear();
-    this.transforms.forEach((transform, objectId) => {
-      this.originalTransforms.set(objectId, { ...transform });
-    });
+  // Scene Snapshot Management
+  createSceneSnapshot(): void {
+    if (!this.scene) return;
+    
+    // Create a deep copy of the scene, but ensure we capture the original transforms
+    // not any runtime modifications that may have occurred
+    const sceneWithOriginalTransforms = JSON.parse(JSON.stringify(this.scene));
+    
+    // Recursively restore original transforms in the snapshot
+    const restoreOriginalTransforms = (objects: GameObject[]) => {
+      objects.forEach(obj => {
+        const originalTransform = this.originalTransforms.get(obj.id);
+        if (originalTransform) {
+          obj.transform = { ...originalTransform };
+        }
+        if (obj.children && obj.children.length > 0) {
+          restoreOriginalTransforms(obj.children);
+        }
+      });
+    };
+    
+    restoreOriginalTransforms(sceneWithOriginalTransforms.objects);
+    this.sceneSnapshot = sceneWithOriginalTransforms;
+    console.log("Scene snapshot created with original transforms.");
   }
 
-  private restoreOriginalTransforms(): void {
-    this.originalTransforms.forEach((originalTransform, objectId) => {
-      // Restore the transform in our internal state
-      this.transforms.set(objectId, { ...originalTransform });
-      
-      // Update the GameObject as well
-      const obj = this.objects.get(objectId);
-      if (obj) {
-        obj.transform = { ...originalTransform };
+  restoreSceneSnapshot(): void {
+    if (!this.sceneSnapshot) {
+      console.warn("No scene snapshot to restore.");
+      return;
+    }
+
+    // 1. Restore the scene data model.
+    this.scene = JSON.parse(JSON.stringify(this.sceneSnapshot));
+    
+    // 2. Rebuild data maps from the restored scene data, preserving physics/visual object maps.
+    this.objects.clear();
+    this.transforms.clear();
+    this.liveTransforms.clear();
+    
+    if (this.scene) {
+      // This correctly calculates the initial world matrices for all objects
+      // based on the snapshot data and stores them in `this.liveTransforms`.
+      this.buildObjectMap(this.scene.objects);
+    }
+
+    // 3. Iterate over all objects and imperatively reset their states.
+    this.objects.forEach((obj, objectId) => {
+      const { transform } = obj;
+
+      // The useFrame loop in SceneObjectNew will handle the visual update
+      // by reading from the now-restored transforms map.
+
+      // Restore the physics rigid body, if it exists.
+      const rigidBody = this.rigidBodies.get(objectId);
+      if (rigidBody) {
+        // Get the world matrix calculated by `buildObjectMap`.
+        const worldMatrix = this.liveTransforms.get(objectId);
+        if (worldMatrix) {
+          const worldPosition = new THREE.Vector3();
+          const worldQuaternion = new THREE.Quaternion();
+          const worldScale = new THREE.Vector3(); // Not used for physics body
+          worldMatrix.decompose(worldPosition, worldQuaternion, worldScale);
+
+          try {
+            // Apply the WORLD position and rotation to the physics body.
+            rigidBody.setTranslation(worldPosition, true);
+            rigidBody.setRotation(worldQuaternion, true);
+            
+            // CRITICAL: Reset all motion to zero.
+            rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+            rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+            
+            rigidBody.wakeUp();
+          } catch (error) {
+            console.error(`Failed to reset rigid body for object ${objectId}:`, error);
+          }
+        } else {
+          console.warn(`Could not find world matrix for object ${objectId} on restore.`);
+        }
       }
       
-      // Update the live transform matrix
-      const matrix = new THREE.Matrix4();
-      const { position, rotation, scale } = originalTransform;
-      
-      matrix.makeTranslation(position.x, position.y, position.z);
-      const rotationMatrix = new THREE.Matrix4();
-      rotationMatrix.makeRotationFromEuler(new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ'));
-      matrix.multiply(rotationMatrix);
-      
-      const scaleMatrix = new THREE.Matrix4();
-      scaleMatrix.makeScale(scale.x, scale.y, scale.z);
-      matrix.multiply(scaleMatrix);
-      
-      this.liveTransforms.set(objectId, matrix);
-      
-      // Update the Three.js object immediately (bypass physics)
-      const threeObj = this.threeObjects.get(objectId);
-      if (threeObj) {
-        threeObj.position.set(position.x, position.y, position.z);
-        threeObj.rotation.set(rotation.x, rotation.y, rotation.z);
-        threeObj.scale.set(scale.x, scale.y, scale.z);
-      }
-      
-      // Emit update for UI synchronization
-      this.emit('objectTransformUpdate', { objectId, transform: originalTransform });
+      // Emit an update for the UI (like the inspector) to refresh with restored local transform.
+      this.emit('objectTransformUpdate', { objectId, transform });
     });
+
+    console.log("Scene snapshot restored.");
+    // This will trigger a re-render for UI consistency.
+    if (this.scene) {
+      this.emit('sceneChanged', { scene: this.scene });
+    }
   }
+
 
   update(currentTime: number): void {
     if (!this._isRunning) return;
@@ -404,111 +379,50 @@ export class GameWorld extends SimpleEventEmitter {
     const deltaTime = (currentTime - this.lastUpdateTime) / 1000;
     this.lastUpdateTime = currentTime;
 
-    // Update physics-controlled transforms from rigid bodies
     this.updatePhysicsTransforms();
-
-    // Execute update callbacks (scripts, etc.)
     this.updateCallbacks.forEach(callback => callback(deltaTime));
-
     this.emit('physicsStep', { deltaTime });
   }
 
   private updatePhysicsTransforms(): void {
-    // Update transforms from physics rigid bodies
     this.rigidBodies.forEach((rigidBody, objectId) => {
-      if (!rigidBody || !rigidBody.translation || !rigidBody.rotation) return;
+      if (!rigidBody?.isDynamic() || !rigidBody.translation) return;
 
-      const translation = rigidBody.translation();
+      const position = rigidBody.translation();
       const rotation = rigidBody.rotation();
-
-      // Update live transform matrix
-      const matrix = new THREE.Matrix4();
-      const position = new THREE.Vector3(translation.x, translation.y, translation.z);
-      const quaternion = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
-      const scale = new THREE.Vector3(1, 1, 1); // Physics doesn't typically modify scale
       
-      matrix.compose(position, quaternion, scale);
-      this.liveTransforms.set(objectId, matrix);
-
-      // Update the corresponding Three.js object
       const threeObj = this.threeObjects.get(objectId);
       if (threeObj) {
-        threeObj.position.copy(position);
-        threeObj.quaternion.copy(quaternion);
-        // Don't update scale from physics
+        threeObj.position.set(position.x, position.y, position.z);
+        threeObj.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
       }
 
-      // Update internal transform for consistency (convert quaternion to euler)
-      const euler = new THREE.Euler().setFromQuaternion(quaternion);
       const transform = this.transforms.get(objectId);
       if (transform) {
-        transform.position = { x: translation.x, y: translation.y, z: translation.z };
+        transform.position = { x: position.x, y: position.y, z: position.z };
+        const euler = new THREE.Euler().setFromQuaternion(new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w));
         transform.rotation = { x: euler.x, y: euler.y, z: euler.z };
-        // Scale remains unchanged by physics
       }
     });
   }
 
-  // Update Callbacks (for scripts, etc.)
-  addUpdateCallback(callback: (deltaTime: number) => void): void {
-    this.updateCallbacks.add(callback);
-  }
+  addUpdateCallback(callback: (deltaTime: number) => void): void { this.updateCallbacks.add(callback); }
+  removeUpdateCallback(callback: (deltaTime: number) => void): void { this.updateCallbacks.delete(callback); }
+  getSelectedObjectData(objectId: string): GameObject | null { return this.objects.get(objectId) || null; }
+  getAllObjects(): GameObject[] { return this.scene ? this.scene.objects : []; }
+  findObjectById(objectId: string): GameObject | null { return this.objects.get(objectId) || null; }
+  findObjectsByTag(tag: string): GameObject[] { return Array.from(this.objects.values()).filter(obj => obj.tags?.includes(tag)); }
+  findObjectsByComponent(type: string): GameObject[] { return Array.from(this.objects.values()).filter(obj => obj.components.some(c => c.type === type)); }
+  isRunning(): boolean { return this._isRunning; }
+  getScene(): GameScene | null { return this.scene; }
 
-  removeUpdateCallback(callback: (deltaTime: number) => void): void {
-    this.updateCallbacks.delete(callback);
-  }
-
-  // Data Access for UI
-  getSelectedObjectData(objectId: string): GameObject | null {
-    return this.objects.get(objectId) || null;
-  }
-
-  getAllObjects(): GameObject[] {
-    if (!this.scene) return [];
-    return this.scene.objects;
-  }
-
-  // Scene queries
-  findObjectById(objectId: string): GameObject | null {
-    return this.objects.get(objectId) || null;
-  }
-
-  findObjectsByTag(tag: string): GameObject[] {
-    const results: GameObject[] = [];
-    this.objects.forEach(obj => {
-      if (obj.tags && obj.tags.includes(tag)) {
-        results.push(obj);
-      }
-    });
-    return results;
-  }
-
-  findObjectsByComponent(componentType: string): GameObject[] {
-    const results: GameObject[] = [];
-    this.objects.forEach(obj => {
-      if (obj.components.some(comp => comp.type === componentType)) {
-        results.push(obj);
-      }
-    });
-    return results;
-  }
-
-  // Utility
-  isRunning(): boolean {
-    return this._isRunning;
-  }
-
-  getScene(): GameScene | null {
-    return this.scene;
-  }
-
-  // Cleanup
   dispose(): void {
-    this._isRunning = false;
+    this.stop();
     this.objects.clear();
     this.transforms.clear();
-    this.liveTransforms.clear();
     this.originalTransforms.clear();
+    this.liveTransforms.clear();
+    this.sceneSnapshot = null;
     this.rigidBodies.clear();
     this.threeObjects.clear();
     this.updateCallbacks.clear();
@@ -517,4 +431,4 @@ export class GameWorld extends SimpleEventEmitter {
 }
 
 // Singleton instance for the editor
-export const gameWorld = new GameWorld(); 
+export const gameWorld = new GameWorld();

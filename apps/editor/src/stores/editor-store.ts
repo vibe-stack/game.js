@@ -137,7 +137,30 @@ const useEditorStore = create<EditorState>()(
     setProjects: (projects) => set({ projects }),
     
     // GameWorld Actions
-    setGameWorld: (gameWorld) => set({ gameWorld }),
+    setGameWorld: (gameWorld) => {
+      const currentGameWorld = get().gameWorld;
+      
+      // Clean up previous game world listeners
+      if (currentGameWorld) {
+        currentGameWorld.removeAllListeners();
+      }
+      
+      // Set up new game world with listeners
+      if (gameWorld) {
+        // Listen for scene changes from GameWorld (e.g., after restore)
+        gameWorld.on('sceneChanged', ({ scene }) => {
+          set({ currentScene: scene });
+        });
+        
+        // Listen for object transform updates
+        gameWorld.on('objectTransformUpdate', () => {
+          // Update selected object snapshot when transforms change
+          get().updateSelectedObjectSnapshot();
+        });
+      }
+      
+      set({ gameWorld });
+    },
     
     // Scene Actions
     setCurrentScene: (scene) => {
@@ -288,6 +311,12 @@ const useEditorStore = create<EditorState>()(
     
     playPhysics: () => {
       const { physicsCallbacks, gameWorld } = get();
+      
+      // Create a comprehensive scene snapshot BEFORE starting physics
+      if (gameWorld) {
+        gameWorld.createSceneSnapshot();
+      }
+      
       physicsCallbacks.play?.();
       gameWorld?.start();
       set({ physicsState: 'playing' });
@@ -302,11 +331,15 @@ const useEditorStore = create<EditorState>()(
     
     stopPhysics: () => {
       const { physicsCallbacks, gameWorld } = get();
+
       physicsCallbacks.stop?.();
       gameWorld?.stop();
+
+      if (gameWorld) {
+        gameWorld.restoreSceneSnapshot();
+      }
+
       set({ physicsState: 'stopped' });
-      
-      // Update selected object snapshot since transforms were restored
       get().updateSelectedObjectSnapshot();
     },
     

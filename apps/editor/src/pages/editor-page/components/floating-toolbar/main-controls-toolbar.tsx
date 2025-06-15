@@ -29,7 +29,6 @@ export default function MainControlsToolbar({
     pausePhysics, 
     stopPhysics, 
     resumePhysics,
-    setPhysicsState,
     currentProject
   } = useEditorStore();
 
@@ -93,26 +92,6 @@ export default function MainControlsToolbar({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onSave]);
 
-  const handlePhysicsPlay = () => {
-    playPhysics();
-    setPhysicsState('playing');
-  };
-
-  const handlePhysicsPause = () => {
-    pausePhysics();
-    setPhysicsState('paused');
-  };
-
-  const handlePhysicsStop = () => {
-    stopPhysics();
-    setPhysicsState('stopped');
-  };
-
-  const handlePhysicsResume = () => {
-    resumePhysics();
-    setPhysicsState('playing');
-  };
-
   return (
     <>
       <div className="flex items-center gap-2">
@@ -172,10 +151,10 @@ export default function MainControlsToolbar({
         {/* Physics Controls */}
         <PhysicsControlsToolbar
           physicsState={physicsState}
-          onPlay={handlePhysicsPlay}
-          onPause={handlePhysicsPause}
-          onStop={handlePhysicsStop}
-          onResume={handlePhysicsResume}
+          onPlay={playPhysics}
+          onPause={pausePhysics}
+          onStop={stopPhysics}
+          onResume={resumePhysics}
         />
       </div>
 

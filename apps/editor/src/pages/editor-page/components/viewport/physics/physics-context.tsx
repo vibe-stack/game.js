@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { Physics, useRapier, RapierRigidBody } from '@react-three/rapier';
-import * as THREE from 'three';
 
 type PhysicsState = 'stopped' | 'playing' | 'paused';
 
@@ -11,6 +10,7 @@ interface PhysicsContextType {
   play: () => void;
   pause: () => void;
   stop: () => void;
+  resetKey: number;
   resume: () => void;
   registerRigidBody: (objectId: string, rigidBody: RapierRigidBody) => void;
   unregisterRigidBody: (objectId: string) => void;
@@ -22,7 +22,6 @@ const PhysicsContext = createContext<PhysicsContextType | null>(null);
 interface PhysicsProviderProps {
   children: React.ReactNode;
   scene: GameScene;
-  onObjectTransformUpdate: (objectId: string, transform: Partial<Transform>) => void;
   debugEnabled?: boolean;
 }
 
@@ -122,7 +121,7 @@ class PhysicsErrorBoundary extends React.Component<
   }
 }
 
-export function PhysicsProvider({ children, scene, onObjectTransformUpdate, debugEnabled }: PhysicsProviderProps) {
+export function PhysicsProvider({ children, scene, debugEnabled }: PhysicsProviderProps) {
   const [physicsState, setPhysicsState] = useState<PhysicsState>('stopped');
   
   // Memoize physics world config validation to prevent infinite re-renders
@@ -150,7 +149,6 @@ export function PhysicsProvider({ children, scene, onObjectTransformUpdate, debu
           scene={scene} 
           physicsState={physicsState}
           setPhysicsState={setPhysicsState}
-          onObjectTransformUpdate={onObjectTransformUpdate}
         >
           {children}
         </PhysicsInnerProvider>
@@ -164,15 +162,14 @@ function PhysicsInnerProvider({
   children, 
   scene, 
   physicsState, 
-  setPhysicsState,
-  onObjectTransformUpdate
+  setPhysicsState
 }: PhysicsProviderProps & { 
   physicsState: PhysicsState; 
   setPhysicsState: React.Dispatch<React.SetStateAction<PhysicsState>>; 
 }) {
   const { world, rapier } = useRapier();
+  const [resetKey, setResetKey] = useState(0);
   const rigidBodiesRef = useRef<Map<string, RapierRigidBody>>(new Map());
-  const initialTransformsRef = useRef<Map<string, Transform>>(new Map());
   const isInitialized = world && rapier;
   const cleanupInProgressRef = useRef(false);
   const lastSceneObjectsRef = useRef<GameObject[]>([]);
@@ -214,15 +211,13 @@ function PhysicsInnerProvider({
       cleanupInProgressRef.current = true;
       // Clear the rigid bodies map to prevent further access
       rigidBodiesRef.current.clear();
-      initialTransformsRef.current.clear();
     };
   }, []);
 
   // Clean up when scene changes
   useEffect(() => {
-    // Clear rigid bodies and transforms for new scene
+    // Clear rigid bodies for new scene
     rigidBodiesRef.current.clear();
-    initialTransformsRef.current.clear();
     
     // Reset scene stability
     setIsSceneStable(false);
@@ -233,64 +228,10 @@ function PhysicsInnerProvider({
     return () => clearTimeout(stabilizeTimer);
   }, [scene.id]);
 
-  // Store initial transforms when simulation starts
-  const storeInitialTransforms = useCallback(() => {
-    if (cleanupInProgressRef.current) return;
-    
-    initialTransformsRef.current.clear();
-    const storeObjectTransforms = (objects: GameObject[]) => {
-      objects.forEach(obj => {
-        initialTransformsRef.current.set(obj.id, { ...obj.transform });
-        if (obj.children.length > 0) {
-          storeObjectTransforms(obj.children);
-        }
-      });
-    };
-    storeObjectTransforms(scene.objects);
-  }, [scene.objects]);
-
-  // Restore initial transforms when simulation stops
-  const restoreInitialTransforms = useCallback(() => {
-    if (cleanupInProgressRef.current) return;
-    
-    initialTransformsRef.current.forEach((transform, objectId) => {
-      // Update the store to reset GameObject.transform to initial state
-      onObjectTransformUpdate(objectId, transform);
-      
-      // Reset rigid body transforms too
-      const rigidBody = rigidBodiesRef.current.get(objectId);
-      if (rigidBody) {
-        try {
-          rigidBody.setTranslation(transform.position, true);
-          
-          // Convert euler to quaternion with consistent rotation order
-          const euler = new THREE.Euler(
-            transform.rotation.x,
-            transform.rotation.y,
-            transform.rotation.z,
-            'XYZ' // Specify rotation order for consistency
-          );
-          const quaternion = new THREE.Quaternion().setFromEuler(euler);
-          rigidBody.setRotation(quaternion, true);
-          
-          // Reset velocities
-          rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-          rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        } catch (error) {
-          console.warn('Failed to reset rigid body transform:', error);
-        }
-      }
-    });
-  }, [onObjectTransformUpdate]);
-
   const play = useCallback(() => {
     if (!isInitialized || cleanupInProgressRef.current) return;
-    
-    if (physicsState === 'stopped') {
-      storeInitialTransforms();
-    }
     setPhysicsState('playing');
-  }, [physicsState, storeInitialTransforms, isInitialized, setPhysicsState]);
+  }, [isInitialized, setPhysicsState]);
 
   const pause = useCallback(() => {
     if (!isInitialized || cleanupInProgressRef.current) return;
@@ -305,8 +246,8 @@ function PhysicsInnerProvider({
   const stop = useCallback(() => {
     if (!isInitialized || cleanupInProgressRef.current) return;
     setPhysicsState('stopped');
-    restoreInitialTransforms();
-  }, [restoreInitialTransforms, isInitialized, setPhysicsState]);
+    setResetKey(prev => prev + 1);
+  }, [isInitialized, setPhysicsState]);
 
   const registerRigidBody = useCallback((objectId: string, rigidBody: RapierRigidBody) => {
     if (cleanupInProgressRef.current || !isSceneStable) return;
@@ -329,6 +270,7 @@ function PhysicsInnerProvider({
     registerRigidBody,
     unregisterRigidBody,
     isInitialized: !!isInitialized && !cleanupInProgressRef.current && isSceneStable,
+    resetKey,
   };
 
   return (

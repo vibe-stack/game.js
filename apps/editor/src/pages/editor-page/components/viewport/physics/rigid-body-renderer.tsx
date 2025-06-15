@@ -26,6 +26,7 @@ export default function RigidBodyRenderer({
     unregisterRigidBody,
     isInitialized,
     physicsState,
+    resetKey,
   } = usePhysics();
   const rigidBodyRef = useRef<RapierRigidBody>(null);
   const [isRegistered, setIsRegistered] = useState(false);
@@ -103,6 +104,7 @@ export default function RigidBodyRenderer({
 
   return (
     <RigidBody
+      key={`${objectId}-${resetKey}`}
       ref={rigidBodyRef}
       type={effectiveBodyType}
       position={[

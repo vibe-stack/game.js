@@ -77,12 +77,23 @@ export class ScriptLifecycle {
     }
   }
 
-  // Destroys all initialized scripts
+  // Destroys all initialized scripts and resets state for next run
   public async destroyScripts() {
-    for (const id of this.states.keys()) {
-      await this.destroyScript(id);
+    for (const state of this.states.values()) {
+      if (state.initialized) {
+        try {
+          if (state.component.properties.eventHandlers.destroy) {
+            await this.executeScript(state.component, 'destroy', {});
+          }
+        } catch (error) {
+          console.error(`Error destroying script ${state.component.properties.scriptPath}:`, error);
+        } finally {
+          // Reset initialization state for next run
+          state.initialized = false;
+        }
+      }
     }
-    this.states.clear();
+    // Don't clear states entirely - keep them for re-initialization
   }
 
   private async destroyScript(id: string) {

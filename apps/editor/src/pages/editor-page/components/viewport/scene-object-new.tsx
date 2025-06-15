@@ -31,7 +31,7 @@ import {
 interface SceneObjectProps {
   objectId: string;
   selectedObjects: string[];
-  onSelect: (id: string) => void;
+  onSelect: (id: string, event?: React.MouseEvent) => void;
   renderType?: "solid" | "wireframe" | "normals" | "realistic";
 }
 
@@ -161,10 +161,6 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
           const scale = scl.current;
           liveTransform.decompose(position, quaternion, scale);
           
-          // console.log('liveTransform', liveTransform);
-          // console.log('position', position);
-          // console.log('quaternion', quaternion);
-          // console.log('scale', scale);
           group.position.copy(position);
           group.quaternion.copy(quaternion);
           group.scale.copy(scale);
@@ -214,7 +210,7 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
               // When pivot controls are active, treat exactly like non-physics object
               <VisualContentRenderer
                 components={effectiveComponents}
-                children={children}
+                children={children || []}
                 selectedObjects={selectedObjects}
                 onSelect={onSelect}
                 showHelpers={shouldShowHelpers}
@@ -231,7 +227,7 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
               >
                 <VisualContentRenderer
                   components={effectiveComponents}
-                  children={children}
+                  children={children || []}
                   selectedObjects={selectedObjects}
                   onSelect={onSelect}
                   showHelpers={shouldShowHelpers}
@@ -249,4 +245,4 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
 
 SceneObject.displayName = "SceneObject";
 
-export default React.memo(SceneObject); 
+export default React.memo(SceneObject);
