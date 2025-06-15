@@ -6,6 +6,8 @@ interface ScriptManager {
   stopWatching: () => Promise<void>;
   getCompiledScript: (scriptPath: string) => Promise<string | null>;
   executeScript: (scriptPath: string, method: string, context: ScriptExecutionContext) => Promise<any>;
+  refreshScript: (scriptPath: string) => Promise<boolean>;
+  onScriptsChanged: (callback: () => void) => () => void; // Returns unsubscribe function
   isWatching: boolean;
 }
 
@@ -52,12 +54,24 @@ export function ScriptManagerProvider({ children }: ScriptManagerProviderProps) 
   const compiledScriptsRef = useRef<Map<string, string>>(new Map());
   const scriptModulesRef = useRef<Map<string, any>>(new Map());
   const blobUrlsRef = useRef<Map<string, string>>(new Map());
+  const scriptsChangedCallbacksRef = useRef<Set<() => void>>(new Set());
+  const lastCompilationTimesRef = useRef<Map<string, Date>>(new Map());
 
   const cleanupBlobUrls = () => {
     blobUrlsRef.current.forEach((blobUrl) => {
       URL.revokeObjectURL(blobUrl);
     });
     blobUrlsRef.current.clear();
+  };
+
+  const notifyScriptsChanged = () => {
+    scriptsChangedCallbacksRef.current.forEach(callback => {
+      try {
+        callback();
+      } catch (error) {
+        console.error('Error in scripts changed callback:', error);
+      }
+    });
   };
 
   const setupImportMap = async () => {
@@ -121,9 +135,124 @@ export function ScriptManagerProvider({ children }: ScriptManagerProviderProps) 
     if (!currentProject) return;
     try {
       const compiled = await window.scriptAPI.getCompiledScripts(currentProject.path);
-      compiledScriptsRef.current = new Map(Object.entries(compiled));
+      
+      const newScripts = new Map(Object.entries(compiled));
+      const previousScripts = compiledScriptsRef.current;
+      const previousCompilationTimes = lastCompilationTimesRef.current;
+      let hasChanges = false;
+      
+      // Check for new or recompiled scripts
+      for (const [scriptPath, compiledPath] of newScripts) {
+        const previousCompiledPath = previousScripts.get(scriptPath);
+        const isNewScript = !previousCompiledPath;
+        
+        if (isNewScript) {
+          console.log(`New script detected: ${scriptPath}`);
+          hasChanges = true;
+        } else {
+          // For existing scripts, check if they've been recompiled by comparing timestamps
+          // We need to get individual script compilation times, but for now we can use file modification time
+          try {
+            const stat = await window.projectAPI.getFileStats(compiledPath);
+            const compiledFileTime = new Date(stat.modified);
+            const previousTime = previousCompilationTimes.get(scriptPath);
+            
+            if (!previousTime || compiledFileTime > previousTime) {
+              console.log(`Script recompiled, clearing cache: ${scriptPath}`);
+              scriptModulesRef.current.delete(scriptPath);
+              hasChanges = true;
+              
+              // Clean up old blob URL
+              const oldBlobUrl = blobUrlsRef.current.get(scriptPath);
+              if (oldBlobUrl) {
+                URL.revokeObjectURL(oldBlobUrl);
+                blobUrlsRef.current.delete(scriptPath);
+              }
+              
+              // Update the compilation time
+              lastCompilationTimesRef.current.set(scriptPath, compiledFileTime);
+            }
+          } catch (error) {
+            console.warn(`Failed to check compilation time for ${scriptPath}:`, error);
+            // If we can't check the time, assume it changed to be safe
+            scriptModulesRef.current.delete(scriptPath);
+            hasChanges = true;
+          }
+        }
+      }
+      
+      // Check for removed scripts
+      for (const [scriptPath] of previousScripts) {
+        if (!newScripts.has(scriptPath)) {
+          console.log(`Script removed: ${scriptPath}`);
+          scriptModulesRef.current.delete(scriptPath);
+          lastCompilationTimesRef.current.delete(scriptPath);
+          
+          // Clean up blob URL
+          const oldBlobUrl = blobUrlsRef.current.get(scriptPath);
+          if (oldBlobUrl) {
+            URL.revokeObjectURL(oldBlobUrl);
+            blobUrlsRef.current.delete(scriptPath);
+          }
+          
+          hasChanges = true;
+        }
+      }
+      
+      // Initialize compilation times for new scripts
+      for (const [scriptPath, compiledPath] of newScripts) {
+        if (!lastCompilationTimesRef.current.has(scriptPath)) {
+          try {
+            const stat = await window.projectAPI.getFileStats(compiledPath);
+            lastCompilationTimesRef.current.set(scriptPath, new Date(stat.modified));
+          } catch (error) {
+            console.warn(`Failed to get initial compilation time for ${scriptPath}:`, error);
+            lastCompilationTimesRef.current.set(scriptPath, new Date());
+          }
+        }
+      }
+      
+      compiledScriptsRef.current = newScripts;
+      
+      // Notify UI components about script changes
+      if (hasChanges) {
+        notifyScriptsChanged();
+      }
     } catch (error) {
       console.error("Failed to load compiled scripts:", error);
+    }
+  };
+
+  const refreshScript = async (scriptPath: string): Promise<boolean> => {
+    if (!currentProject) return false;
+    
+    try {
+      // Force recompilation of specific script
+      const result = await window.scriptAPI.compileScript(currentProject.path, scriptPath);
+      if (result.success) {
+        console.log(`Script manually recompiled: ${scriptPath}`);
+        
+        // Clear module cache for this script
+        scriptModulesRef.current.delete(scriptPath);
+        
+        // Clean up old blob URL
+        const oldBlobUrl = blobUrlsRef.current.get(scriptPath);
+        if (oldBlobUrl) {
+          URL.revokeObjectURL(oldBlobUrl);
+          blobUrlsRef.current.delete(scriptPath);
+        }
+        
+        // Reload compiled scripts to get latest version
+        await loadCompiledScripts();
+        
+        return true;
+      } else {
+        console.error(`Script compilation failed: ${result.error}`);
+        return false;
+      }
+    } catch (error) {
+      console.error("Failed to refresh script:", error);
+      return false;
     }
   };
 
@@ -154,6 +283,7 @@ export function ScriptManagerProvider({ children }: ScriptManagerProviderProps) 
         isWatchingRef.current = false;
         compiledScriptsRef.current.clear();
         scriptModulesRef.current.clear();
+        lastCompilationTimesRef.current.clear();
         cleanupBlobUrls();
         console.log(`Stopped watching scripts for project: ${currentProject.name}`);
       } catch (error) {
@@ -212,6 +342,15 @@ export function ScriptManagerProvider({ children }: ScriptManagerProviderProps) 
       }
     },
 
+    refreshScript: refreshScript,
+
+    onScriptsChanged: (callback: () => void) => {
+      scriptsChangedCallbacksRef.current.add(callback);
+      return () => {
+        scriptsChangedCallbacksRef.current.delete(callback);
+      };
+    },
+
     get isWatching() {
       return isWatchingRef.current;
     }
@@ -221,6 +360,20 @@ export function ScriptManagerProvider({ children }: ScriptManagerProviderProps) 
   useEffect(() => {
     if (currentProject) {
       scriptManager.startWatching();
+      
+      // Set up polling to detect script changes and invalidate cache
+      const interval = setInterval(async () => {
+        if (scriptManager.isWatching) {
+          await loadCompiledScripts(); // This will automatically invalidate changed scripts
+        }
+      }, 2000); // Check every 2 seconds
+      
+      return () => {
+        clearInterval(interval);
+        if (currentProject) {
+          scriptManager.stopWatching();
+        }
+      };
     }
 
     return () => {

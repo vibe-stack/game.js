@@ -138,6 +138,26 @@ export class ProjectService {
     return this.fileSystemManager.getFileStats(filePath);
   }
 
+  async createFile(filePath: string, content: string = ""): Promise<void> {
+    return this.fileSystemManager.createFile(filePath, content);
+  }
+
+  async createDirectory(dirPath: string): Promise<void> {
+    return this.fileSystemManager.createDirectory(dirPath);
+  }
+
+  async deleteFile(filePath: string): Promise<void> {
+    return this.fileSystemManager.deleteFile(filePath);
+  }
+
+  async deleteDirectory(dirPath: string): Promise<void> {
+    return this.fileSystemManager.deleteDirectory(dirPath);
+  }
+
+  async renameItem(oldPath: string, newPath: string): Promise<void> {
+    return this.fileSystemManager.renameItem(oldPath, newPath);
+  }
+
   // IPC Registration - unchanged
   registerIpcHandlers() {
     ipcMain.handle("project:load-projects", () => this.loadProjects());
@@ -228,6 +248,21 @@ export class ProjectService {
     );
     ipcMain.handle("project:get-file-stats", (_, filePath: string) =>
       this.getFileStats(filePath),
+    );
+    ipcMain.handle("project:create-file", (_, filePath: string, content: string) =>
+      this.createFile(filePath, content),
+    );
+    ipcMain.handle("project:create-directory", (_, dirPath: string) =>
+      this.createDirectory(dirPath),
+    );
+    ipcMain.handle("project:delete-file", (_, filePath: string) =>
+      this.deleteFile(filePath),
+    );
+    ipcMain.handle("project:delete-directory", (_, dirPath: string) =>
+      this.deleteDirectory(dirPath),
+    );
+    ipcMain.handle("project:rename-item", (_, oldPath: string, newPath: string) =>
+      this.renameItem(oldPath, newPath),
     );
   }
 }

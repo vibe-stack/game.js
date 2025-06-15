@@ -1,4 +1,10 @@
-import React, { forwardRef, useRef, useCallback, useMemo, useEffect } from "react";
+import React, {
+  forwardRef,
+  useRef,
+  useCallback,
+  useMemo,
+  useEffect,
+} from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { useGameWorld } from "@/services/game-world-context";
@@ -18,10 +24,10 @@ import {
 
 /**
  * New SceneObject Component - GameWorld Integration
- * 
+ *
  * This component now reads from the GameWorld service imperatively
  * for high-frequency updates, avoiding React's reconciliation overhead.
- * 
+ *
  * DATA FLOW:
  * - Initial render: Uses GameObject data from props for setup
  * - High-frequency updates: Reads transforms directly from GameWorld
@@ -45,7 +51,7 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
 
     // Get initial object data from GameWorld
     const obj = gameWorld.getObject(objectId);
-
+    
     // Register Three.js object with GameWorld
     useEffect(() => {
       const group = groupRef.current;
@@ -69,16 +75,20 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
 
     // Get object properties (with fallbacks for when object doesn't exist)
     const { transform, components, children, visible, tags } = obj || {
-      transform: { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+      transform: {
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+      },
       components: [],
       children: [],
       visible: false,
-      tags: [] as string[]
+      tags: [] as string[],
     };
 
     // Check if this is a utility object that should remain empty
     const isUtilityObject = useMemo(
-      () => tags?.includes('utility') || false,
+      () => tags?.includes("utility") || false,
       [tags],
     );
 
@@ -96,22 +106,25 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
     const isPivotControlsActive = isControlledByPivot;
 
     // Memoize effective components - avoid default mesh for utility objects
-    const effectiveComponents = useMemo(
-      () => {
-        if (components.length > 0) {
-          return regularComponents;
-        }
-        
-        // Don't create default mesh for utility objects (empty objects, groups, etc.)
-        if (isUtilityObject) {
-          return [];
-        }
-        
-        // Create default mesh for other objects with no components
-        return [createDefaultMeshComponent(isSelected, renderType)];
-      },
-      [components.length, regularComponents, isUtilityObject, isSelected, renderType],
-    );
+    const effectiveComponents = useMemo(() => {
+      if (components.length > 0) {
+        return regularComponents;
+      }
+
+      // Don't create default mesh for utility objects (empty objects, groups, etc.)
+      if (isUtilityObject) {
+        return [];
+      }
+
+      // Create default mesh for other objects with no components
+      return [createDefaultMeshComponent(isSelected, renderType)];
+    }, [
+      components.length,
+      regularComponents,
+      isUtilityObject,
+      isSelected,
+      renderType,
+    ]);
 
     // Memoize transform for physics wrapper
     const transformForPhysics = useMemo(() => {
@@ -141,8 +154,8 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
 
     // Check if this entity has script components
     const hasScriptComponents = useMemo(
-      () => components.some(comp => comp.type === "script"),
-      [components]
+      () => components.some((comp) => comp.type === "script"),
+      [components],
     );
 
     const pos = useRef(new THREE.Vector3());
@@ -152,10 +165,18 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
     // High-frequency transform updates from GameWorld
     useFrame(() => {
       const group = groupRef.current;
+      
+      // Use GameWorld manipulation state directly - this is more reliable
+      const isCurrentlyManipulating = gameWorld.isManipulating(objectId);
+      
       if (!group || !shouldApplyTransform) return;
 
+      // CRITICAL: Don't update transforms when pivot controls are active OR being manipulated
+      // This prevents useFrame from overriding PivotControls transforms
+      if (isPivotControlsActive || isCurrentlyManipulating) return;
+
       // During physics or high-frequency mode, read live transforms from GameWorld
-      if (physicsState === 'playing') {
+      if (physicsState === "playing") {
         const liveTransform = gameWorld.getLiveTransform(objectId);
         if (liveTransform) {
           // Apply live transform directly to Three.js object (bypassing React)
@@ -163,7 +184,7 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
           const quaternion = quat.current;
           const scale = scl.current;
           liveTransform.decompose(position, quaternion, scale);
-          
+
           group.position.copy(position);
           group.quaternion.copy(quaternion);
           group.scale.copy(scale);
@@ -181,15 +202,42 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
     });
 
     const groupProps = useMemo(() => {
+      const { position, rotation, scale } = transform;
+
       return {
         ref: isSelected ? ref || groupRef : groupRef,
-        onClick: handleClick,
+        onClick: (e: React.MouseEvent) => {
+          if ((e as any).delta < 10) {
+            handleClick(e);
+          }
+        }, // Simplified click handling to prevent interference with dragging
         userData: { objectId },
-        // Don't set initial transform here - will be handled by useFrame
+        // Apply initial transforms when needed (like old code)
+        // This ensures proper positioning before useFrame takes over
+        ...(shouldApplyTransform && {
+          position: [position.x, position.y, position.z] as [
+            number,
+            number,
+            number,
+          ],
+          rotation: [rotation.x, rotation.y, rotation.z] as [
+            number,
+            number,
+            number,
+          ],
+          scale: [scale.x, scale.y, scale.z] as [number, number, number],
+        }),
       };
-    }, [isSelected, ref, handleClick, objectId]);
+    }, [
+      isSelected,
+      ref,
+      handleClick,
+      objectId,
+      shouldApplyTransform,
+      transform,
+    ]);
 
-    // Early returns after all hooks
+    // Early returns after all hooks - check if GameWorld is properly initialized
     if (!obj || !visible) return null;
 
     return (
@@ -198,17 +246,15 @@ const SceneObject = forwardRef<THREE.Group, SceneObjectProps>(
           transform={transform}
           isManipulating={isManipulatingRef.current}
           onMatrixChange={handleMatrixChange}
+          isPivotControlsActive={isPivotControlsActive}
         />
-        <PivotControlsWrapper
-          isSelected={isSelected}
-          objectId={objectId}
-        >
+        <PivotControlsWrapper isSelected={isSelected} objectId={objectId}>
           <group {...groupProps}>
             {/* Add script executor for entities with script components */}
             {hasScriptComponents && currentScene && (
               <ScriptExecutor entity={obj} scene={currentScene} />
             )}
-            
+
             {isPivotControlsActive ? (
               // When pivot controls are active, treat exactly like non-physics object
               <VisualContentRenderer

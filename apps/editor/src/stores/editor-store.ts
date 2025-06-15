@@ -367,7 +367,7 @@ const useEditorStore = create<EditorState>()(
       if (gameWorld) {
         gameWorld.createSceneSnapshot();
       }
-
+      set({ selectedObjects: [], editorMode: "select" });
       physicsCallbacks.play?.();
       gameWorld?.start();
       set({ physicsState: "playing" });
@@ -591,6 +591,13 @@ const useEditorStore = create<EditorState>()(
       const { gameWorld, currentScene } = get();
       if (!gameWorld || !currentScene) return;
 
+      // First, add the component to the GameWorld object directly
+      const obj = gameWorld.getObject(objectId);
+      if (obj) {
+        obj.components.push(component);
+      }
+
+      // Then update the scene in the store to keep UI state synchronized
       const updateInObjects = (objects: GameObject[]): GameObject[] => {
         return objects.map((obj) => {
           if (obj.id === objectId) {
@@ -609,7 +616,7 @@ const useEditorStore = create<EditorState>()(
       };
 
       set({ currentScene: updatedScene });
-      gameWorld.loadScene(updatedScene);
+      // Don't call gameWorld.loadScene() to avoid triggering scene change events
 
       // Update snapshot if selected
       if (get().selectedObjects.includes(objectId)) {

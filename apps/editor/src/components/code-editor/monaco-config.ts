@@ -1,22 +1,20 @@
-import * as monaco from 'monaco-editor';
-
-export const configureMonaco = () => {
+export const configureMonaco = (monacoInstance: any) => {
   // Configure TypeScript compiler options
-  monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-    target: monaco.languages.typescript.ScriptTarget.ES2020,
+  monacoInstance.languages.typescript.typescriptDefaults.setCompilerOptions({
+    target: monacoInstance.languages.typescript.ScriptTarget.ES2020,
     allowNonTsExtensions: true,
-    moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-    module: monaco.languages.typescript.ModuleKind.CommonJS,
+    moduleResolution: monacoInstance.languages.typescript.ModuleResolutionKind.NodeJs,
+    module: monacoInstance.languages.typescript.ModuleKind.CommonJS,
     noEmit: true,
     esModuleInterop: true,
-    jsx: monaco.languages.typescript.JsxEmit.React,
+    jsx: monacoInstance.languages.typescript.JsxEmit.React,
     reactNamespace: 'React',
     allowJs: true,
     typeRoots: ['node_modules/@types'],
   });
 
   // Configure diagnostics options
-  monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+  monacoInstance.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
     noSemanticValidation: false,
     noSyntaxValidation: false,
   });
@@ -56,13 +54,13 @@ export const configureMonaco = () => {
     declare const transform: Transform;
   `;
 
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
+  monacoInstance.languages.typescript.typescriptDefaults.addExtraLib(
     gameJSTypes,
     'file:///node_modules/@types/gamejs/index.d.ts'
   );
 
   // Define custom theme
-  monaco.editor.defineTheme('gamejs-dark', {
+  monacoInstance.editor.defineTheme('gamejs-dark', {
     base: 'vs-dark',
     inherit: true,
     rules: [
@@ -84,7 +82,7 @@ export const configureMonaco = () => {
     },
   });
 
-  monaco.editor.defineTheme('gamejs-light', {
+  monacoInstance.editor.defineTheme('gamejs-light', {
     base: 'vs',
     inherit: true,
     rules: [

@@ -61,6 +61,18 @@ export function exposeProjectContext() {
     getFileStats: (filePath: string) => 
       ipcRenderer.invoke("project:get-file-stats", filePath),
     
+    // New File System Operations
+    createFile: (filePath: string, content?: string) => 
+      ipcRenderer.invoke("project:create-file", filePath, content || ""),
+    createDirectory: (dirPath: string) => 
+      ipcRenderer.invoke("project:create-directory", dirPath),
+    deleteFile: (filePath: string) => 
+      ipcRenderer.invoke("project:delete-file", filePath),
+    deleteDirectory: (dirPath: string) => 
+      ipcRenderer.invoke("project:delete-directory", dirPath),
+    renameItem: (oldPath: string, newPath: string) => 
+      ipcRenderer.invoke("project:rename-item", oldPath, newPath),
+    
     // Legacy - keeping for backward compatibility
     installPackages: (projectName: string) => 
       ipcRenderer.invoke("project:install-packages", projectName),

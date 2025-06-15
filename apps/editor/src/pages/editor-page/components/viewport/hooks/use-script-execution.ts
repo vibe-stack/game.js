@@ -17,6 +17,10 @@ export function useScriptExecution(entity: GameObject, scene: GameScene) {
   const gameWorld = useGameWorld();
   const lifecycleRef = useRef<ScriptLifecycle | null>(null);
   const startTimeRef = useRef(Date.now());
+  
+  // BATCHING FIX: Batch transform updates to prevent conflicts
+  const pendingTransformsRef = useRef<Map<string, Partial<Transform>>>(new Map());
+  const flushTransformsRef = useRef<() => void>(() => {});
 
   // Use refs to hold the latest entity and scene to prevent callbacks from becoming stale
   const entityRef = useRef(entity);
@@ -37,6 +41,37 @@ export function useScriptExecution(entity: GameObject, scene: GameScene) {
     [entity.components]
   );
 
+  // Set up transform batching system
+  useEffect(() => {
+    let isFlushScheduled = false;
+    
+    const flushPendingTransforms = () => {
+      const pending = pendingTransformsRef.current;
+      if (pending.size === 0) return;
+
+      // Merge all pending transforms for this entity
+      let mergedTransform: Partial<Transform> = {};
+      for (const transform of pending.values()) {
+        mergedTransform = { ...mergedTransform, ...transform };
+      }
+
+      // Apply the merged transform once
+      gameWorld.updateObjectTransform(entityRef.current.id, mergedTransform);
+      
+      // Clear pending transforms
+      pending.clear();
+      isFlushScheduled = false;
+    };
+
+    flushTransformsRef.current = () => {
+      if (!isFlushScheduled) {
+        isFlushScheduled = true;
+        // Use microtask to batch transforms within the same frame
+        Promise.resolve().then(flushPendingTransforms);
+      }
+    };
+  }, [gameWorld]);
+
   const buildExecutionContext = useCallback(
     (scriptComponent: ScriptComponent, context: ScriptContext) => ({
       entity: entityRef.current,
@@ -47,9 +82,12 @@ export function useScriptExecution(entity: GameObject, scene: GameScene) {
       parameters: scriptComponent.properties.parameters,
       timeScale: scriptComponent.properties.timeScale,
       debugMode: scriptComponent.properties.debugMode,
-      // Add GameWorld API for proper transform updates
+      // BATCHING FIX: Use batched transform updates
       updateTransform: (transform: Partial<Transform>) => {
-        gameWorld.updateObjectTransform(entityRef.current.id, transform);
+        const objectId = entityRef.current.id;
+        const currentPending = pendingTransformsRef.current.get(objectId) || {};
+        pendingTransformsRef.current.set(objectId, { ...currentPending, ...transform });
+        flushTransformsRef.current();
       },
       // Add physics control methods
       applyForce: (force: Vector3, point?: Vector3) => {

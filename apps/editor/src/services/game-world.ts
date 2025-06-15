@@ -91,6 +91,7 @@ export class GameWorld extends SimpleEventEmitter {
   private updateCallbacks: Set<(deltaTime: number) => void> = new Set();
   private threeScene: THREE.Scene | null = null;
   private threeObjects: Map<string, THREE.Object3D> = new Map();
+  private manipulatingObjects: Set<string> = new Set(); // Track which objects are being manipulated
 
   constructor() {
     super();
@@ -226,10 +227,9 @@ export class GameWorld extends SimpleEventEmitter {
       }
     }
 
-    // Rebuild object map to update world transforms for all children
-    if (this.scene) {
-      this.buildObjectMap(this.scene.objects);
-    }
+    // PERFORMANCE FIX: Only rebuild specific object transform hierarchies instead of entire scene
+    // This prevents conflicts when multiple scripts update transforms in the same frame
+    this.updateObjectHierarchy(objectId, newTransform);
 
     const threeObj = this.threeObjects.get(objectId);
     if (threeObj) {
@@ -242,6 +242,88 @@ export class GameWorld extends SimpleEventEmitter {
     const obj = this.objects.get(objectId);
     if (obj) obj.transform = newTransform;
     this.emit("objectTransformUpdate", { objectId, transform: newTransform });
+  }
+
+  // NEW: Efficient update of specific object hierarchy instead of rebuilding entire scene
+  private updateObjectHierarchy(objectId: string, newTransform: Transform): void {
+    const obj = this.objects.get(objectId);
+    if (!obj) return;
+
+    // Calculate local matrix for this object
+    const localMatrix = new THREE.Matrix4();
+    const { position, rotation, scale } = newTransform;
+    const rotQuat = new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(rotation.x, rotation.y, rotation.z, "XYZ"),
+    );
+    localMatrix.compose(
+      new THREE.Vector3(position.x, position.y, position.z),
+      rotQuat,
+      new THREE.Vector3(scale.x, scale.y, scale.z),
+    );
+
+    // Find parent transform or use identity
+    let parentMatrix = new THREE.Matrix4(); // Identity matrix
+    const parentId = this.findParentId(objectId);
+    if (parentId) {
+      const parentWorldMatrix = this.liveTransforms.get(parentId);
+      if (parentWorldMatrix) {
+        parentMatrix = parentWorldMatrix.clone();
+      }
+    }
+
+    // Calculate world matrix for this object
+    const worldMatrix = new THREE.Matrix4().multiplyMatrices(parentMatrix, localMatrix);
+    this.liveTransforms.set(objectId, worldMatrix);
+
+    // Recursively update children with new parent matrix
+    this.updateChildrenTransforms(obj, worldMatrix);
+  }
+
+  // Helper to find parent object ID
+  private findParentId(objectId: string): string | null {
+    if (!this.scene) return null;
+    
+    const findInObjects = (objects: GameObject[], parent: GameObject | null = null): string | null => {
+      for (const obj of objects) {
+        if (obj.id === objectId) {
+          return parent?.id || null;
+        }
+        if (obj.children && obj.children.length > 0) {
+          const result = findInObjects(obj.children, obj);
+          if (result !== null) return result;
+        }
+      }
+      return null;
+    };
+
+    return findInObjects(this.scene.objects);
+  }
+
+  // Helper to update children transforms recursively
+  private updateChildrenTransforms(parentObj: GameObject, parentWorldMatrix: THREE.Matrix4): void {
+    if (!parentObj.children || parentObj.children.length === 0) return;
+
+    for (const child of parentObj.children) {
+      const childTransform = this.transforms.get(child.id);
+      if (!childTransform) continue;
+
+      const { position, rotation, scale } = childTransform;
+      const localMatrix = new THREE.Matrix4();
+      const rotQuat = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(rotation.x, rotation.y, rotation.z, "XYZ"),
+      );
+      localMatrix.compose(
+        new THREE.Vector3(position.x, position.y, position.z),
+        rotQuat,
+        new THREE.Vector3(scale.x, scale.y, scale.z),
+      );
+
+      const childWorldMatrix = new THREE.Matrix4().multiplyMatrices(parentWorldMatrix, localMatrix);
+      this.liveTransforms.set(child.id, childWorldMatrix);
+
+      // Recursively update grandchildren
+      this.updateChildrenTransforms(child, childWorldMatrix);
+    }
   }
 
   updateObjectComponent(
@@ -523,6 +605,19 @@ export class GameWorld extends SimpleEventEmitter {
     this.threeObjects.clear();
     this.updateCallbacks.clear();
     this.removeAllListeners();
+  }
+
+  // Manipulation tracking methods
+  startManipulating(objectId: string): void {
+    this.manipulatingObjects.add(objectId);
+  }
+
+  stopManipulating(objectId: string): void {
+    this.manipulatingObjects.delete(objectId);
+  }
+
+  isManipulating(objectId: string): boolean {
+    return this.manipulatingObjects.has(objectId);
   }
 }
 

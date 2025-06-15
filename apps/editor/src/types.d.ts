@@ -578,6 +578,13 @@ interface ProjectAPI {
   fileExists: (filePath: string) => Promise<boolean>;
   listDirectory: (dirPath: string) => Promise<FileSystemItem[]>;
   getFileStats: (filePath: string) => Promise<{ size: number; modified: Date }>;
+  
+  // New File System Operations
+  createFile: (filePath: string, content?: string) => Promise<void>;
+  createDirectory: (dirPath: string) => Promise<void>;
+  deleteFile: (filePath: string) => Promise<void>;
+  deleteDirectory: (dirPath: string) => Promise<void>;
+  renameItem: (oldPath: string, newPath: string) => Promise<void>;
 
   // Legacy - keeping for backward compatibility
   installPackages: (projectName: string) => Promise<void>;

@@ -30,6 +30,28 @@ export class FileSystemManager {
     }
   }
 
+  async createFile(filePath: string, content: string = ""): Promise<void> {
+    const dir = path.dirname(filePath);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(filePath, content, "utf-8");
+  }
+
+  async createDirectory(dirPath: string): Promise<void> {
+    await fs.mkdir(dirPath, { recursive: true });
+  }
+
+  async deleteFile(filePath: string): Promise<void> {
+    await fs.unlink(filePath);
+  }
+
+  async deleteDirectory(dirPath: string): Promise<void> {
+    await fs.rmdir(dirPath, { recursive: true });
+  }
+
+  async renameItem(oldPath: string, newPath: string): Promise<void> {
+    await fs.rename(oldPath, newPath);
+  }
+
   async listDirectory(dirPath: string): Promise<FileSystemItem[]> {
     try {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });

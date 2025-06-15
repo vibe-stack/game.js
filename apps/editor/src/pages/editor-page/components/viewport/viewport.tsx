@@ -255,13 +255,18 @@ export default function Viewport({
   onSelectObject,
   onPhysicsCallbacks,
 }: ViewportProps) {
-  const { viewportCamera } = useEditorStore();
+  const { viewportCamera, setSelectedObjects } = useEditorStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Load scene into GameWorld when scene changes, but only if NOT updating from GameWorld
   useEffect(() => {
     if (scene) {
       gameWorld.loadScene(scene);
+      
+      // CRITICAL FIX: Create a scene snapshot on initial load
+      // This ensures proper state synchronization like the play/stop cycle does
+      // Without this, there can be flashing on initial load due to uninitialized state
+      gameWorld.createSceneSnapshot();
     }
   }, [scene]);
 
@@ -411,12 +416,17 @@ export default function Viewport({
                 target={[0, 0, 0]}
                 makeDefault
               />
-
-              <SceneRenderer
-                scene={scene}
-                selectedObjects={selectedObjects}
-                onSelectObject={onSelectObject}
-              />
+              <group
+                onPointerMissed={() => {
+                  setSelectedObjects([]);
+                }}
+              >
+                <SceneRenderer
+                  scene={scene}
+                  selectedObjects={selectedObjects}
+                  onSelectObject={onSelectObject}
+                />
+              </group>
             </PhysicsProvider>
           </Suspense>
         </GameWorldProvider>

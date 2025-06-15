@@ -18,4 +18,22 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    include: ["monaco-editor/esm/vs/editor/editor.api"],
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          monaco: ["monaco-editor"],
+        },
+      },
+    },
+  },
+  worker: {
+    format: "es",
+  },
+  define: {
+    "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "development"),
+  },
 });

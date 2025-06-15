@@ -5,12 +5,14 @@ interface TransformManagerProps {
   transform: Transform;
   isManipulating: boolean;
   onMatrixChange: (matrix: THREE.Matrix4) => void;
+  isPivotControlsActive?: boolean;
 }
 
 const TransformManager: React.FC<TransformManagerProps> = ({
   transform,
   isManipulating,
   onMatrixChange,
+  isPivotControlsActive = false,
 }) => {
   const matrixRef = useRef<THREE.Matrix4>(new THREE.Matrix4());
   const lastTransformRef = useRef<Transform>(transform);
@@ -37,14 +39,14 @@ const TransformManager: React.FC<TransformManagerProps> = ({
     [rotation]
   );
 
-  // Update matrix when transform changes or when not manipulating
+  // Update matrix when transform changes, but NOT when manipulating or pivot controls are active
   React.useLayoutEffect(() => {
-    if (!isManipulating) {
+    if (!isManipulating && !isPivotControlsActive) {
       matrixRef.current.compose(position, quaternion, scale);
       lastTransformRef.current = { ...transform };
       onMatrixChange(matrixRef.current);
     }
-  }, [isManipulating, position, quaternion, scale, transform, onMatrixChange]);
+  }, [isManipulating, isPivotControlsActive, position, quaternion, scale, transform, onMatrixChange]);
 
   return null; // This is a logic-only component
 };

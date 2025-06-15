@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { DragInput } from "@/components/ui/drag-input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -9,16 +9,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, FileText } from "lucide-react";
 import useEditorStore from "@/stores/editor-store";
 import Vector3Controls from "../vector3-controls";
+import { useScriptManager } from "../../../script-manager";
 
 interface ScriptComponentProps {
   component: ScriptComponent;
   onUpdate: (updates: Partial<ScriptComponent>) => void;
 }
 
-export default function ScriptComponent({ component, onUpdate }: ScriptComponentProps) {
-  const { currentProject } = useEditorStore();
+export default function ScriptComponent({ component: propComponent, onUpdate }: ScriptComponentProps) {
+  const { currentProject, selectedObjectData } = useEditorStore();
+  const scriptManager = useScriptManager();
   const [availableScripts, setAvailableScripts] = useState<string[]>([]);
   const [scriptStatus, setScriptStatus] = useState<{ isWatching: boolean; compiledCount: number } | null>(null);
+  
+  // Get the current component data from the store to ensure we have the latest state
+  const component = useMemo(() => {
+    if (selectedObjectData) {
+      const currentComponent = selectedObjectData.components.find(c => c.id === propComponent.id) as ScriptComponent;
+      return currentComponent || propComponent;
+    }
+    return propComponent;
+  }, [selectedObjectData, propComponent]);
+  
   const props = component.properties;
 
   // Load available scripts and compilation status
@@ -26,8 +38,16 @@ export default function ScriptComponent({ component, onUpdate }: ScriptComponent
     if (currentProject) {
       loadAvailableScripts();
       getScriptStatus();
+      
+      // Listen for script changes instead of polling
+      const unsubscribe = scriptManager.onScriptsChanged(() => {
+        loadAvailableScripts();
+        getScriptStatus();
+      });
+      
+      return unsubscribe;
     }
-  }, [currentProject]);
+  }, [currentProject, scriptManager]);
 
   const loadAvailableScripts = async () => {
     if (!currentProject) return;
@@ -175,7 +195,6 @@ export default function ScriptComponent({ component, onUpdate }: ScriptComponent
       const result = await window.scriptAPI.compileScript(currentProject.path, props.scriptPath);
       if (result.success) {
         console.log(`Script compiled successfully: ${props.scriptPath}`);
-        await loadAvailableScripts();
       } else {
         console.error(`Script compilation failed: ${result.error}`);
       }
@@ -223,25 +242,15 @@ export default function ScriptComponent({ component, onUpdate }: ScriptComponent
           )}
 
           {props.scriptPath && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleManualCompile}
-                className="h-6 px-2 text-xs"
-              >
-                <FileText className="h-3 w-3 mr-1" />
-                Recompile
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadAvailableScripts}
-                className="h-6 px-2 text-xs"
-              >
-                Refresh
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualCompile}
+              className="h-6 px-2 text-xs"
+            >
+              <FileText className="h-3 w-3 mr-1" />
+              Recompile
+            </Button>
           )}
         </div>
       </div>

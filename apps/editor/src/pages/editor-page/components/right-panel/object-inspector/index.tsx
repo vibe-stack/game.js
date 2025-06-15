@@ -14,6 +14,7 @@ export default function ObjectInspector({ scene, selectedObjects }: ObjectInspec
   const { 
     selectedObjectData, 
     gameWorld,
+    physicsState,
     updateObject, 
     updateObjectTransform, 
     updateObjectComponent, 
@@ -29,33 +30,36 @@ export default function ObjectInspector({ scene, selectedObjects }: ObjectInspec
   }
 
   const handleObjectUpdate = (objectId: string, updates: Partial<GameObject>) => {
-    // Delegate to GameWorld for immediate updates
-    if (gameWorld) {
+    // During editing mode, use the store methods to ensure UI reactivity
+    // During physics simulation, we can directly update GameWorld
+    if (physicsState === 'playing' && gameWorld) {
       Object.keys(updates).forEach(key => {
         gameWorld.updateObjectProperty(objectId, key, (updates as any)[key]);
       });
     } else {
-      // Fallback to store if GameWorld not available
+      // Use store method which updates both GameWorld and store state
       updateObject(objectId, updates);
     }
   };
 
   const handleTransformUpdate = (objectId: string, transform: Partial<Transform>) => {
-    // Delegate to GameWorld for immediate updates
-    if (gameWorld) {
+    // During editing mode, use the store methods to ensure UI reactivity
+    // During physics simulation, we can directly update GameWorld
+    if (physicsState === 'playing' && gameWorld) {
       gameWorld.updateObjectTransform(objectId, transform);
     } else {
-      // Fallback to store if GameWorld not available
+      // Use store method which updates both GameWorld and store state
       updateObjectTransform(objectId, transform);
     }
   };
 
   const handleComponentUpdate = (objectId: string, componentId: string, updates: Partial<GameObjectComponent | PhysicsComponent>) => {
-    // Delegate to GameWorld for immediate updates
-    if (gameWorld) {
+    // During editing mode, use the store methods to ensure UI reactivity
+    // During physics simulation, we can directly update GameWorld
+    if (physicsState === 'playing' && gameWorld) {
       gameWorld.updateObjectComponent(objectId, componentId, updates);
     } else {
-      // Fallback to store if GameWorld not available
+      // Use store method which updates both GameWorld and store state
       updateObjectComponent(objectId, componentId, updates);
     }
   };

@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Editor from "@monaco-editor/react";
+import { loader } from "@monaco-editor/react";
+import * as monaco from "monaco-editor";
 import { X, Save, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useEditorStore from "@/stores/editor-store";
 import { configureMonaco } from "./monaco-config";
+
+// Configure Monaco to load locally instead of from CDN
+loader.config({ monaco });
 
 interface CodeFile {
   path: string;
@@ -42,6 +47,32 @@ export default function CodeEditor({ isOpen, onClose, initialFile }: CodeEditorP
     }
   }, [initialFile, isOpen]);
 
+  const saveFile = useCallback(async (filePath: string) => {
+    const file = openFiles.find(f => f.path === filePath);
+    if (!file || !currentProject) return;
+
+    try {
+      await window.projectAPI.writeFile(filePath, file.content);
+      setOpenFiles(prev => 
+        prev.map(f => f.path === filePath ? { ...f, isDirty: false } : f)
+      );
+    } catch (error) {
+      console.error('Failed to save file:', error);
+    }
+  }, [openFiles, currentProject]);
+
+  const handleEditorChange = (value: string | undefined, filePath: string) => {
+    if (value === undefined) return;
+
+    setOpenFiles(prev => 
+      prev.map(f => 
+        f.path === filePath 
+          ? { ...f, content: value, isDirty: f.content !== value }
+          : f
+      )
+    );
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -56,11 +87,11 @@ export default function CodeEditor({ isOpen, onClose, initialFile }: CodeEditorP
       document.addEventListener('keydown', handleKeyDown);
       return () => document.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isOpen, activeFile]);
+  }, [isOpen, activeFile, saveFile]);
 
-  const handleEditorWillMount = () => {
+  const handleEditorWillMount = (monacoInstance: any) => {
     if (!monacoConfigured) {
-      configureMonaco();
+      configureMonaco(monacoInstance);
       setMonacoConfigured(true);
     }
   };
@@ -132,32 +163,6 @@ export default function CodeEditor({ isOpen, onClose, initialFile }: CodeEditorP
     if (openFiles.length === 1) {
       onClose();
     }
-  };
-
-  const saveFile = async (filePath: string) => {
-    const file = openFiles.find(f => f.path === filePath);
-    if (!file || !currentProject) return;
-
-    try {
-      await window.projectAPI.writeFile(filePath, file.content);
-      setOpenFiles(prev => 
-        prev.map(f => f.path === filePath ? { ...f, isDirty: false } : f)
-      );
-    } catch (error) {
-      console.error('Failed to save file:', error);
-    }
-  };
-
-  const handleEditorChange = (value: string | undefined, filePath: string) => {
-    if (value === undefined) return;
-
-    setOpenFiles(prev => 
-      prev.map(f => 
-        f.path === filePath 
-          ? { ...f, content: value, isDirty: f.content !== value }
-          : f
-      )
-    );
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -238,7 +243,7 @@ export default function CodeEditor({ isOpen, onClose, initialFile }: CodeEditorP
   return (
     <div
       ref={containerRef}
-      className="bg-background border rounded-lg shadow-2xl overflow-hidden"
+      className="bg-background/50 backdrop-blur-lg border rounded-lg shadow-2xl overflow-hidden"
       style={containerStyle}
     >
       {/* Title Bar */}
@@ -279,7 +284,7 @@ export default function CodeEditor({ isOpen, onClose, initialFile }: CodeEditorP
       </div>
 
       {/* File Tabs */}
-      <Tabs value={activeFile || undefined} onValueChange={setActiveFile} className="flex-1 flex flex-col">
+      <Tabs value={activeFile || undefined} onValueChange={setActiveFile} className="flex-1 flex flex-col h-full pb-20">
         <TabsList className="w-full justify-start rounded-none border-b bg-muted/30 h-10">
           {openFiles.map((file) => (
             <TabsTrigger
@@ -319,6 +324,7 @@ export default function CodeEditor({ isOpen, onClose, initialFile }: CodeEditorP
                 onMount={(editor) => {
                   editorRef.current = editor;
                 }}
+                theme="gamejs-dark"
                 options={{
                   minimap: { enabled: true },
                   fontSize: 14,
@@ -329,7 +335,6 @@ export default function CodeEditor({ isOpen, onClose, initialFile }: CodeEditorP
                   tabSize: 2,
                   insertSpaces: true,
                   wordWrap: 'on',
-                  theme: 'gamejs-dark',
                 }}
               />
             </div>
