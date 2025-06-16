@@ -71,3 +71,16 @@ The editor communicates with the GameJS CLI to create and manage projects, and i
 - Component property editing
 - Real-time preview
 - Deployment tools
+
+
+# dump for prompts
+i am trying to build a game engine library that wraps threejs and rapier3d for easy building of games
+
+i think there are multiple things missing though to make a proper game with this..
+- Interactivity currently is limited to mouse, but games can be played in various ways such as keyboards, touchscreen, physical controllers, touch controls (virtual joysticks, buttons)
+- Scene switching, preloading OR streaming assets
+- Soundmanagement and controls
+- A material registry and being able to reuse them across entities/meshes
+- Bringing it all together in a Mesh3D component instead of just having primitives
+- 
+- Scripting support: I have, on another branch, a full scripting setup that then compiles scripts, imports them and then allows me to dynamically inject them in the editor (for export builds they will all be bundled and precompiled together, but that's not something for now), but it was a different architecture and here i need the ability to fully allow scripts to interact with their entities and also different managers and the gameworld etc. so scripts are actually powerful

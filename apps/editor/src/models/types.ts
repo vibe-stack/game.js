@@ -61,6 +61,11 @@ export interface GameState {
   scene: {
     activeCamera: string;
     activeControls: string;
+    cameraTransition?: {
+      inProgress: boolean;
+      from?: string;
+      to?: string;
+    };
   };
   [key: string]: any;
 }
@@ -74,7 +79,7 @@ export interface InteractionCallbacks {
   onPointerUp?: (event: any) => void;
 }
 
-export type EntityType = "mesh" | "light" | "camera" | "group" | "primitive";
+export type EntityType = "mesh" | "sphere" | "box" | "mesh3d" | "light" | "camera" | "group" | "primitive";
 
 export interface EntityMetadata {
   type: EntityType;

@@ -3,6 +3,8 @@ import { Registry, RegistryManager } from "./registry";
 import { StateManager } from "./state-manager";
 import { PhysicsManager } from "./physics-manager";
 import { InteractionManager } from "./interaction-manager";
+import { CameraManager } from "./camera-manager";
+import { CameraControlManager } from "./camera-control-manager";
 import { Entity } from "./entity";
 import { Sphere } from "./primitives/sphere";
 import { Box } from "./primitives/box";
@@ -17,13 +19,13 @@ export class GameWorld {
   private stateManager: StateManager;
   private physicsManager: PhysicsManager;
   private interactionManager: InteractionManager;
+  private cameraManager: CameraManager;
+  private cameraControlManager: CameraControlManager;
   
   private entities: Registry<Entity>;
   private cameras: Registry<THREE.Camera>;
   private controls: Registry<any>;
   
-  private activeCamera: THREE.Camera | null = null;
-  private activeCameraId = "default";
   private isRunning = false;
   private animationId: number | null = null;
   
@@ -60,13 +62,29 @@ export class GameWorld {
     this.cameras = this.registryManager.createRegistry<THREE.Camera>("cameras");
     this.controls = this.registryManager.createRegistry<any>("controls");
 
+    // Initialize new managers
+    this.cameraManager = new CameraManager(
+      this.cameras,
+      this.stateManager,
+      this.scene,
+      width / height
+    );
+    
+    this.cameraControlManager = new CameraControlManager(
+      this.controls,
+      this.stateManager
+    );
+
+    // Setup default camera first
+    this.setupDefaultCamera(width, height);
+    
+    // Now initialize interaction manager with the active camera
     this.interactionManager = new InteractionManager(
       this.renderer as any,
-      this.activeCamera!,
+      this.cameraManager.getActiveCamera()!,
       config.canvas
     );
 
-    this.setupDefaultCamera(width, height);
     this.setupDefaultLighting();
     
     if (config.enablePhysics !== false) {
@@ -91,7 +109,7 @@ export class GameWorld {
     camera.lookAt(0, 0, 0);
     
     this.cameras.add("default", "Default Camera", camera);
-    this.setActiveCamera("default");
+    this.cameraManager.setActiveCamera("default");
   }
 
   private setupDefaultLighting(): void {
@@ -184,24 +202,34 @@ export class GameWorld {
     const camera = this.cameras.get(id);
     if (!camera) return false;
 
-    this.activeCamera = camera;
-    this.activeCameraId = id;
-    this.interactionManager.camera = camera;
-    this.updateState();
-    return true;
+    const success = this.cameraManager.setActiveCamera(id);
+    if (success) {
+      // Update interaction manager with the new active camera
+      this.interactionManager.camera = this.cameraManager.getActiveCamera()!;
+      this.updateState();
+    }
+    return success;
   }
 
   getActiveCamera(): THREE.Camera | null {
-    return this.activeCamera;
+    return this.cameraManager.getActiveCamera();
+  }
+
+  getCameraManager(): CameraManager {
+    return this.cameraManager;
+  }
+
+  getCameraControlManager(): CameraControlManager {
+    return this.cameraControlManager;
   }
 
   addControls(id: string, name: string, controls: any): void {
-    this.controls.add(id, name, controls);
+    this.cameraControlManager.addControls(id, name, controls);
     this.updateState();
   }
 
   getControls(id: string): any {
-    return this.controls.get(id);
+    return this.cameraControlManager.getControls(id);
   }
 
   start(): void {
@@ -237,11 +265,11 @@ export class GameWorld {
       }
     });
 
-    this.controls.forEach((controls) => {
-      if (controls.update) {
-        controls.update();
-      }
-    });
+    // Update camera manager (for transitions)
+    this.cameraManager.update();
+
+    // Update camera controls through the control manager
+    this.cameraControlManager.update();
 
     // Throttle state updates to avoid performance issues
     if (currentTime - this.lastStateUpdate >= this.stateUpdateInterval) {
@@ -249,8 +277,8 @@ export class GameWorld {
       this.lastStateUpdate = currentTime;
     }
 
-    if (this.activeCamera) {
-      this.renderer.render(this.scene, this.activeCamera);
+    if (this.cameraManager.getActiveCamera()) {
+      this.renderer.render(this.scene, this.cameraManager.getActiveCamera()!);
     }
   };
 
@@ -295,7 +323,7 @@ export class GameWorld {
         ...(physicsWorld && { world: physicsWorld }),
       },
       scene: {
-        activeCamera: this.activeCameraId,
+        activeCamera: this.cameraManager.getActiveCameraId(),
         activeControls: "",
       },
     });
@@ -315,11 +343,7 @@ export class GameWorld {
 
   resize(width: number, height: number): void {
     this.renderer.setSize(width, height);
-    
-    if (this.activeCamera instanceof THREE.PerspectiveCamera) {
-      this.activeCamera.aspect = width / height;
-      this.activeCamera.updateProjectionMatrix();
-    }
+    this.cameraManager.resize(width, height);
   }
 
   dispose(): void {
@@ -327,6 +351,14 @@ export class GameWorld {
     
     if (this.interactionManager) {
       this.interactionManager.dispose();
+    }
+    
+    if (this.cameraControlManager) {
+      this.cameraControlManager.dispose();
+    }
+    
+    if (this.cameraManager) {
+      this.cameraManager.dispose();
     }
     
     if (this.physicsManager) {
