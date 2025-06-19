@@ -1,16 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { GameWorld } from "../../models";
-import { createGameExample, useGameState } from "../../models/example";
+import { createKitchenSinkExampleV4, useKitchenSinkGameStateV4 } from "../../models/kitchen-sink-example-v4";
 
 export default function DemoPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameRef = useRef<{
-    game: GameWorld;
-    switchToCamera: (cameraId: string, enableTransition?: boolean) => void;
-    toggleControls: () => void;
-    cleanup: () => void;
-  } | null>(null);
+  const gameRef = useRef<any>(null);
   const [gameInitialized, setGameInitialized] = useState(false);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
 
   // Handle canvas resize
   useEffect(() => {
@@ -62,15 +58,15 @@ export default function DemoPage() {
 
     const initializeGame = async () => {
       try {
-        const gameExample = await createGameExample(canvasRef.current!);
+        const kitchenSinkExample = await createKitchenSinkExampleV4(canvasRef.current!);
         if (mounted) {
-          gameRef.current = gameExample;
+          gameRef.current = kitchenSinkExample;
           setGameInitialized(true);
         } else {
-          gameExample.cleanup();
+          kitchenSinkExample.cleanup();
         }
       } catch (error) {
-        console.error("Failed to initialize game:", error);
+        console.error("Failed to initialize kitchen sink demo:", error);
       }
     };
 
@@ -86,128 +82,167 @@ export default function DemoPage() {
     };
   }, []);
 
+  const enableAudio = async () => {
+    if (gameRef.current) {
+      try {
+        await gameRef.current.managers.sound.handleUserInteraction();
+        setIsAudioEnabled(true);
+      } catch (error) {
+        console.error("Failed to enable audio:", error);
+      }
+    }
+  };
+
   return (
-    <div className="demo-page relative w-full h-screen overflow-hidden">
+    <div className="demo-page relative w-full h-screen overflow-hidden bg-gray-900">
       <canvas
         ref={canvasRef}
-        className="game-canvas w-full h-full block bg-gray-900"
+        className="game-canvas w-full h-full block"
       />
+{/* 
+      {gameInitialized && gameRef.current && (
+        <KitchenSinkUI 
+          game={gameRef.current.game}
+          entities={gameRef.current.entities}
+          managers={gameRef.current.managers}
+          player={gameRef.current.player}
+          currentController={gameRef.current.functions.getCurrentController()}
+        />
+      )} */}
 
       {gameInitialized && gameRef.current && (
-        <GameUI game={gameRef.current.game} />
-      )}
-
-      {gameInitialized && gameRef.current && (
-        <CameraControls 
-          switchToCamera={gameRef.current.switchToCamera}
-          toggleControls={gameRef.current.toggleControls}
+        <ControlPanelV4 
+          functions={gameRef.current.functions}
+          managers={gameRef.current.managers}
+          isAudioEnabled={isAudioEnabled}
+          onEnableAudio={enableAudio}
         />
       )}
 
-      <div className="demo-info absolute top-5 right-5 bg-black/80 text-white p-5 rounded-lg max-w-xs font-sans">
-        <h2 className="m-0 mb-2.5 text-lg">Enhanced Game Demo</h2>
-        <p className="m-0 mb-4 text-sm">
-          Click the sphere to apply an impulse!
-        </p>
-        <ul className="m-0 pl-5 text-xs">
-          <li>Physics-enabled sphere (Player Ball)</li>
-          <li>Static ground plane</li>
-          <li>Multiple cameras with smooth transitions</li>
-          <li>Orbit controls management</li>
-          <li>Click interaction</li>
-          <li>Real-time state management</li>
-        </ul>
-      </div>
+      {gameInitialized && gameRef.current && (
+        <KeyboardControlsV4 />
+      )}
     </div>
   );
 }
 
-function GameUI({ game }: { game: GameWorld }) {
-  const entityCount = useGameState(game, (state) => state.entities.size);
-  const physicsEnabled = useGameState(game, (state) => state.physics.enabled);
-  const activeCamera = useGameState(game, (state) => state.scene.activeCamera);
-  const cameraTransition = useGameState(game, (state) => state.scene.cameraTransition?.inProgress);
-  const ballPosition = useGameState(game, (state) => {
-    // Find entity with "player" tag
-    const entities = Array.from(state.entities.values());
-    const playerEntity = entities.find((entity: any) => entity.hasTag?.("player"));
-    return playerEntity?.position;
-  });
-
-  return (
-    <div className="game-ui absolute top-5 left-5 bg-black/80 text-white p-4 rounded-lg font-sans text-sm">
-      <div className="mb-1">
-        <strong>Entities:</strong> {entityCount}
-      </div>
-      <div className="mb-1">
-        <strong>Physics:</strong>{" "}
-        {physicsEnabled ? "Enabled" : "Disabled"}
-      </div>
-      <div className="mb-1">
-        <strong>Active Camera:</strong> {activeCamera}
-      </div>
-      <div className="mb-1">
-        <strong>Camera Transition:</strong>{" "}
-        {cameraTransition ? "In Progress" : "None"}
-      </div>
-      <div>
-        <strong>Ball Position:</strong>{" "}
-        {ballPosition ? `X: ${ballPosition.x.toFixed(2)}, Y: ${ballPosition.y.toFixed(2)}, Z: ${ballPosition.z.toFixed(2)}` : "N/A"}
-      </div>
-    </div>
-  );
-}
-
-function CameraControls({ 
-  switchToCamera, 
-  toggleControls 
+function ControlPanelV4({ 
+  functions, 
+  managers, 
+  isAudioEnabled, 
+  onEnableAudio 
 }: { 
-  switchToCamera: (cameraId: string, enableTransition?: boolean) => void;
-  toggleControls: () => void;
+  functions: any;
+  managers: any;
+  isAudioEnabled: boolean;
+  onEnableAudio: () => void;
 }) {
   return (
-    <div className="camera-controls absolute bottom-5 left-5 bg-black/80 text-white p-4 rounded-lg font-sans">
-      <h3 className="m-0 mb-3 text-sm font-bold">Camera Controls</h3>
+    <div className="control-panel absolute bottom-5 left-5 bg-black/90 text-white p-4 rounded-lg font-mono max-w-md">
+      <h3 className="text-lg font-bold mb-3 text-blue-400">🎛️ Terrain Demo Controls</h3>
       
-      <div className="mb-3">
-        <p className="m-0 mb-2 text-xs">Switch Camera:</p>
-        <div className="flex gap-2 mb-2">
+      {/* Action Controls */}
+      <div className="mb-4">
+        <h4 className="text-sm font-bold mb-2 text-yellow-400">Actions:</h4>
+        <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={() => switchToCamera('default')}
-            className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded"
+            onClick={functions.explodeAllObjects}
+            className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 rounded"
           >
-            Default
+            Explode (E)
           </button>
           <button
-            onClick={() => switchToCamera('top-view')}
-            className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 rounded"
-          >
-            Top View
-          </button>
-          <button
-            onClick={() => switchToCamera('side-view')}
-            className="px-2 py-1 text-xs bg-purple-600 hover:bg-purple-700 rounded"
-          >
-            Side View
-          </button>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => switchToCamera('default', false)}
+            onClick={functions.resetScene}
             className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-700 rounded"
           >
-            Quick Switch
+            Reset (R)
           </button>
         </div>
       </div>
 
-      <div>
-        <button
-          onClick={toggleControls}
-          className="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 rounded"
-        >
-          Toggle Controls
-        </button>
+      {/* Debug Controls */}
+      <div className="mb-4">
+        <h4 className="text-sm font-bold mb-2 text-green-400">Debug:</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={functions.toggleEntityDebugRender}
+            className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 rounded"
+          >
+            Entity Debug (D)
+          </button>
+          <button
+            onClick={functions.logPhysicsInfo}
+            className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded"
+          >
+            Physics Info (I)
+          </button>
+        </div>
+      </div>
+
+      {/* Audio Controls */}
+      <div className="mb-4">
+        <h4 className="text-sm font-bold mb-2 text-purple-400">Audio:</h4>
+        {!isAudioEnabled ? (
+          <button
+            onClick={onEnableAudio}
+            className="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 rounded w-full"
+          >
+            Enable Audio
+          </button>
+        ) : (
+          <div className="text-xs text-gray-300">
+            <div>SFX: Click objects to interact</div>
+            <div>Jump: Space</div>
+          </div>
+        )}
+      </div>
+
+      <div className="text-xs text-gray-400">
+        <div>🌍 Third Person Terrain Demo</div>
+        <div>🎨 Various materials & primitives</div>
+        <div>💡 Orbital lighting effects</div>
+        <div>🏃‍♂️ Physics-based character controller</div>
+      </div>
+    </div>
+  );
+}
+
+function KeyboardControlsV4() {
+  return (
+    <div className="keyboard-controls absolute top-5 right-5 bg-black/90 text-white p-4 rounded-lg font-mono text-xs max-w-xs">
+      <h3 className="text-sm font-bold mb-3 text-cyan-400">⌨️ Terrain Demo Controls</h3>
+      
+      <div className="space-y-2">
+        <div className="border-b border-gray-700 pb-2">
+          <div className="text-yellow-400 font-bold">Movement:</div>
+          <div className="text-gray-300">WASD: Move around terrain</div>
+          <div className="text-gray-300">Space: Jump</div>
+          <div className="text-gray-300">Shift: Sprint</div>
+          <div className="text-gray-300">Mouse: Look around (third person)</div>
+        </div>
+        
+        <div className="border-b border-gray-700 pb-2">
+          <div className="text-red-400 font-bold">Actions:</div>
+          <div className="text-gray-300">E: Explode all objects</div>
+          <div className="text-gray-300">R: Reset scene</div>
+          <div className="text-gray-300">Click objects: Apply force</div>
+        </div>
+        
+        <div className="border-b border-gray-700 pb-2">
+          <div className="text-green-400 font-bold">Debug:</div>
+          <div className="text-gray-300">P: Toggle physics debug</div>
+          <div className="text-gray-300">D: Toggle entity debug</div>
+          <div className="text-gray-300">I: Log physics info</div>
+        </div>
+        
+        <div>
+          <div className="text-purple-400 font-bold">Features:</div>
+          <div className="text-gray-300">• Procedural terrain</div>
+          <div className="text-gray-300">• Dynamic primitives</div>
+          <div className="text-gray-300">• Orbital lighting</div>
+          <div className="text-gray-300">• Physics interactions</div>
+          <div className="text-gray-300">• Various materials</div>
+        </div>
       </div>
     </div>
   );

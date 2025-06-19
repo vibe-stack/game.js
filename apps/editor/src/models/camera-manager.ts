@@ -17,6 +17,15 @@ export interface CameraTransitionConfig {
   onComplete?: () => void;
 }
 
+export interface CameraFollowConfig {
+  target: THREE.Object3D | (() => THREE.Object3D | null);
+  offset?: THREE.Vector3;
+  followPosition?: boolean;
+  followRotation?: boolean;
+  rotationOffset?: THREE.Euler;
+  smoothing?: number; // 0 = instant, 1 = very smooth
+}
+
 export class CameraManager {
   private cameras: Registry<THREE.Camera>;
   private stateManager: StateManager;
@@ -42,6 +51,9 @@ export class CameraManager {
     position: THREE.Vector3;
     target: THREE.Vector3;
   } | null = null;
+
+  // Camera following system
+  private followConfigs = new Map<string, CameraFollowConfig>();
 
   constructor(
     cameras: Registry<THREE.Camera>,
@@ -150,8 +162,10 @@ export class CameraManager {
       return this.transitionToCamera(id, transition);
     }
 
-    // Reset the target camera to its original position before making it active
-    this.resetCameraToOriginal(id);
+    // Only reset to original position if not following something
+    if (!this.followConfigs.has(id)) {
+      this.resetCameraToOriginal(id);
+    }
 
     this.activeCamera = camera;
     this.activeCameraId = id;
@@ -208,6 +222,9 @@ export class CameraManager {
   }
 
   update(): void {
+    // Update camera following first
+    this.updateCameraFollowing();
+
     if (this.isTransitioning && this.activeCamera && this.fromCameraState && this.toCameraState) {
       const elapsed = performance.now() - this.transitionStartTime;
       const progress = Math.min(elapsed / this.transitionDuration, 1);
@@ -356,5 +373,72 @@ export class CameraManager {
     };
 
     this.addCameraWithMetadata(id, name, camera, metadata);
+  }
+
+  // Camera following methods
+  setCameraFollow(cameraId: string, config: CameraFollowConfig): boolean {
+    const camera = this.cameras.get(cameraId);
+    if (!camera) return false;
+
+    this.followConfigs.set(cameraId, {
+      target: config.target,
+      offset: config.offset ?? new THREE.Vector3(0, 1.8, 0),
+      followPosition: config.followPosition ?? true,
+      followRotation: config.followRotation ?? false,
+      rotationOffset: config.rotationOffset ?? new THREE.Euler(0, 0, 0),
+      smoothing: config.smoothing ?? 0
+    });
+
+    return true;
+  }
+
+  removeCameraFollow(cameraId: string): boolean {
+    return this.followConfigs.delete(cameraId);
+  }
+
+  getCameraFollow(cameraId: string): CameraFollowConfig | undefined {
+    return this.followConfigs.get(cameraId);
+  }
+
+  private updateCameraFollowing(): void {
+    // Only update following for the currently active camera
+    if (this.activeCameraId && this.followConfigs.has(this.activeCameraId)) {
+      const config = this.followConfigs.get(this.activeCameraId)!;
+      const camera = this.cameras.get(this.activeCameraId);
+      
+      if (!camera) return;
+
+      // Get target object
+      const target = typeof config.target === 'function' 
+        ? config.target() 
+        : config.target;
+      
+      if (!target) return;
+
+      if (config.followPosition) {
+        const targetPosition = target.position.clone().add(config.offset!);
+        
+        if (config.smoothing! > 0) {
+          camera.position.lerp(targetPosition, 1 - config.smoothing!);
+        } else {
+          camera.position.copy(targetPosition);
+        }
+      }
+
+      if (config.followRotation) {
+        const targetRotation = target.rotation.clone();
+        targetRotation.x += config.rotationOffset!.x;
+        targetRotation.y += config.rotationOffset!.y;
+        targetRotation.z += config.rotationOffset!.z;
+
+        if (config.smoothing! > 0) {
+          // Smooth rotation interpolation
+          const targetQuaternion = new THREE.Quaternion().setFromEuler(targetRotation);
+          camera.quaternion.slerp(targetQuaternion, 1 - config.smoothing!);
+        } else {
+          camera.rotation.copy(targetRotation);
+        }
+      }
+    }
   }
 } 

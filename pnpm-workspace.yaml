@@ -1,4 +1,13 @@
 packages:
-  - "apps/*"
-  - "packages/*"
-  - "projects/*"
+  - apps/*
+  - packages/*
+  - projects/*
+
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - '@tailwindcss/oxide'
+  - bufferutil
+  - electron
+  - electron-winstaller
+  - esbuild
+  - utf-8-validate

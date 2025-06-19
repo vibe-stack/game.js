@@ -5,6 +5,7 @@ import { PhysicsManager } from "./physics-manager";
 import { InteractionManager } from "./interaction-manager";
 import { CameraManager } from "./camera-manager";
 import { CameraControlManager } from "./camera-control-manager";
+import { DebugRenderer } from "./debug-renderer";
 import { Entity } from "./entity";
 import { Sphere } from "./primitives/sphere";
 import { Box } from "./primitives/box";
@@ -21,6 +22,7 @@ export class GameWorld {
   private interactionManager: InteractionManager;
   private cameraManager: CameraManager;
   private cameraControlManager: CameraControlManager;
+  private debugRenderer: DebugRenderer;
   
   private entities: Registry<Entity>;
   private cameras: Registry<THREE.Camera>;
@@ -84,6 +86,9 @@ export class GameWorld {
       this.cameraManager.getActiveCamera()!,
       config.canvas
     );
+
+    // Initialize debug renderer
+    this.debugRenderer = new DebugRenderer(this.scene, this.physicsManager);
 
     this.setupDefaultLighting();
     
@@ -265,6 +270,9 @@ export class GameWorld {
       }
     });
 
+    // Update debug renderer
+    this.debugRenderer.update();
+
     // Update camera manager (for transitions)
     this.cameraManager.update();
 
@@ -349,6 +357,10 @@ export class GameWorld {
   dispose(): void {
     this.stop();
     
+    if (this.debugRenderer) {
+      this.debugRenderer.dispose();
+    }
+    
     if (this.interactionManager) {
       this.interactionManager.dispose();
     }
@@ -376,5 +388,25 @@ export class GameWorld {
     if (this.stateManager) {
       this.stateManager.clearSubscribers();
     }
+  }
+
+  enablePhysicsDebugRender(): void {
+    this.debugRenderer.enable();
+  }
+
+  disablePhysicsDebugRender(): void {
+    this.debugRenderer.disable();
+  }
+
+  togglePhysicsDebugRender(): void {
+    this.debugRenderer.toggle();
+  }
+
+  isPhysicsDebugRenderEnabled(): boolean {
+    return this.debugRenderer.isEnabled();
+  }
+
+  getDebugRenderer(): DebugRenderer {
+    return this.debugRenderer;
   }
 }

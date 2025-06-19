@@ -69,8 +69,8 @@ export class SoundManager {
       this.masterGainNode = this.audioContext.createGain();
       this.masterGainNode.connect(this.audioContext.destination);
       
-      // Create audio listener for 3D audio
-      this.listener = new AudioListener();
+      // Get audio listener for 3D audio (use the one from AudioContext)
+      this.listener = this.audioContext.listener;
       
       // Resume context if suspended (common on mobile)
       if (this.audioContext.state === 'suspended') {
@@ -304,20 +304,36 @@ export class SoundManager {
   public setListenerPosition(position: THREE.Vector3, forward?: THREE.Vector3, up?: THREE.Vector3): void {
     if (!this.listener) return;
 
-    this.listener.positionX.setValueAtTime(position.x, this.audioContext.currentTime);
-    this.listener.positionY.setValueAtTime(position.y, this.audioContext.currentTime);
-    this.listener.positionZ.setValueAtTime(position.z, this.audioContext.currentTime);
+    try {
+      // Modern Web Audio API with AudioParam properties
+      if (this.listener.positionX && this.listener.positionX.setValueAtTime) {
+        this.listener.positionX.setValueAtTime(position.x, this.audioContext.currentTime);
+        this.listener.positionY.setValueAtTime(position.y, this.audioContext.currentTime);
+        this.listener.positionZ.setValueAtTime(position.z, this.audioContext.currentTime);
 
-    if (forward) {
-      this.listener.forwardX.setValueAtTime(forward.x, this.audioContext.currentTime);
-      this.listener.forwardY.setValueAtTime(forward.y, this.audioContext.currentTime);
-      this.listener.forwardZ.setValueAtTime(forward.z, this.audioContext.currentTime);
-    }
+        if (forward && this.listener.forwardX && this.listener.forwardX.setValueAtTime) {
+          this.listener.forwardX.setValueAtTime(forward.x, this.audioContext.currentTime);
+          this.listener.forwardY.setValueAtTime(forward.y, this.audioContext.currentTime);
+          this.listener.forwardZ.setValueAtTime(forward.z, this.audioContext.currentTime);
+        }
 
-    if (up) {
-      this.listener.upX.setValueAtTime(up.x, this.audioContext.currentTime);
-      this.listener.upY.setValueAtTime(up.y, this.audioContext.currentTime);
-      this.listener.upZ.setValueAtTime(up.z, this.audioContext.currentTime);
+        if (up && this.listener.upX && this.listener.upX.setValueAtTime) {
+          this.listener.upX.setValueAtTime(up.x, this.audioContext.currentTime);
+          this.listener.upY.setValueAtTime(up.y, this.audioContext.currentTime);
+          this.listener.upZ.setValueAtTime(up.z, this.audioContext.currentTime);
+        }
+      }
+      // Fallback for older Web Audio API
+      else if ((this.listener as any).setPosition) {
+        (this.listener as any).setPosition(position.x, position.y, position.z);
+        
+        if (forward && up && (this.listener as any).setOrientation) {
+          (this.listener as any).setOrientation(forward.x, forward.y, forward.z, up.x, up.y, up.z);
+        }
+      }
+    } catch (error) {
+      // Silently handle cases where 3D audio isn't supported
+      console.warn('3D audio positioning not supported:', error);
     }
   }
 

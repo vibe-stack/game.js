@@ -1,0 +1,146 @@
+import * as THREE from "three/webgpu";
+import { Entity } from "../entity";
+import { EntityConfig } from "../types";
+
+export interface CapsuleConfig extends EntityConfig {
+  // Basic dimensions
+  radius?: number;
+  length?: number;
+  
+  // Segment configuration
+  capSegments?: number;
+  radialSegments?: number;
+  
+  // Material
+  material?: THREE.Material;
+  
+  // Shadow settings
+  castShadow?: boolean;
+  receiveShadow?: boolean;
+}
+
+export class Capsule extends Entity {
+  public readonly dimensions: { radius: number; length: number };
+  public readonly segments: { cap: number; radial: number };
+  private mesh: THREE.Mesh;
+  private geometry: THREE.CapsuleGeometry;
+
+  constructor(config: CapsuleConfig = {}) {
+    super(config);
+    
+    this.dimensions = {
+      radius: config.radius ?? 1,
+      length: config.length ?? 1
+    };
+    
+    this.segments = {
+      cap: config.capSegments ?? 4,
+      radial: config.radialSegments ?? 8
+    };
+    
+    const material = config.material ?? new THREE.MeshStandardMaterial({ color: 0xff0088 });
+    
+    this.geometry = new THREE.CapsuleGeometry(
+      this.dimensions.radius,
+      this.dimensions.length,
+      this.segments.cap,
+      this.segments.radial
+    );
+    
+    this.mesh = new THREE.Mesh(this.geometry, material);
+    this.mesh.castShadow = config.castShadow ?? true;
+    this.mesh.receiveShadow = config.receiveShadow ?? true;
+    this.add(this.mesh);
+    
+    this.metadata.type = "primitive";
+    this.addTag("capsule");
+  }
+
+  protected createCollider(): void {
+    if (!this.physicsManager || !this.rigidBodyId) return;
+    
+    this.physicsManager.createCollider(
+      this.colliderId!,
+      this.rigidBodyId,
+      "capsule",
+      new THREE.Vector3(this.dimensions.radius, this.dimensions.length, this.dimensions.radius)
+    );
+  }
+
+  setDimensions(radius: number, length: number): this {
+    this.geometry.dispose();
+    this.geometry = new THREE.CapsuleGeometry(
+      radius,
+      length,
+      this.segments.cap,
+      this.segments.radial
+    );
+    this.mesh.geometry = this.geometry;
+    (this.dimensions as any).radius = radius;
+    (this.dimensions as any).length = length;
+    return this;
+  }
+
+  setSegments(capSegments: number, radialSegments: number): this {
+    this.geometry.dispose();
+    this.geometry = new THREE.CapsuleGeometry(
+      this.dimensions.radius,
+      this.dimensions.length,
+      capSegments,
+      radialSegments
+    );
+    this.mesh.geometry = this.geometry;
+    (this.segments as any).cap = capSegments;
+    (this.segments as any).radial = radialSegments;
+    return this;
+  }
+
+  setRadius(radius: number): this {
+    return this.setDimensions(radius, this.dimensions.length);
+  }
+
+  setLength(length: number): this {
+    return this.setDimensions(this.dimensions.radius, length);
+  }
+
+  setMaterial(material: THREE.Material): this {
+    this.mesh.material = material;
+    return this;
+  }
+
+  setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
+    this.mesh.castShadow = castShadow;
+    this.mesh.receiveShadow = receiveShadow;
+    return this;
+  }
+
+  getMesh(): THREE.Mesh {
+    return this.mesh;
+  }
+
+  getGeometry(): THREE.CapsuleGeometry {
+    return this.geometry;
+  }
+
+  // Convenience getters
+  get radius(): number { return this.dimensions.radius; }
+  get length(): number { return this.dimensions.length; }
+  get totalHeight(): number { return this.dimensions.length + this.dimensions.radius * 2; }
+
+  // Create common capsule variations
+  static createPill(config: CapsuleConfig = {}): Capsule {
+    return new Capsule({
+      radius: 0.3,
+      length: 1.5,
+      ...config
+    });
+  }
+
+  static createBullet(config: CapsuleConfig = {}): Capsule {
+    return new Capsule({
+      radius: 0.2,
+      length: 0.8,
+      ...config
+    });
+  }
+} 

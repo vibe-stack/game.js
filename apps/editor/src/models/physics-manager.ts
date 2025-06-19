@@ -10,6 +10,7 @@ export class PhysicsManager {
   private colliderMap = new Map<string, RapierType.Collider>();
   private gravity = new THREE.Vector3(0, -9.81, 0);
   private rapierModule: typeof RAPIER | null = null;
+  private debugRenderEnabled = false;
 
   async initialize(gravity?: THREE.Vector3): Promise<void> {
     try {
@@ -68,8 +69,8 @@ export class PhysicsManager {
   createCollider(
     id: string,
     rigidBodyId: string,
-    shape: "ball" | "cuboid" | "capsule" | "trimesh",
-    dimensions: THREE.Vector3 | number,
+    shape: "ball" | "cuboid" | "capsule" | "trimesh" | "heightfield",
+    dimensions: THREE.Vector3 | number | { heights: number[][]; scale: THREE.Vector3 },
     config?: PhysicsConfig
   ): RapierType.Collider | null {
     if (!this.isEnabled() || !this.rapierModule) return null;
@@ -81,7 +82,7 @@ export class PhysicsManager {
     
     switch (shape) {
       case "ball": {
-        const radius = typeof dimensions === "number" ? dimensions : dimensions.x;
+        const radius = typeof dimensions === "number" ? dimensions : (dimensions as THREE.Vector3).x;
         colliderDesc = this.rapierModule.ColliderDesc.ball(radius);
         break;
       }
@@ -93,18 +94,52 @@ export class PhysicsManager {
             dimensions / 2
           );
         } else {
+          const dims = dimensions as THREE.Vector3;
           colliderDesc = this.rapierModule.ColliderDesc.cuboid(
-            dimensions.x / 2,
-            dimensions.y / 2,
-            dimensions.z / 2
+            dims.x / 2,
+            dims.y / 2,
+            dims.z / 2
           );
         }
         break;
       }
       case "capsule": {
-        const height = typeof dimensions === "number" ? dimensions : dimensions.y;
-        const capsuleRadius = typeof dimensions === "number" ? dimensions / 4 : dimensions.x / 2;
+        const height = typeof dimensions === "number" ? dimensions : (dimensions as THREE.Vector3).y;
+        const capsuleRadius = typeof dimensions === "number" ? dimensions / 4 : (dimensions as THREE.Vector3).x / 2;
         colliderDesc = this.rapierModule.ColliderDesc.capsule(height / 2, capsuleRadius);
+        break;
+      }
+      case "heightfield": {
+        const heightfieldData = dimensions as { heights: number[][]; scale: THREE.Vector3 };
+        const { heights, scale } = heightfieldData;
+        
+        // Flatten the 2D height array to 1D as required by Rapier
+        const nrows = heights.length;
+        const ncols = heights[0]?.length || 0;
+        
+        if (nrows === 0 || ncols === 0) {
+          console.error("Invalid heightfield data: empty height array");
+          return null;
+        }
+        
+        // Rapier expects heights flattened in row-major order
+        // heights[row][col] -> flatHeights[row * ncols + col]
+        const flatHeights = new Float32Array(nrows * ncols);
+        for (let row = 0; row < nrows; row++) {
+          for (let col = 0; col < ncols; col++) {
+            flatHeights[row * ncols + col] = heights[row][col];
+          }
+        }
+        
+        // Create heightfield collider
+        // Arguments: (nrows-1, ncols-1, heights, scale)
+        // Note: nrows-1 and ncols-1 because Rapier counts intervals, not samples
+        colliderDesc = this.rapierModule.ColliderDesc.heightfield(
+          nrows - 1, 
+          ncols - 1, 
+          flatHeights,
+          { x: scale.x, y: scale.y, z: scale.z }
+        );
         break;
       }
       default:
@@ -264,11 +299,51 @@ export class PhysicsManager {
     }
   }
 
+  // Helper method specifically for heightfield colliders
+  createHeightfieldCollider(
+    id: string,
+    rigidBodyId: string,
+    heights: number[][],
+    scale: THREE.Vector3,
+    config?: PhysicsConfig
+  ): RapierType.Collider | null {
+    return this.createCollider(id, rigidBodyId, "heightfield", { heights, scale }, config);
+  }
+
   getBodyCount(): number {
     return this.bodyMap.size;
   }
 
   getColliderCount(): number {
     return this.colliderMap.size;
+  }
+
+  enableDebugRender(enabled: boolean): void {
+    this.debugRenderEnabled = enabled;
+  }
+
+  isDebugRenderEnabled(): boolean {
+    return this.debugRenderEnabled;
+  }
+
+  getDebugRenderData(): { vertices: Float32Array; colors: Float32Array } | null {
+    if (!this.isEnabled() || !this.debugRenderEnabled || !this.world) {
+      return null;
+    }
+
+    try {
+      const buffers = this.world.debugRender();
+      // Log debug information periodically
+      if (Math.random() < 0.01) { // Log ~1% of the time to avoid spam
+        console.log(`Debug render data: ${buffers.vertices.length} vertices, ${buffers.colors.length} colors`);
+      }
+      return {
+        vertices: buffers.vertices,
+        colors: buffers.colors
+      };
+    } catch (error) {
+      console.error("Error getting debug render data:", error);
+      return null;
+    }
   }
 } 

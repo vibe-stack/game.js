@@ -3,6 +3,7 @@ export { Entity } from "./entity";
 export { Registry, RegistryManager } from "./registry";
 export { StateManager, createStateHook, createStateSelector } from "./state-manager";
 export { PhysicsManager } from "./physics-manager";
+export { DebugRenderer } from "./debug-renderer";
 export { InteractionManager, InteractiveObject, InteractiveEvent } from "./interaction-manager";
 export { CameraManager } from "./camera-manager";
 export { CameraControlManager } from "./camera-control-manager";
@@ -13,9 +14,45 @@ export { AssetManager } from "./asset-manager";
 export { SceneManager } from "./scene-manager";
 export { SoundManager } from "./sound-manager";
 
+// Asset Pipeline System
+export { 
+  AssetPipeline,
+  DEFAULT_PIPELINE_CONFIG,
+  DEFAULT_STREAMING_CONFIG 
+} from "./asset-pipeline";
+
+// Character controller
+export { 
+  CharacterController,
+  FPS_CHARACTER_CONFIG,
+  THIRD_PERSON_CHARACTER_CONFIG,
+  PLATFORMER_CHARACTER_CONFIG 
+} from "./character-controller";
+
+// Basic primitives
 export { Sphere } from "./primitives/sphere";
 export { Box } from "./primitives/box";
 export { Mesh3D } from "./primitives/mesh-3d";
+
+// Terrain primitives
+export { Heightfield } from "./primitives/heightfield";
+export { CustomHeightfield } from "./primitives/custom-heightfield";
+
+// Extended primitives
+export { Cylinder } from "./primitives/cylinder";
+export { Plane } from "./primitives/plane";
+export { Cone } from "./primitives/cone";
+export { Torus } from "./primitives/torus";
+export { Capsule } from "./primitives/capsule";
+export { Ring } from "./primitives/ring";
+
+// Polyhedron primitives
+export { 
+  Tetrahedron, 
+  Octahedron, 
+  Dodecahedron, 
+  Icosahedron 
+} from "./primitives/polyhedron";
 
 export type {
   PhysicsConfig,
@@ -48,6 +85,16 @@ export type {
   AssetData,
 } from "./asset-manager";
 
+// Asset Pipeline types
+export type {
+  AssetPipelineConfig,
+  StreamingConfig,
+  AssetStreamingState,
+  StreamingAsset,
+  AssetBundle,
+  PipelineMetrics,
+} from "./asset-pipeline";
+
 // Scene system types
 export type {
   SceneConfig,
@@ -62,16 +109,45 @@ export type {
   AudioCategory,
 } from "./sound-manager";
 
-export type { 
-  CameraConfig, 
-  CameraTransitionConfig 
+export type {
+  CameraConfig,
+  CameraTransitionConfig,
+  CameraFollowConfig
 } from "./camera-manager";
 
-export type { 
-  CameraControlConfig, 
-  CameraControlInfo 
+export type {
+  CameraControlConfig,
+  CameraControlInfo
 } from "./camera-control-manager";
 
+// Character controller types
+export type {
+  CharacterControllerConfig,
+  CharacterState
+} from "./character-controller";
+
+// Basic primitive types
 export type { SphereConfig } from "./primitives/sphere";
 export type { BoxConfig } from "./primitives/box";
-export type { Mesh3DConfig } from "./primitives/mesh-3d"; 
+export type { Mesh3DConfig } from "./primitives/mesh-3d";
+
+// Terrain primitive types
+export type { HeightfieldConfig } from "./primitives/heightfield";
+export type { CustomHeightfieldConfig, HeightfieldEdit, HeightfieldRegion } from "./primitives/custom-heightfield";
+
+// Extended primitive types
+export type { CylinderConfig } from "./primitives/cylinder";
+export type { PlaneConfig } from "./primitives/plane";
+export type { ConeConfig } from "./primitives/cone";
+export type { TorusConfig } from "./primitives/torus";
+export type { CapsuleConfig } from "./primitives/capsule";
+export type { RingConfig } from "./primitives/ring";
+
+// Polyhedron primitive types
+export type { 
+  PolyhedronConfig,
+  TetrahedronConfig, 
+  OctahedronConfig, 
+  DodecahedronConfig, 
+  IcosahedronConfig 
+} from "./primitives/polyhedron"; 

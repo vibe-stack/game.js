@@ -13,6 +13,7 @@ export class Entity extends THREE.Object3D {
   private tweens: TweenConfig[] = [];
   private interactionCallbacks: InteractionCallbacks = {};
   private destroyed = false;
+  private debugRenderEnabled = false;
 
   constructor(config: EntityConfig = {}) {
     super();
@@ -290,5 +291,24 @@ export class Entity extends THREE.Object3D {
 
   isDestroyed(): boolean {
     return this.destroyed;
+  }
+
+  enableDebugRender(): this {
+    this.debugRenderEnabled = true;
+    return this;
+  }
+
+  disableDebugRender(): this {
+    this.debugRenderEnabled = false;
+    return this;
+  }
+
+  toggleDebugRender(): this {
+    this.debugRenderEnabled = !this.debugRenderEnabled;
+    return this;
+  }
+
+  isDebugRenderEnabled(): boolean {
+    return this.debugRenderEnabled;
   }
 } 
