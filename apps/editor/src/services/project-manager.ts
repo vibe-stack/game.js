@@ -91,7 +91,7 @@ export class ProjectManager {
 
   private static async createDefaultScene(projectPath: string, template: string): Promise<void> {
     const sceneData = ProjectManager.generateSceneTemplate(template);
-    const scenePath = path.join(projectPath, "scenes", "main-scene.json");
+    const scenePath = path.join(projectPath, "scenes", "main-scene.scene.json");
     await fs.writeFile(scenePath, JSON.stringify(sceneData, null, 2), "utf-8");
   }
 

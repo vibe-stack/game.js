@@ -192,6 +192,7 @@ export class GameWorld {
   // ... (getters and other methods)
   getScene(): THREE.Scene { return this.scene; }
   getRenderer(): THREE.WebGPURenderer { return this.renderer; }
+  getCanvas(): HTMLCanvasElement { return this.renderer.domElement as HTMLCanvasElement; }
   getStateManager(): StateManager { return this.stateManager; }
   getPhysicsManager(): PhysicsManager { return this.physicsManager; }
   getRegistryManager(): RegistryManager { return this.registryManager; }

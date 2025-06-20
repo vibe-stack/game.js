@@ -16,7 +16,8 @@ export default function GameCanvas({ gameWorldService }: GameCanvasProps) {
     shouldLoadScene,
     currentSceneName,
     setShouldLoadScene,
-    setCurrentSceneName
+    setCurrentSceneName,
+    setGameWorldService
   } = useGameStudioStore();
 
   // Initialize game world when project is available
@@ -29,6 +30,8 @@ export default function GameCanvas({ gameWorldService }: GameCanvasProps) {
         
         if (!gameWorldService.current) {
           gameWorldService.current = new GameWorldService();
+          // Set the service in the store so other components can access it
+          setGameWorldService(gameWorldService.current);
         }
 
         await gameWorldService.current.initialize(canvasRef.current!);
@@ -63,9 +66,10 @@ export default function GameCanvas({ gameWorldService }: GameCanvasProps) {
     return () => {
       if (gameWorldService.current) {
         gameWorldService.current.stop();
+        setGameWorldService(null);
       }
     };
-  }, [currentProject, setLoading, setError, gameWorldService, setCurrentSceneName, setShouldLoadScene]);
+  }, [currentProject, setLoading, setError, gameWorldService, setCurrentSceneName, setShouldLoadScene, setGameWorldService]);
 
   // Handle scene loading when shouldLoadScene changes
   useEffect(() => {

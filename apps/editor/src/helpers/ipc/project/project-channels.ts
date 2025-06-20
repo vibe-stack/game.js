@@ -7,6 +7,14 @@ export const PROJECT_DELETE_PROJECT_CHANNEL = "project:delete-project";
 export const PROJECT_OPEN_FOLDER_CHANNEL = "project:open-folder";
 export const PROJECT_SELECT_DIRECTORY_CHANNEL = "project:select-directory";
 
+// Scene Management Channels
+export const PROJECT_LIST_SCENES_CHANNEL = "project:list-scenes";
+export const PROJECT_LOAD_SCENE_CHANNEL = "project:load-scene";
+export const PROJECT_SAVE_SCENE_CHANNEL = "project:save-scene";
+export const PROJECT_CREATE_SCENE_CHANNEL = "project:create-scene";
+export const PROJECT_DELETE_SCENE_CHANNEL = "project:delete-scene";
+export const PROJECT_SWITCH_SCENE_CHANNEL = "project:switch-scene";
+
 // Asset Management Channels
 export const PROJECT_SELECT_ASSET_FILES_CHANNEL = "project:select-asset-files";
 export const PROJECT_IMPORT_ASSET_FROM_DATA_CHANNEL = "project:import-asset-from-data";

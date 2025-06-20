@@ -2,7 +2,8 @@ import { ipcMain } from "electron";
 import { ProjectManager } from "./project-manager";
 import { AssetManager } from "./asset-manager";
 import { FileSystemManager } from "./file-system-manager";
-import type { GameProject, AssetReference } from "../types/project";
+import type { GameProject, AssetReference, SceneData } from "../types/project";
+import * as path from "path";
 
 export class ProjectService {
   private constructor() {} // Prevent instantiation
@@ -34,6 +35,151 @@ export class ProjectService {
 
   static async deleteProject(projectPath: string): Promise<void> {
     return ProjectManager.deleteProject(projectPath);
+  }
+
+  // Scene Management
+  static async listScenes(projectPath: string): Promise<string[]> {
+    const scenesDir = path.join(projectPath, "scenes");
+    
+    try {
+      // Check if scenes directory exists
+      if (!(await FileSystemManager.fileExists(scenesDir))) {
+        // Create scenes directory if it doesn't exist
+        await FileSystemManager.createDirectory(scenesDir);
+        return [];
+      }
+      
+      const items = await FileSystemManager.listDirectory(scenesDir);
+      console.log("AVAILABLE SCENES", scenesDir, projectPath, items)
+      const sceneFiles = items
+        .filter(item => item.type === 'file' && item.name.endsWith('.scene.json'))
+        .map(item => item.name.replace('.scene.json', ''));
+      
+      return sceneFiles;
+    } catch (error) {
+      console.error('Failed to list scenes:', error);
+      return [];
+    }
+  }
+
+  static async loadScene(projectPath: string, sceneName: string): Promise<SceneData> {
+    const scenePath = path.join(projectPath, "scenes", `${sceneName}.scene.json`);
+    
+    try {
+      const sceneContent = await FileSystemManager.readFile(scenePath);
+      return JSON.parse(sceneContent);
+    } catch (error) {
+      console.error(`Failed to load scene ${sceneName}:`, error);
+      throw new Error(`Failed to load scene: ${sceneName}`);
+    }
+  }
+
+  static async saveScene(projectPath: string, sceneName: string, sceneData: SceneData): Promise<void> {
+    const scenesDir = path.join(projectPath, "scenes");
+    const scenePath = path.join(scenesDir, `${sceneName}.scene.json`);
+    
+    try {
+      // Ensure scenes directory exists
+      if (!(await FileSystemManager.fileExists(scenesDir))) {
+        await FileSystemManager.createDirectory(scenesDir);
+      }
+      
+      // Update scene metadata
+      const updatedSceneData = {
+        ...sceneData,
+        metadata: {
+          ...sceneData.metadata,
+          modified: Date.now()
+        }
+      };
+      
+      await FileSystemManager.writeFile(scenePath, JSON.stringify(updatedSceneData, null, 2));
+    } catch (error) {
+      console.error(`Failed to save scene ${sceneName}:`, error);
+      throw new Error(`Failed to save scene: ${sceneName}`);
+    }
+  }
+
+  static async createScene(projectPath: string, sceneName: string, sceneData?: SceneData): Promise<void> {
+    const scenesDir = path.join(projectPath, "scenes");
+    const scenePath = path.join(scenesDir, `${sceneName}.scene.json`);
+    
+    try {
+      // Ensure scenes directory exists
+      if (!(await FileSystemManager.fileExists(scenesDir))) {
+        await FileSystemManager.createDirectory(scenesDir);
+      }
+      
+      // Check if scene already exists
+      if (await FileSystemManager.fileExists(scenePath)) {
+        throw new Error(`Scene ${sceneName} already exists`);
+      }
+      
+      // Use provided scene data or create default
+      const finalSceneData = sceneData || {
+        id: sceneName,
+        name: sceneName,
+        entities: [],
+        world: {
+          gravity: { x: 0, y: -9.81, z: 0 },
+          physics: { enabled: true, timeStep: 1/60, maxSubSteps: 10 },
+          rendering: {
+            backgroundColor: "#87CEEB",
+            environment: "",
+            fog: { enabled: false, color: "#ffffff", near: 10, far: 100 },
+            shadows: { enabled: true, type: "pcfsoft" as const },
+            antialias: true,
+            pixelRatio: 1,
+          },
+        },
+        activeCamera: undefined,
+        assets: [],
+        editor: { showGrid: true, gridSize: 1, showHelpers: true, showWireframe: false, debugPhysics: false },
+        metadata: { created: Date.now(), modified: Date.now(), version: "1.0.0" },
+      };
+      
+      await FileSystemManager.writeFile(scenePath, JSON.stringify(finalSceneData, null, 2));
+    } catch (error) {
+      console.error(`Failed to create scene ${sceneName}:`, error);
+      throw error;
+    }
+  }
+
+  static async deleteScene(projectPath: string, sceneName: string): Promise<void> {
+    const scenePath = path.join(projectPath, "scenes", `${sceneName}.scene.json`);
+    
+    try {
+      if (await FileSystemManager.fileExists(scenePath)) {
+        await FileSystemManager.deleteFile(scenePath);
+      } else {
+        throw new Error(`Scene ${sceneName} does not exist`);
+      }
+    } catch (error) {
+      console.error(`Failed to delete scene ${sceneName}:`, error);
+      throw error;
+    }
+  }
+
+  static async switchScene(projectPath: string, sceneName: string): Promise<void> {
+    const projectConfigPath = path.join(projectPath, "game.config.json");
+    
+    try {
+      // Load project configuration
+      let projectConfig: any = {};
+      if (await FileSystemManager.fileExists(projectConfigPath)) {
+        const configContent = await FileSystemManager.readFile(projectConfigPath);
+        projectConfig = JSON.parse(configContent);
+      }
+      
+      // Update current scene
+      projectConfig.activeScene = sceneName;
+      
+      // Save project configuration
+      await FileSystemManager.writeFile(projectConfigPath, JSON.stringify(projectConfig, null, 2));
+    } catch (error) {
+      console.error(`Failed to switch to scene ${sceneName}:`, error);
+      throw error;
+    }
   }
 
   // Asset Management
@@ -92,6 +238,15 @@ export class ProjectService {
     ipcMain.handle("project:save-project", (_, ...args: [GameProject]) => ProjectService.saveProject(...args));
     ipcMain.handle("project:open-folder", (_, ...args: [string]) => ProjectService.openProjectFolder(...args));
     ipcMain.handle("project:delete-project", (_, ...args: [string]) => ProjectService.deleteProject(...args));
+    
+    // Scene Management
+    ipcMain.handle("project:list-scenes", (_, ...args: [string]) => ProjectService.listScenes(...args));
+    ipcMain.handle("project:load-scene", (_, ...args: [string, string]) => ProjectService.loadScene(...args));
+    ipcMain.handle("project:save-scene", (_, ...args: [string, string, SceneData]) => ProjectService.saveScene(...args));
+    ipcMain.handle("project:create-scene", (_, ...args: [string, string, SceneData?]) => ProjectService.createScene(...args));
+    ipcMain.handle("project:delete-scene", (_, ...args: [string, string]) => ProjectService.deleteScene(...args));
+    ipcMain.handle("project:switch-scene", (_, ...args: [string, string]) => ProjectService.switchScene(...args));
+    
     // Assets
     ipcMain.handle("project:select-asset-files", () => ProjectService.selectAssetFiles());
     ipcMain.handle("project:import-asset-from-data", (_, ...args: [string, string, Buffer]) => ProjectService.importAssetFromData(...args));

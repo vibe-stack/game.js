@@ -16,6 +16,12 @@ export class GameWorldService {
     const { setInitialized, setError, setGameState } = useGameStudioStore.getState();
 
     try {
+      // Dispose of existing game world if it exists
+      if (this.gameWorld) {
+        this.gameWorld.dispose();
+        this.gameWorld = null;
+      }
+
       this.gameWorld = new GameWorld({
         canvas,
         enablePhysics: true,
@@ -41,6 +47,21 @@ export class GameWorldService {
     const { setCurrentScene, setGameState } = useGameStudioStore.getState();
 
     try {
+      // Clear the existing scene completely before loading new one
+      // Store reference to canvas before disposing
+      const canvas = this.gameWorld.getCanvas();
+      this.gameWorld.dispose();
+      
+      // Reinitialize the game world with the same canvas
+      this.gameWorld = new GameWorld({
+        canvas,
+        enablePhysics: true,
+        antialias: true,
+        shadowMapEnabled: true,
+      });
+      
+      await this.gameWorld.initialize();
+
       if (SceneLoader.validateSceneData(sceneData)) {
         await this.sceneLoader.loadScene(this.gameWorld, sceneData);
         this.currentSceneData = sceneData; // Keep a copy for reset

@@ -7,6 +7,12 @@ import {
   PROJECT_DELETE_PROJECT_CHANNEL,
   PROJECT_OPEN_FOLDER_CHANNEL,
   PROJECT_SELECT_DIRECTORY_CHANNEL,
+  PROJECT_LIST_SCENES_CHANNEL,
+  PROJECT_LOAD_SCENE_CHANNEL,
+  PROJECT_SAVE_SCENE_CHANNEL,
+  PROJECT_CREATE_SCENE_CHANNEL,
+  PROJECT_DELETE_SCENE_CHANNEL,
+  PROJECT_SWITCH_SCENE_CHANNEL,
   PROJECT_SELECT_ASSET_FILES_CHANNEL,
   PROJECT_IMPORT_ASSET_FROM_DATA_CHANNEL,
   PROJECT_IMPORT_ASSET_CHANNEL,
@@ -45,6 +51,20 @@ export function addProjectEventListeners() {
     ProjectService.openProjectFolder(...args));
   ipcMain.handle(PROJECT_SELECT_DIRECTORY_CHANNEL, () => 
     ProjectService.selectProjectDirectory());
+
+  // Scene Management
+  ipcMain.handle(PROJECT_LIST_SCENES_CHANNEL, (_, ...args: [string]) => 
+    ProjectService.listScenes(...args));
+  ipcMain.handle(PROJECT_LOAD_SCENE_CHANNEL, (_, ...args: [string, string]) => 
+    ProjectService.loadScene(...args));
+  ipcMain.handle(PROJECT_SAVE_SCENE_CHANNEL, (_, ...args: [string, string, any]) => 
+    ProjectService.saveScene(...args));
+  ipcMain.handle(PROJECT_CREATE_SCENE_CHANNEL, (_, ...args: [string, string, any?]) => 
+    ProjectService.createScene(...args));
+  ipcMain.handle(PROJECT_DELETE_SCENE_CHANNEL, (_, ...args: [string, string]) => 
+    ProjectService.deleteScene(...args));
+  ipcMain.handle(PROJECT_SWITCH_SCENE_CHANNEL, (_, ...args: [string, string]) => 
+    ProjectService.switchScene(...args));
 
   // Asset Management
   ipcMain.handle(PROJECT_SELECT_ASSET_FILES_CHANNEL, () => 

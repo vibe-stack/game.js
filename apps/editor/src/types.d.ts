@@ -141,6 +141,14 @@ interface ProjectAPI {
   openProjectFolder: (projectPath: string) => Promise<void>;
   selectProjectDirectory: () => Promise<string | undefined>;
 
+  // Scene Management
+  listScenes: (projectPath: string) => Promise<string[]>;
+  loadScene: (projectPath: string, sceneName: string) => Promise<any>;
+  saveScene: (projectPath: string, sceneName: string, sceneData: any) => Promise<void>;
+  createScene: (projectPath: string, sceneName: string, sceneData?: any) => Promise<void>;
+  deleteScene: (projectPath: string, sceneName: string) => Promise<void>;
+  switchScene: (projectPath: string, sceneName: string) => Promise<void>;
+
   // Asset Management
   selectAssetFiles: () => Promise<string[]>;
   importAssetFromData: (

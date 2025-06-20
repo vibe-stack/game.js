@@ -6,7 +6,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import useGameStudioStore from "@/stores/game-studio-store";
-import { GameScene } from "@/types/project";
+import { GameScene, SceneData } from "@/types/project";
+import { SceneLoader } from "@/models";
+import { toast } from "sonner";
 
 interface ProjectInfoToolbarProps {
   projectName?: string;
@@ -22,27 +24,73 @@ export default function ProjectInfoToolbar({
     currentScene, 
     availableScenes, 
     setAvailableScenes,
-    setCurrentScene 
+    setCurrentScene,
+    gameWorldService 
   } = useGameStudioStore();
   
   const [isCreateSceneOpen, setIsCreateSceneOpen] = useState(false);
   const [newSceneName, setNewSceneName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    loadAvailableScenes();
+    if (currentProject) {
+      loadAvailableScenes();
+    }
   }, [currentProject]);
 
   const loadAvailableScenes = async () => {
-    if (!currentProject) return;
+    console.log("LOADING AVAILABLE SCENES", currentProject)
+    if (!currentProject?.path) return;
     
     try {
-      // TODO: Implement scene listing when project API is available in game studio
-      console.log("Loading available scenes - placeholder");
-      const mockScenes = ["main-scene"];
-      setAvailableScenes(mockScenes);
+      setIsLoading(true);
+      const scenes = await window.projectAPI.listScenes(currentProject.path);
+      setAvailableScenes(scenes);
+      
+      // If no current scene is selected but scenes exist, select the first one
+      if (!currentScene && scenes.length > 0) {
+        await handleSceneChange(scenes[0]);
+      }
     } catch (error) {
       console.error('Failed to load scenes:', error);
+      toast.error('Failed to load scenes from project');
+      
+      // Fallback to default scene if no scenes exist
+      if (!currentScene) {
+        await createDefaultScene();
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createDefaultScene = async () => {
+    if (!currentProject?.path) return;
+    
+    try {
+      const defaultSceneData = SceneLoader.getDefaultSceneData();
+      const sceneName = "main-scene";
+      
+      await window.projectAPI.createScene(currentProject.path, sceneName, defaultSceneData);
+      setAvailableScenes([sceneName]);
+      
+      const sceneWithMetadata: GameScene = {
+        ...defaultSceneData,
+        name: sceneName,
+        id: sceneName
+      };
+      setCurrentScene(sceneWithMetadata);
+      
+      // Load the scene in the game world
+      if (gameWorldService) {
+        await gameWorldService.loadScene(defaultSceneData);
+      }
+      
+      toast.success('Default scene created');
+    } catch (error) {
+      console.error('Failed to create default scene:', error);
+      toast.error('Failed to create default scene');
     }
   };
 
@@ -53,24 +101,78 @@ export default function ProjectInfoToolbar({
     ).join(' ');
   };
 
+  const convertDisplayNameToId = (displayName: string) => {
+    // Convert display name to scene ID (kebab-case)
+    return displayName.toLowerCase().replace(/\s+/g, '-');
+  };
+
   const handleSceneChange = async (sceneName: string) => {
-    // TODO: Implement scene switching when available
-    console.log("Switching to scene:", sceneName);
-    setCurrentScene({ name: sceneName, id: sceneName } as GameScene);
+    if (!currentProject?.path) return;
+
+    console.log("SWITCHING TO SCENE", sceneName)
+    
+    try {
+      setIsLoading(true);
+      
+      // Load scene data from project
+      const sceneData = await window.projectAPI.loadScene(currentProject.path, sceneName);
+      console.log("SCENE DATA", sceneData)
+      
+      // Update current scene in store
+      const sceneWithMetadata: GameScene = {
+        ...sceneData,
+        name: sceneName,
+        id: sceneName
+      };
+      setCurrentScene(sceneWithMetadata);
+      console.log("SCENE WITH METADATA", sceneWithMetadata)
+      // Switch scene in the project
+      await window.projectAPI.switchScene(currentProject.path, sceneName);
+      console.log("SWITCHED TO SCENE", sceneName)
+      // Load scene in the game world
+      if (gameWorldService) {
+        await gameWorldService.loadScene(sceneData);
+      }
+      console.log("LOADED SCENE IN GAME WORLD", gameWorldService)
+      toast.success(`Switched to scene: ${getSceneName(sceneName)}`);
+    } catch (error) {
+      console.error('Failed to switch scene:', error);
+      toast.error('Failed to switch scene');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCreateScene = async () => {
-    if (!currentProject || !newSceneName.trim()) return;
+    if (!currentProject?.path || !newSceneName.trim()) return;
     
     setIsCreating(true);
     try {
-      // TODO: Implement scene creation when project API is available
-      console.log("Creating scene:", newSceneName.trim());
+      const sceneName = convertDisplayNameToId(newSceneName.trim());
+      const defaultSceneData = SceneLoader.getDefaultSceneData();
+      
+      // Update scene data with user-provided name
+      const sceneDataWithName: SceneData = {
+        ...defaultSceneData,
+        name: newSceneName.trim(),
+        id: sceneName
+      };
+      
+      // Create scene in project
+      await window.projectAPI.createScene(currentProject.path, sceneName, sceneDataWithName);
+      
+      // Refresh scene list
+      await loadAvailableScenes();
+      
+      // Switch to the new scene
+      await handleSceneChange(sceneName);
+      
       setNewSceneName("");
       setIsCreateSceneOpen(false);
-      await loadAvailableScenes();
+      toast.success(`Scene "${newSceneName.trim()}" created successfully`);
     } catch (error) {
       console.error('Failed to create scene:', error);
+      toast.error('Failed to create scene');
     } finally {
       setIsCreating(false);
     }
@@ -99,10 +201,11 @@ export default function ProjectInfoToolbar({
           <Select
             value={currentScene?.name || ""}
             onValueChange={handleSceneChange}
+            disabled={isLoading}
           >
             <SelectTrigger className="w-32 h-6 text-xs border-0 bg-transparent hover:bg-accent focus:ring-0">
-              <SelectValue placeholder="No Scene">
-                {currentScene ? getSceneName(currentScene.name) : "No Scene"}
+              <SelectValue placeholder={isLoading ? "Loading..." : "No Scene"}>
+                {isLoading ? "Loading..." : currentScene ? getSceneName(currentScene.name) : "No Scene"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -120,6 +223,7 @@ export default function ProjectInfoToolbar({
                 size="sm"
                 variant="ghost"
                 className="h-6 w-6 p-0"
+                disabled={!currentProject}
               >
                 <Plus size={12} />
               </Button>

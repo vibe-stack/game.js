@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { Entity, GameWorld } from "@/models";
 import { GameProject, SceneData } from "@/types/project";
+import { GameWorldService } from "@/pages/game-studio-page/services/game-world-service";
 
 interface GameStudioState {
   currentProject: GameProject | null;
@@ -20,6 +21,7 @@ interface GameStudioState {
   availableScenes: string[];
   currentSceneName: string | null;
   shouldLoadScene: boolean;
+  gameWorldService: GameWorldService | null;
 
   // Actions - These should mostly set state, logic is in services/models
   setCurrentProject: (project: GameProject | null) => void;
@@ -38,6 +40,7 @@ interface GameStudioState {
   setAvailableScenes: (scenes: string[]) => void;
   setCurrentSceneName: (sceneName: string | null) => void;
   setShouldLoadScene: (should: boolean) => void;
+  setGameWorldService: (service: GameWorldService | null) => void;
   loadScene: (sceneName: string) => void;
   loadDefaultScene: () => void;
 
@@ -66,6 +69,7 @@ const useGameStudioStore = create<GameStudioState>()(
     availableScenes: [],
     currentSceneName: null,
     shouldLoadScene: false,
+    gameWorldService: null,
 
     // Basic Setters
     setCurrentProject: (project) => {
@@ -87,6 +91,7 @@ const useGameStudioStore = create<GameStudioState>()(
     setAvailableScenes: (scenes) => set({ availableScenes: scenes }),
     setCurrentSceneName: (sceneName) => set({ currentSceneName: sceneName }),
     setShouldLoadScene: (should) => set({ shouldLoadScene: should }),
+    setGameWorldService: (service) => set({ gameWorldService: service }),
 
     loadScene: (sceneName) => {
       set({ currentSceneName: sceneName, shouldLoadScene: true, isLoading: true, error: null });

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { GameProject, AssetReference } from "@/types/project";
+import type { GameProject, AssetReference, SceneData } from "@/types/project";
 
 export function exposeProjectContext() {
   console.log("Exposing project context...");
@@ -19,6 +19,20 @@ export function exposeProjectContext() {
       ipcRenderer.invoke("project:open-folder", projectPath),
     selectProjectDirectory: () => 
       ipcRenderer.invoke("project:select-directory"),
+    
+    // Scene Management
+    listScenes: (projectPath: string) => 
+      ipcRenderer.invoke("project:list-scenes", projectPath),
+    loadScene: (projectPath: string, sceneName: string) => 
+      ipcRenderer.invoke("project:load-scene", projectPath, sceneName),
+    saveScene: (projectPath: string, sceneName: string, sceneData: SceneData) => 
+      ipcRenderer.invoke("project:save-scene", projectPath, sceneName, sceneData),
+    createScene: (projectPath: string, sceneName: string, sceneData?: SceneData) => 
+      ipcRenderer.invoke("project:create-scene", projectPath, sceneName, sceneData),
+    deleteScene: (projectPath: string, sceneName: string) => 
+      ipcRenderer.invoke("project:delete-scene", projectPath, sceneName),
+    switchScene: (projectPath: string, sceneName: string) => 
+      ipcRenderer.invoke("project:switch-scene", projectPath, sceneName),
     
     // Asset Management
     selectAssetFiles: () => 
