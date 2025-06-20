@@ -69,6 +69,11 @@ export class SceneSerializer {
     const cameraEntities = gameWorld.getEntitiesByTag("camera");
 
     for (const entity of cameraEntities) {
+      // Skip the editor camera - it should never be serialized
+      if (entity.entityId === "__editor_orbit_camera__") {
+        continue;
+      }
+
       if ('camera' in entity) {
         const camera = (entity as any).camera as THREE.Camera;
 

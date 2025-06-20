@@ -1,15 +1,18 @@
 import { GameWorld, SceneLoader, SceneSerializer } from "@/models";
 import useGameStudioStore from "@/stores/game-studio-store";
+import { EditorCameraService } from "./editor-camera-service";
 
 export class GameWorldService {
   private gameWorld: GameWorld | null = null;
   private sceneLoader: SceneLoader;
   private sceneSerializer: SceneSerializer;
   private currentSceneData: any = null;
+  private editorCameraService: EditorCameraService;
 
   constructor() {
     this.sceneLoader = new SceneLoader();
     this.sceneSerializer = new SceneSerializer();
+    this.editorCameraService = new EditorCameraService();
   }
 
   async initialize(canvas: HTMLCanvasElement): Promise<void> {
@@ -30,6 +33,13 @@ export class GameWorldService {
       });
 
       await this.gameWorld.initialize();
+      
+      // Initialize editor camera service
+      this.editorCameraService.initialize(this.gameWorld, canvas);
+      
+      // Set editor camera as default active camera for viewport
+      this.editorCameraService.switchToEditorCamera();
+      
       // The gameWorld instance itself is not stored in zustand to avoid serialization issues.
       // We manage its lifecycle here and interact with it.
       setInitialized(true);
@@ -65,6 +75,16 @@ export class GameWorldService {
       if (SceneLoader.validateSceneData(sceneData)) {
         await this.sceneLoader.loadScene(this.gameWorld, sceneData);
         this.currentSceneData = sceneData; // Keep a copy for reset
+        
+        // Reinitialize editor camera service after scene reload
+        this.editorCameraService.initialize(this.gameWorld, canvas);
+        
+        // Discover and update available cameras in the store
+        this.updateAvailableCameras();
+        
+        // Set editor camera as active by default after scene load
+        this.editorCameraService.switchToEditorCamera();
+        
         setCurrentScene(sceneData);
         setGameState("initial");
       } else {
@@ -132,9 +152,90 @@ export class GameWorldService {
       this.gameWorld.dispose();
       this.gameWorld = null;
     }
+    this.editorCameraService.dispose();
   }
 
   getGameWorld(): GameWorld | null {
     return this.gameWorld;
+  }
+
+  // Camera Management Methods
+  updateAvailableCameras(): void {
+    if (!this.gameWorld) return;
+    
+    const { setAvailableCameras, setActiveCamera } = useGameStudioStore.getState();
+    
+    // Get all cameras from the camera manager
+    const cameraManager = this.gameWorld.getCameraManager();
+    const allCameras = cameraManager.getAllCameras();
+    
+    console.log("All cameras from camera manager:", allCameras);
+    
+    // Filter out the editor camera to get only scene cameras
+    const sceneCameras = allCameras.filter(cam => cam.id !== this.editorCameraService.getEditorCameraId());
+    
+    console.log("Scene cameras (filtered):", sceneCameras);
+    
+    // Convert to the format expected by the store (Entity-like objects)
+    const availableCameras = sceneCameras.map(cam => ({
+      entityId: cam.id,
+      entityName: cam.name,
+      // Add other properties that might be expected
+      metadata: { tags: ['camera'] }
+    }));
+    
+    console.log("Available cameras for store:", availableCameras);
+    
+    setAvailableCameras(availableCameras as any);
+    
+    // Set editor camera as active by default
+    setActiveCamera(this.editorCameraService.getEditorCameraId());
+  }
+
+  switchToCamera(cameraId: string): boolean {
+    if (!this.gameWorld) return false;
+    
+    const { setActiveCamera, setTransitioning } = useGameStudioStore.getState();
+    
+    if (cameraId === this.editorCameraService.getEditorCameraId()) {
+      // Switch to editor camera
+      setTransitioning(true);
+      const success = this.editorCameraService.switchToEditorCamera();
+      if (success) {
+        setActiveCamera(cameraId);
+      }
+      
+      // Simulate transition for smooth UX
+      setTimeout(() => {
+        setTransitioning(false);
+      }, 300);
+      
+      return success;
+    } else {
+      // Switch to scene camera
+      setTransitioning(true);
+      const success = this.editorCameraService.switchToSceneCamera(cameraId);
+      if (success) {
+        setActiveCamera(cameraId);
+      }
+      
+      // Simulate transition for smooth UX
+      setTimeout(() => {
+        setTransitioning(false);
+      }, 300);
+      
+      return success;
+    }
+  }
+
+  isEditorCameraActive(): boolean {
+    return this.editorCameraService.isEditorCameraActive();
+  }
+
+  // Update method to be called in the render loop
+  update(): void {
+    if (this.gameWorld) {
+      this.editorCameraService.update();
+    }
   }
 }

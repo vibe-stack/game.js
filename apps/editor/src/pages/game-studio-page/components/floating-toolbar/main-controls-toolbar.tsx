@@ -83,10 +83,6 @@ export default function MainControlsToolbar({
             </DropdownMenuTrigger>
             <DropdownMenuContent><DropdownMenuLabel>Export Format</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem onClick={() => handleExport("json")}><FileText className="mr-2 h-4 w-4" /><span>GameJS Scene (.json)</span></DropdownMenuItem></DropdownMenuContent>
           </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button size="sm" variant="outline" className="h-8 gap-2" title="Switch Scene"><Layers size={16} />{currentSceneName || "Select Scene"}</Button></DropdownMenuTrigger>
-            <DropdownMenuContent><DropdownMenuLabel>Switch Scene</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem onClick={() => loadDefaultScene()}><Play className="mr-2 h-4 w-4" /><span>Demo Scene</span></DropdownMenuItem>{currentProject?.scenes?.map((sceneName) => (<DropdownMenuItem key={sceneName} onClick={() => loadScene(sceneName)}><FileText className="mr-2 h-4 w-4" /><span>{sceneName}</span></DropdownMenuItem>))}</DropdownMenuContent>
-          </DropdownMenu>
           <Button size="sm" variant="outline" onClick={onOpenFolder} className="h-8 gap-2" title="Open Project Folder"><FolderOpen size={16} /></Button>
           <Button size="sm" onClick={onSave} disabled={isSaving} className="h-8 gap-2" title="Save Scene (Ctrl+S)">{isSaving ? <Loader2Icon size={16} className="animate-spin" /> : <Save size={16} />}</Button>
         </div>

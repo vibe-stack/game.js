@@ -110,6 +110,28 @@ export default function GameCanvas({ gameWorldService }: GameCanvasProps) {
     loadSceneAsync();
   }, [shouldLoadScene, currentSceneName, currentProject, setLoading, setError, setShouldLoadScene]);
 
+  // Setup camera service updates in the render loop
+  useEffect(() => {
+    if (!gameWorldService.current) return;
+    
+    let animationId: number;
+    
+    const updateLoop = () => {
+      if (gameWorldService.current) {
+        gameWorldService.current.update();
+      }
+      animationId = requestAnimationFrame(updateLoop);
+    };
+    
+    animationId = requestAnimationFrame(updateLoop);
+    
+    return () => {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+    };
+  }, [gameWorldService]);
+
   // Handle canvas resize
   // useEffect(() => {
   //   const handleResize = () => {

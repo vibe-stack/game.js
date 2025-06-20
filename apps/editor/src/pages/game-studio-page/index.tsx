@@ -6,6 +6,7 @@ import FloatingToolbar from "./components/floating-toolbar";
 import GameCanvas from "./components/game-canvas";
 import LoadingOverlay from "./components/loading-overlay";
 import ErrorDisplay from "./components/error-display";
+import SceneSidebar from "./components/scene-sidebar";
 
 export default function GameStudioPage() {
   const navigate = useNavigate();
@@ -60,6 +61,7 @@ export default function GameStudioPage() {
   return (
     <div className="relative h-screen overflow-hidden bg-gray-900">
       <LoadingOverlay />
+      <SceneSidebar gameWorldService={gameWorldServiceRef} />
       <FloatingToolbar
         onHome={handleGoHome}
         onSave={handleSave}

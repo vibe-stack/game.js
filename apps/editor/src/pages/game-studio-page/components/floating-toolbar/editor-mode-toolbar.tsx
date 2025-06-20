@@ -37,10 +37,12 @@ export default function EditorModeToolbar() {
 
   // Update cameras when scene changes
   useEffect(() => {
-    if (currentScene) {
-      // For now, create a simple mock camera list
-      console.log("Discovering cameras - placeholder");
-      setAvailableCameras([]);
+    const { gameWorldService } = useGameStudioStore.getState();
+    console.log("CURRENT SCENE", currentScene, gameWorldService)
+    console.log("Available cameras in toolbar:", availableCameras);
+    if (currentScene && gameWorldService) {
+      // Discover cameras from the loaded scene
+      gameWorldService.updateAvailableCameras();
     } else {
       setAvailableCameras([]);
     }
@@ -89,19 +91,17 @@ export default function EditorModeToolbar() {
   const handleCameraSelect = async (cameraId: string, event: React.MouseEvent) => {
     event.preventDefault();
     
-    if (currentScene && activeCamera !== cameraId) {
-      setTransitioning(true);
-      setActiveCamera(cameraId);
-      
-      // If switching to camera mode and selecting a camera, enable camera follow mode
-      if (viewportMode === 'orbit') {
-        setViewportMode('camera');
+    if (activeCamera !== cameraId) {
+      const { gameWorldService } = useGameStudioStore.getState();
+      if (gameWorldService) {
+        // Use the game world service to switch cameras
+        const success = gameWorldService.switchToCamera(cameraId);
+        if (success) {
+          // Update viewport mode based on camera type
+          const isEditorCamera = cameraId === "__editor_orbit_camera__";
+          setViewportMode(isEditorCamera ? 'orbit' : 'camera');
+        }
       }
-      
-      // Simulate transition duration for smooth UX
-      setTimeout(() => {
-        setTransitioning(false);
-      }, 800);
     }
   };
 
@@ -111,10 +111,16 @@ export default function EditorModeToolbar() {
   };
 
   const getCurrentCameraName = () => {
-    if (!activeCamera || availableCameras.length === 0) {
+    if (!activeCamera) {
       return "Editor Camera";
     }
     
+    // Check if it's the editor camera
+    if (activeCamera === "__editor_orbit_camera__") {
+      return "Editor Camera";
+    }
+    
+    // Look for scene camera
     const activeCameraObj = availableCameras.find(cam => cam.entityId === activeCamera);
     return activeCameraObj?.entityName || "Unknown Camera";
   };
@@ -141,34 +147,52 @@ export default function EditorModeToolbar() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-56 animate-in slide-in-from-top-2 duration-200">
-          <DropdownMenuLabel>Scene Cameras</DropdownMenuLabel>
+          <DropdownMenuLabel>Available Cameras</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {availableCameras.length > 0 ? (
-            availableCameras.map((camera) => {
-              const isActive = activeCamera === camera.entityId;
-              
-              return (
-                <DropdownMenuItem
-                  key={camera.entityId}
-                  onClick={(e) => handleCameraSelect(camera.entityId, e)}
-                  className="flex items-center justify-between hover:bg-accent/60 transition-colors duration-150"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium">{camera.entityName}</span>
-                    <span className="text-xs text-muted-foreground">
-                      Camera
-                    </span>
-                  </div>
-                  {isActive && (
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                  )}
-                </DropdownMenuItem>
-              );
-            })
-          ) : (
-            <DropdownMenuItem disabled>
-              No cameras in scene
-            </DropdownMenuItem>
+          
+          {/* Editor Camera - Always available */}
+          <DropdownMenuItem
+            onClick={(e) => handleCameraSelect("__editor_orbit_camera__", e)}
+            className="flex items-center justify-between hover:bg-accent/60 transition-colors duration-150"
+          >
+            <div className="flex flex-col">
+              <span className="font-medium">Editor Camera</span>
+              <span className="text-xs text-muted-foreground">
+                Orbit Controls
+              </span>
+            </div>
+            {activeCamera === "__editor_orbit_camera__" && (
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            )}
+          </DropdownMenuItem>
+          
+          {/* Scene Cameras */}
+          {availableCameras.length > 0 && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Scene Cameras</DropdownMenuLabel>
+              {availableCameras.map((camera) => {
+                const isActive = activeCamera === camera.entityId;
+                
+                return (
+                  <DropdownMenuItem
+                    key={camera.entityId}
+                    onClick={(e) => handleCameraSelect(camera.entityId, e)}
+                    className="flex items-center justify-between hover:bg-accent/60 transition-colors duration-150"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium">{camera.entityName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Scene Camera
+                      </span>
+                    </div>
+                    {isActive && (
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                    )}
+                  </DropdownMenuItem>
+                );
+              })}
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
