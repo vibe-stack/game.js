@@ -21,6 +21,17 @@ export {
   DEFAULT_STREAMING_CONFIG 
 } from "./asset-pipeline";
 
+// Scene Loader System
+export { 
+  SceneLoader,
+  EntityLoader,
+  CameraLoader,
+  LightingLoader,
+  PhysicsLoader,
+  SceneSerializer,
+  DEMO_SCENE_DATA 
+} from "./scene-loader";
+
 // Character controller
 export { 
   CharacterController,
@@ -45,6 +56,15 @@ export { Cone } from "./primitives/cone";
 export { Torus } from "./primitives/torus";
 export { Capsule } from "./primitives/capsule";
 export { Ring } from "./primitives/ring";
+
+// Light primitives
+export { 
+  Light, 
+  AmbientLight, 
+  DirectionalLight, 
+  PointLight, 
+  SpotLight 
+} from "./primitives/light";
 
 // Polyhedron primitives
 export { 
@@ -126,6 +146,15 @@ export type {
   CharacterState
 } from "./character-controller";
 
+// Scene Loader types  
+export type {
+  EntityData,
+  CameraData,
+  LightingData,
+  PhysicsData,
+  LoaderContext,
+} from "./scene-loader";
+
 // Basic primitive types
 export type { SphereConfig } from "./primitives/sphere";
 export type { BoxConfig } from "./primitives/box";
@@ -142,6 +171,9 @@ export type { ConeConfig } from "./primitives/cone";
 export type { TorusConfig } from "./primitives/torus";
 export type { CapsuleConfig } from "./primitives/capsule";
 export type { RingConfig } from "./primitives/ring";
+
+// Light primitive types
+export type { LightConfig } from "./primitives/light";
 
 // Polyhedron primitive types
 export type { 

@@ -25,14 +25,12 @@ export class ProjectService {
   async createProject(
     projectName: string,
     customPath?: string,
+    template: string = "empty",
+    description?: string,
+    author?: string,
   ): Promise<GameProject> {
-    const project = await this.projectManager.createProject(projectName, customPath);
-    
-    // Create default scene using SceneManager
-    const defaultScene = this.sceneManager.createDefaultScene();
-    await this.sceneManager.saveScene(project.path, defaultScene);
-    
-    return project;
+    // The ProjectManager now handles scene creation internally
+    return this.projectManager.createProject(projectName, customPath, template, description, author);
   }
 
   async selectProjectDirectory(): Promise<string | undefined> {
@@ -49,6 +47,10 @@ export class ProjectService {
 
   async openProjectFolder(projectPath: string): Promise<void> {
     return this.projectManager.openProjectFolder(projectPath);
+  }
+
+  async deleteProject(projectPath: string): Promise<void> {
+    return this.projectManager.deleteProject(projectPath);
   }
 
   // Scene Management - delegate to SceneManager
@@ -163,8 +165,8 @@ export class ProjectService {
     ipcMain.handle("project:load-projects", () => this.loadProjects());
     ipcMain.handle(
       "project:create-project",
-      (_, projectName: string, projectPath?: string) =>
-        this.createProject(projectName, projectPath),
+      (_, projectName: string, projectPath?: string, template?: string, description?: string, author?: string) =>
+        this.createProject(projectName, projectPath, template, description, author),
     );
     ipcMain.handle("project:select-directory", () =>
       this.selectProjectDirectory(),
@@ -177,6 +179,9 @@ export class ProjectService {
     );
     ipcMain.handle("project:open-folder", (_, projectPath: string) =>
       this.openProjectFolder(projectPath),
+    );
+    ipcMain.handle("project:delete-project", (_, projectPath: string) =>
+      this.deleteProject(projectPath),
     );
     ipcMain.handle(
       "project:load-scene",

@@ -11,6 +11,8 @@ export class PhysicsManager {
   private gravity = new THREE.Vector3(0, -9.81, 0);
   private rapierModule: typeof RAPIER | null = null;
   private debugRenderEnabled = false;
+  private bodyIdMap = new Map<RapierType.RigidBody, string>();
+  private colliderIdMap = new Map<RapierType.Collider, string>();
 
   async initialize(gravity?: THREE.Vector3): Promise<void> {
     try {
@@ -61,7 +63,10 @@ export class PhysicsManager {
     }
 
     const rigidBody = this.world!.createRigidBody(bodyDesc);
+    
+    // Track the body ID
     this.bodyMap.set(id, rigidBody);
+    this.bodyIdMap.set(rigidBody, id);
     
     return rigidBody;
   }
@@ -73,6 +78,7 @@ export class PhysicsManager {
     dimensions: THREE.Vector3 | number | { heights: number[][]; scale: THREE.Vector3 },
     config?: PhysicsConfig
   ): RapierType.Collider | null {
+    console.log("createCollider", id, rigidBodyId, shape, dimensions, config);
     if (!this.isEnabled() || !this.rapierModule) return null;
 
     const rigidBody = this.bodyMap.get(rigidBodyId);
@@ -157,7 +163,10 @@ export class PhysicsManager {
     }
 
     const collider = this.world!.createCollider(colliderDesc, rigidBody);
+    
+    // Track the collider ID
     this.colliderMap.set(id, collider);
+    this.colliderIdMap.set(collider, id);
     
     return collider;
   }
@@ -197,6 +206,7 @@ export class PhysicsManager {
 
     this.world.removeRigidBody(rigidBody);
     this.bodyMap.delete(id);
+    this.bodyIdMap.delete(rigidBody);
     return true;
   }
 
@@ -206,6 +216,7 @@ export class PhysicsManager {
 
     this.world.removeCollider(collider, true);
     this.colliderMap.delete(id);
+    this.colliderIdMap.delete(collider);
     return true;
   }
 
@@ -288,6 +299,8 @@ export class PhysicsManager {
     }
     this.bodyMap.clear();
     this.colliderMap.clear();
+    this.bodyIdMap.clear();
+    this.colliderIdMap.clear();
     this.enabled = false;
   }
 

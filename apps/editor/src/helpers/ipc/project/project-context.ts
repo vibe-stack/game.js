@@ -4,8 +4,8 @@ export function exposeProjectContext() {
   contextBridge.exposeInMainWorld("projectAPI", {
     // Project Management
     loadProjects: () => ipcRenderer.invoke("project:load-projects"),
-    createProject: (projectName: string, projectPath?: string) => 
-      ipcRenderer.invoke("project:create-project", projectName, projectPath),
+    createProject: (projectName: string, projectPath?: string, template?: string, description?: string, author?: string) => 
+      ipcRenderer.invoke("project:create-project", projectName, projectPath, template, description, author),
     openProject: (projectPath: string) => 
       ipcRenderer.invoke("project:open-project", projectPath),
     saveProject: (project: GameProject) => 

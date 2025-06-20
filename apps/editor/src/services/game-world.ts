@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { SceneData, SceneEntity, Transform } from "@/types/project";
 
 // Simple browser-compatible EventEmitter implementation
 type EventListener = (...args: any[]) => void;
@@ -72,19 +73,20 @@ class SimpleEventEmitter {
 
 export interface GameWorldEvent {
   objectTransformUpdate: { objectId: string; transform: Transform };
-  objectUpdate: { objectId: string; updates: Partial<GameObject> };
+  objectUpdate: { objectId: string; updates: Partial<SceneEntity> };
   physicsStep: { deltaTime: number };
-  sceneChanged: { scene: GameScene };
+  sceneChanged: { scene: SceneData };
 }
 
 export class GameWorld extends SimpleEventEmitter {
-  private scene: GameScene | null = null;
-  private objects: Map<string, GameObject> = new Map();
+  private scene: SceneData | null = null;
+  private objects: Map<string, SceneEntity> = new Map();
   private transforms: Map<string, Transform> = new Map();
   private originalTransforms: Map<string, Transform> = new Map(); // Store original transforms for reset
   private liveTransforms: Map<string, THREE.Matrix4> = new Map();
-  private sceneSnapshot: GameScene | null = null; // Full scene snapshot
+  private sceneSnapshot: SceneData | null = null; // Full scene snapshot
   private physicsWorld: any = null;
+  private transformSnapshot: Map<string, Transform> | null = null; // Entity transform snapshot
   private rigidBodies: Map<string, any> = new Map();
   private _isRunning = false;
   private lastUpdateTime = 0;
@@ -103,35 +105,30 @@ export class GameWorld extends SimpleEventEmitter {
   }
 
   // Scene Management
-  loadScene(scene: GameScene): void {
-    this.stop();
-    this.scene = scene;
+  loadScene(scene: SceneData): void {
+    // Clear existing scene data to prevent duplication
     this.objects.clear();
     this.transforms.clear();
     this.originalTransforms.clear();
     this.liveTransforms.clear();
-    this.threeObjects.clear();
     this.rigidBodies.clear();
-    this.sceneSnapshot = null;
-
-    if (this.scene) {
-      this.buildObjectMap(this.scene.objects);
-    }
-
-    this.emit("sceneChanged", { scene });
+    this.threeObjects.clear();
+    
+    this.scene = { ...scene };
+    this.buildObjectMap(scene.entities);
   }
 
   private buildObjectMap(
-    objects: GameObject[],
+    entities: SceneEntity[],
     parentTransform = new THREE.Matrix4(),
   ): void {
-    for (const obj of objects) {
-      this.objects.set(obj.id, obj);
-      this.transforms.set(obj.id, { ...obj.transform });
-      this.originalTransforms.set(obj.id, { ...obj.transform }); // Store original transform
+    for (const entity of entities) {
+      this.objects.set(entity.id, entity);
+      this.transforms.set(entity.id, { ...entity.transform });
+      this.originalTransforms.set(entity.id, { ...entity.transform }); // Store original transform
 
       const localMatrix = new THREE.Matrix4();
-      const { position, rotation, scale } = obj.transform;
+      const { position, rotation, scale } = entity.transform;
 
       const rotQuat = new THREE.Quaternion().setFromEuler(
         new THREE.Euler(rotation.x, rotation.y, rotation.z, "XYZ"),
@@ -146,10 +143,10 @@ export class GameWorld extends SimpleEventEmitter {
         parentTransform,
         localMatrix,
       );
-      this.liveTransforms.set(obj.id, worldMatrix.clone());
+      this.liveTransforms.set(entity.id, worldMatrix.clone());
 
-      if (obj.children && obj.children.length > 0) {
-        this.buildObjectMap(obj.children, worldMatrix);
+      if (entity.children && entity.children.length > 0) {
+        this.buildObjectMap(entity.children, worldMatrix);
       }
     }
   }
@@ -190,7 +187,7 @@ export class GameWorld extends SimpleEventEmitter {
   }
 
   // Object Management
-  getObject(objectId: string): GameObject | null {
+  getObject(objectId: string): SceneEntity | null {
     return this.objects.get(objectId) || null;
   }
 
@@ -238,17 +235,17 @@ export class GameWorld extends SimpleEventEmitter {
 
       // Also update the scene snapshot if it exists to reflect the new state
       if (this.sceneSnapshot) {
-        const updateSnapshotTransforms = (objects: GameObject[]) => {
-          objects.forEach((obj) => {
-            if (obj.id === objectId) {
-              obj.transform = { ...newTransform };
+        const updateSnapshotTransforms = (entities: SceneEntity[]) => {
+          entities.forEach((entity) => {
+            if (entity.id === objectId) {
+              entity.transform = { ...newTransform };
             }
-            if (obj.children && obj.children.length > 0) {
-              updateSnapshotTransforms(obj.children);
+            if (entity.children && entity.children.length > 0) {
+              updateSnapshotTransforms(entity.children);
             }
           });
         };
-        updateSnapshotTransforms(this.sceneSnapshot.objects);
+        updateSnapshotTransforms(this.sceneSnapshot.entities);
       }
     }
 
@@ -308,27 +305,27 @@ export class GameWorld extends SimpleEventEmitter {
   private findParentId(objectId: string): string | null {
     if (!this.scene) return null;
     
-    const findInObjects = (objects: GameObject[], parent: GameObject | null = null): string | null => {
-      for (const obj of objects) {
-        if (obj.id === objectId) {
+    const findInObjects = (entities: SceneEntity[], parent: SceneEntity | null = null): string | null => {
+      for (const entity of entities) {
+        if (entity.id === objectId) {
           return parent?.id || null;
         }
-        if (obj.children && obj.children.length > 0) {
-          const result = findInObjects(obj.children, obj);
+        if (entity.children && entity.children.length > 0) {
+          const result = findInObjects(entity.children, entity);
           if (result !== null) return result;
         }
       }
       return null;
     };
 
-    return findInObjects(this.scene.objects);
+    return findInObjects(this.scene.entities);
   }
 
   // Helper to update children transforms recursively
-  private updateChildrenTransforms(parentObj: GameObject, parentWorldMatrix: THREE.Matrix4): void {
-    if (!parentObj.children || parentObj.children.length === 0) return;
+  private updateChildrenTransforms(parentEntity: SceneEntity, parentWorldMatrix: THREE.Matrix4): void {
+    if (!parentEntity.children || parentEntity.children.length === 0) return;
 
-    for (const child of parentObj.children) {
+    for (const child of parentEntity.children) {
       const childTransform = this.transforms.get(child.id);
       if (!childTransform) continue;
 
@@ -353,25 +350,19 @@ export class GameWorld extends SimpleEventEmitter {
 
   updateObjectComponent(
     objectId: string,
-    componentId: string,
-    updates: Partial<GameObjectComponent>,
+    property: string,
+    updates: any,
   ): void {
     const obj = this.objects.get(objectId);
     if (!obj) return;
 
-    const componentIndex = obj.components.findIndex(
-      (c) => c.id === componentId,
-    );
-    if (componentIndex === -1) return;
-
-    obj.components[componentIndex] = {
-      ...obj.components[componentIndex],
-      ...updates,
-    };
+    // Update entity properties
+    if (!obj.properties) obj.properties = {};
+    obj.properties[property] = updates;
 
     this.emit("objectUpdate", {
       objectId,
-      updates: { components: obj.components },
+      updates: { properties: obj.properties },
     });
   }
 
@@ -387,40 +378,40 @@ export class GameWorld extends SimpleEventEmitter {
   }
 
   // Physics Control Methods
-  applyForce(objectId: string, force: Vector3, point?: Vector3): void {
+  applyForce(objectId: string, force: { x: number; y: number; z: number }, point?: { x: number; y: number; z: number }): void {
     const rigidBody = this.rigidBodies.get(objectId);
     if (!rigidBody) return;
     if (point) rigidBody.applyForceAtPoint(force, point, true);
     else rigidBody.applyForce(force, true);
   }
 
-  applyImpulse(objectId: string, impulse: Vector3, point?: Vector3): void {
+  applyImpulse(objectId: string, impulse: { x: number; y: number; z: number }, point?: { x: number; y: number; z: number }): void {
     const rigidBody = this.rigidBodies.get(objectId);
     if (!rigidBody) return;
     if (point) rigidBody.applyImpulseAtPoint(impulse, point, true);
     else rigidBody.applyImpulse(impulse, true);
   }
 
-  setVelocity(objectId: string, velocity: Vector3): void {
+  setVelocity(objectId: string, velocity: { x: number; y: number; z: number }): void {
     const rigidBody = this.rigidBodies.get(objectId);
     if (!rigidBody) return;
     rigidBody.setLinvel(velocity, true);
   }
 
-  setAngularVelocity(objectId: string, angularVelocity: Vector3): void {
+  setAngularVelocity(objectId: string, angularVelocity: { x: number; y: number; z: number }): void {
     const rigidBody = this.rigidBodies.get(objectId);
     if (!rigidBody) return;
     rigidBody.setAngvel(angularVelocity, true);
   }
 
-  getVelocity(objectId: string): Vector3 | null {
+  getVelocity(objectId: string): { x: number; y: number; z: number } | null {
     const rigidBody = this.rigidBodies.get(objectId);
     if (!rigidBody) return null;
     const v = rigidBody.linvel();
     return { x: v.x, y: v.y, z: v.z };
   }
 
-  getAngularVelocity(objectId: string): Vector3 | null {
+  getAngularVelocity(objectId: string): { x: number; y: number; z: number } | null {
     const rigidBody = this.rigidBodies.get(objectId);
     if (!rigidBody) return null;
     const av = rigidBody.angvel();
@@ -430,22 +421,105 @@ export class GameWorld extends SimpleEventEmitter {
   // Game Loop
   start(): void {
     if (this._isRunning) return;
+    
+    // Take snapshots before starting
+    this.takeSnapshots();
+    
     this._isRunning = true;
     this.lastUpdateTime = performance.now();
   }
+
   stop(): void {
     this._isRunning = false;
+    
+    // Restore from snapshots
+    this.restoreSnapshots();
   }
+
+  private takeSnapshots(): void {
+    // Take transform snapshot
+    this.transformSnapshot = new Map();
+    this.transforms.forEach((transform, objectId) => {
+      this.transformSnapshot!.set(objectId, {
+        position: { ...transform.position },
+        rotation: { ...transform.rotation },
+        scale: { ...transform.scale }
+      });
+    });
+    
+    console.log(`Transform snapshots taken for ${this.transformSnapshot.size} objects`);
+  }
+
+  private restoreSnapshots(): void {
+    let transformsRestored = false;
+    
+    // Restore transforms
+    if (this.transformSnapshot) {
+      this.transformSnapshot.forEach((snapshotTransform, objectId) => {
+        // Update the transform in our maps
+        this.transforms.set(objectId, {
+          position: { ...snapshotTransform.position },
+          rotation: { ...snapshotTransform.rotation },
+          scale: { ...snapshotTransform.scale }
+        });
+        
+        // Update Three.js object if it exists
+        const threeObj = this.threeObjects.get(objectId);
+        if (threeObj) {
+          const { position, rotation, scale } = snapshotTransform;
+          threeObj.position.set(position.x, position.y, position.z);
+          threeObj.rotation.set(rotation.x, rotation.y, rotation.z);
+          threeObj.scale.set(scale.x, scale.y, scale.z);
+        }
+        
+        // Reset physics body if it exists (manual reset, not snapshot)
+        const rigidBody = this.rigidBodies.get(objectId);
+        if (rigidBody) {
+          try {
+            const { position, rotation } = snapshotTransform;
+            rigidBody.setTranslation({ x: position.x, y: position.y, z: position.z }, true);
+            rigidBody.setRotation({ x: rotation.x, y: rotation.y, z: rotation.z, w: 1 }, true);
+            // Reset velocities to zero
+            rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+            rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+            // Wake up the body
+            rigidBody.wakeUp();
+          } catch (error) {
+            console.error(`Failed to reset rigid body for object ${objectId}:`, error);
+          }
+        }
+        
+        // Emit update event
+        this.emit("objectTransformUpdate", { objectId, transform: snapshotTransform });
+        transformsRestored = true;
+      });
+    }
+    
+    // Clear snapshots after use
+    this.transformSnapshot = null;
+    
+    // Emit reset event to notify UI components
+    this.emit("physicsReset");
+    
+    // Update scene to reflect restored state
+    if (transformsRestored && this.scene) {
+      this.emit("sceneChanged", { scene: this.scene });
+    }
+    
+    console.log(`Transforms restored: ${transformsRestored}`);
+  }
+
   pause(): void {
     this._isRunning = false;
   }
+
   resume(): void {
     if (this._isRunning) return;
     this._isRunning = true;
     this.lastUpdateTime = performance.now();
   }
 
-  // Scene Snapshot Management
+  // Scene Snapshot Management (fallback)
   createSceneSnapshot(): void {
     if (!this.scene) return;
 
@@ -454,19 +528,19 @@ export class GameWorld extends SimpleEventEmitter {
     const sceneWithOriginalTransforms = JSON.parse(JSON.stringify(this.scene));
 
     // Recursively restore original transforms in the snapshot
-    const restoreOriginalTransforms = (objects: GameObject[]) => {
-      objects.forEach((obj) => {
-        const originalTransform = this.originalTransforms.get(obj.id);
+    const restoreOriginalTransforms = (entities: SceneEntity[]) => {
+      entities.forEach((entity) => {
+        const originalTransform = this.originalTransforms.get(entity.id);
         if (originalTransform) {
-          obj.transform = { ...originalTransform };
+          entity.transform = { ...originalTransform };
         }
-        if (obj.children && obj.children.length > 0) {
-          restoreOriginalTransforms(obj.children);
+        if (entity.children && entity.children.length > 0) {
+          restoreOriginalTransforms(entity.children);
         }
       });
     };
 
-    restoreOriginalTransforms(sceneWithOriginalTransforms.objects);
+    restoreOriginalTransforms(sceneWithOriginalTransforms.entities);
     this.sceneSnapshot = sceneWithOriginalTransforms;
     console.log("Scene snapshot created with original transforms.");
   }
@@ -488,18 +562,18 @@ export class GameWorld extends SimpleEventEmitter {
     if (this.scene) {
       // This correctly calculates the initial world matrices for all objects
       // based on the snapshot data and stores them in `this.liveTransforms`.
-      this.buildObjectMap(this.scene.objects);
+      this.buildObjectMap(this.scene.entities);
     }
 
     // 3. CRITICAL FIX: Synchronize originalTransforms with the restored state
     // This ensures that the restored state becomes the new baseline for any subsequent manual edits during stopped physics
-    this.objects.forEach((obj, objectId) => {
-      this.originalTransforms.set(objectId, { ...obj.transform });
+    this.objects.forEach((entity, objectId) => {
+      this.originalTransforms.set(objectId, { ...entity.transform });
     });
 
     // 4. Iterate over all objects and imperatively reset their states.
-    this.objects.forEach((obj, objectId) => {
-      const { transform } = obj;
+    this.objects.forEach((entity, objectId) => {
+      const { transform } = entity;
 
       // The useFrame loop in SceneObjectNew will handle the visual update
       // by reading from the now-restored transforms map.
@@ -552,6 +626,36 @@ export class GameWorld extends SimpleEventEmitter {
     }
   }
 
+  private updateTransformsFromPhysics(): void {
+    // Update transforms based on current physics state
+    this.rigidBodies.forEach((rigidBody, objectId) => {
+      if (!rigidBody?.translation || !rigidBody?.rotation) return;
+
+      const position = rigidBody.translation();
+      const rotation = rigidBody.rotation();
+
+      // Update the transform in our maps
+      const transform = this.transforms.get(objectId);
+      if (transform) {
+        transform.position = { x: position.x, y: position.y, z: position.z };
+        const euler = new THREE.Euler().setFromQuaternion(
+          new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
+        );
+        transform.rotation = { x: euler.x, y: euler.y, z: euler.z };
+        
+        // Emit update event
+        this.emit("objectTransformUpdate", { objectId, transform });
+      }
+
+      // Update Three.js object if it exists
+      const threeObj = this.threeObjects.get(objectId);
+      if (threeObj) {
+        threeObj.position.set(position.x, position.y, position.z);
+        threeObj.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+      }
+    });
+  }
+
   update(currentTime: number): void {
     if (!this._isRunning) return;
 
@@ -593,29 +697,29 @@ export class GameWorld extends SimpleEventEmitter {
   removeUpdateCallback(callback: (deltaTime: number) => void): void {
     this.updateCallbacks.delete(callback);
   }
-  getSelectedObjectData(objectId: string): GameObject | null {
+  getSelectedObjectData(objectId: string): SceneEntity | null {
     return this.objects.get(objectId) || null;
   }
-  getAllObjects(): GameObject[] {
-    return this.scene ? this.scene.objects : [];
+  getAllObjects(): SceneEntity[] {
+    return this.scene ? this.scene.entities : [];
   }
-  findObjectById(objectId: string): GameObject | null {
+  findObjectById(objectId: string): SceneEntity | null {
     return this.objects.get(objectId) || null;
   }
-  findObjectsByTag(tag: string): GameObject[] {
-    return Array.from(this.objects.values()).filter((obj) =>
-      obj.tags?.includes(tag),
+  findObjectsByTag(tag: string): SceneEntity[] {
+    return Array.from(this.objects.values()).filter((entity) =>
+      entity.tags?.includes(tag),
     );
   }
-  findObjectsByComponent(type: string): GameObject[] {
-    return Array.from(this.objects.values()).filter((obj) =>
-      obj.components.some((c) => c.type === type),
+  findObjectsByComponent(type: string): SceneEntity[] {
+    return Array.from(this.objects.values()).filter((entity) =>
+      entity.type === type,
     );
   }
   isRunning(): boolean {
     return this._isRunning;
   }
-  getScene(): GameScene | null {
+  getScene(): SceneData | null {
     return this.scene;
   }
 
@@ -626,6 +730,7 @@ export class GameWorld extends SimpleEventEmitter {
     this.originalTransforms.clear();
     this.liveTransforms.clear();
     this.sceneSnapshot = null;
+    this.transformSnapshot = null;
     this.rigidBodies.clear();
     this.threeObjects.clear();
     this.updateCallbacks.clear();

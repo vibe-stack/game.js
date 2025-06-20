@@ -118,10 +118,6 @@ export default function DemoPage() {
           onEnableAudio={enableAudio}
         />
       )}
-
-      {gameInitialized && gameRef.current && (
-        <KeyboardControlsV4 />
-      )}
     </div>
   );
 }
@@ -231,7 +227,6 @@ function KeyboardControlsV4() {
         <div className="border-b border-gray-700 pb-2">
           <div className="text-green-400 font-bold">Debug:</div>
           <div className="text-gray-300">P: Toggle physics debug</div>
-          <div className="text-gray-300">D: Toggle entity debug</div>
           <div className="text-gray-300">I: Log physics info</div>
         </div>
         

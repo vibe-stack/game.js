@@ -11,16 +11,63 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, FolderOpen, Play, Settings, Folder } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, FolderOpen, Play, Settings, Folder, Trash2, GamepadIcon } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import useEditorStore from "@/stores/editor-store";
+// Using existing GameProject type from d.ts for now
+interface CreateProjectOptions {
+  name: string;
+  template?: string;
+  description?: string;
+  author?: string;
+}
+
+const PROJECT_TEMPLATES = [
+  {
+    id: "empty",
+    name: "Empty Project",
+    description: "Start with a blank scene",
+    icon: "🎯",
+  },
+  {
+    id: "basic",
+    name: "Basic Scene",
+    description: "Ground plane with physics and basic objects",
+    icon: "🎮",
+  },
+  {
+    id: "platformer",
+    name: "Platformer Template",
+    description: "Platform game template with ground and obstacles",
+    icon: "🏃",
+  },
+  {
+    id: "fps",
+    name: "FPS Template",
+    description: "First-person shooter template with large ground plane",
+    icon: "🔫",
+  },
+] as const;
 
 export default function HomePage() {
   const [projects, setProjects] = useState<GameProject[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectData, setNewProjectData] = useState<CreateProjectOptions>({
+    name: "",
+    template: "empty",
+  });
   const [selectedDirectory, setSelectedDirectory] = useState<string>("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  
   const navigate = useNavigate();
   const { setCurrentProject, setProjects: setStoreProjects } = useEditorStore();
 
@@ -51,25 +98,28 @@ export default function HomePage() {
   };
 
   const createProject = async () => {
-    if (!newProjectName.trim()) return;
+    if (!newProjectData.name.trim()) return;
 
     setIsCreating(true);
     try {
+      // Use the new API with template support
       const newProject = await window.projectAPI.createProject(
-        newProjectName,
+        newProjectData.name,
         selectedDirectory || undefined,
+        newProjectData.template || "empty",
+        newProjectData.description || undefined,
+        newProjectData.author || undefined
       );
 
       await loadProjects(); // Refresh the project list
-      setNewProjectName("");
-      setSelectedDirectory("");
-      setIsCreateDialogOpen(false);
+      resetCreateDialog();
 
       // Set current project and navigate to editor
       setCurrentProject(newProject);
-      navigate({ to: "/editor" });
+      navigate({ to: "/game-studio-page" });
     } catch (error) {
       console.error("Failed to create project:", error);
+      // TODO: Show error toast
     } finally {
       setIsCreating(false);
     }
@@ -80,9 +130,10 @@ export default function HomePage() {
       // Load fresh project data
       const freshProject = await window.projectAPI.openProject(project.path);
       setCurrentProject(freshProject);
-      navigate({ to: "/editor" });
+      navigate({ to: "/game-studio-page" });
     } catch (error) {
       console.error("Failed to open project:", error);
+      // TODO: Show error toast
     }
   };
 
@@ -94,11 +145,39 @@ export default function HomePage() {
     }
   };
 
+  const deleteProject = async (project: GameProject) => {
+    if (isDeleting) return;
+    
+    if (confirm(`Are you sure you want to delete "${project.name}"? This cannot be undone.`)) {
+      setIsDeleting(project.path);
+      try {
+        await window.projectAPI.deleteProject(project.path);
+        await loadProjects();
+      } catch (error) {
+        console.error("Failed to delete project:", error);
+        // TODO: Show error toast
+      } finally {
+        setIsDeleting(null);
+      }
+    }
+  };
+
   const resetCreateDialog = () => {
-    setNewProjectName("");
+    setNewProjectData({
+      name: "",
+      template: "empty",
+      description: "",
+      author: "",
+    });
     setSelectedDirectory("");
     setIsCreateDialogOpen(false);
   };
+
+  const updateProjectData = (field: keyof CreateProjectOptions, value: any) => {
+    setNewProjectData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const selectedTemplate = PROJECT_TEMPLATES.find(t => t.id === newProjectData.template);
 
   return (
     <div className="container mx-auto max-w-6xl p-6">
@@ -125,9 +204,72 @@ export default function HomePage() {
                 <Label htmlFor="project-name">Project Name</Label>
                 <Input
                   id="project-name"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
+                  value={newProjectData.name}
+                  onChange={(e) => updateProjectData("name", e.target.value)}
                   placeholder="my-awesome-game"
+                  disabled={isCreating}
+                />
+              </div>
+              <div>
+                <Label>Template</Label>
+                <Select
+                  value={newProjectData.template}
+                  onValueChange={(value) => updateProjectData("template", value)}
+                  disabled={isCreating}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROJECT_TEMPLATES.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{template.icon}</span>
+                          <div>
+                            <div className="font-medium">{template.name}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {template.description}
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedTemplate && (
+                  <div className="mt-2 p-3 bg-muted rounded-md">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">{selectedTemplate.icon}</span>
+                      <span className="font-medium">{selectedTemplate.name}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedTemplate.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="project-description">
+                  Description (Optional)
+                </Label>
+                <Textarea
+                  id="project-description"
+                  value={newProjectData.description || ""}
+                  onChange={(e) => updateProjectData("description", e.target.value)}
+                  placeholder="Describe your game project..."
+                  disabled={isCreating}
+                  rows={2}
+                />
+              </div>
+              <div>
+                <Label htmlFor="project-author">
+                  Author (Optional)
+                </Label>
+                <Input
+                  id="project-author"
+                  value={newProjectData.author || ""}
+                  onChange={(e) => updateProjectData("author", e.target.value)}
+                  placeholder="Your name"
                   disabled={isCreating}
                 />
               </div>
@@ -169,7 +311,7 @@ export default function HomePage() {
                 </Button>
                 <Button
                   onClick={createProject}
-                  disabled={!newProjectName.trim() || isCreating}
+                  disabled={!newProjectData.name.trim() || isCreating}
                 >
                   {isCreating ? "Creating..." : "Create Project"}
                 </Button>
@@ -252,8 +394,18 @@ export default function HomePage() {
                   >
                     <FolderOpen size={14} />
                   </Button>
-                  <Button size="sm" variant="outline" className="gap-2">
-                    <Settings size={14} />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => deleteProject(project)}
+                    disabled={isDeleting === project.path}
+                    className="gap-2"
+                  >
+                    {isDeleting === project.path ? (
+                      "..."
+                    ) : (
+                      <Trash2 size={14} />
+                    )}
                   </Button>
                 </div>
               </CardContent>

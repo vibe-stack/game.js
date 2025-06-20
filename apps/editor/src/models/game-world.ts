@@ -9,6 +9,7 @@ import { DebugRenderer } from "./debug-renderer";
 import { Entity } from "./entity";
 import { Sphere } from "./primitives/sphere";
 import { Box } from "./primitives/box";
+import { AmbientLight, DirectionalLight, PointLight, SpotLight } from "./primitives/light";
 import { GameConfig } from "./types";
 
 export class GameWorld {
@@ -30,6 +31,9 @@ export class GameWorld {
   
   private isRunning = false;
   private animationId: number | null = null;
+  private isPaused = false;
+  private renderLoopId: number | null = null;
+  private entityTransformSnapshot: Map<string, { position: THREE.Vector3; rotation: THREE.Euler; scale: THREE.Vector3 }> | null = null;
   
   // State update throttling
   private lastStateUpdate = 0;
@@ -90,7 +94,7 @@ export class GameWorld {
     // Initialize debug renderer
     this.debugRenderer = new DebugRenderer(this.scene, this.physicsManager);
 
-    this.setupDefaultLighting();
+    // Lighting will be handled by scene loading, no default lights needed
     
     if (config.enablePhysics !== false) {
       this.initializePhysics(config.gravity);
@@ -101,6 +105,8 @@ export class GameWorld {
 
   async initialize(): Promise<void> {
     await this.renderer.init();
+    // Start the render loop immediately after initialization
+    this.startRenderLoop();
   }
 
   private setupDefaultCamera(width: number, height: number): void {
@@ -152,6 +158,31 @@ export class GameWorld {
     return entity;
   }
 
+  // Light factory methods
+  createAmbientLight(config?: any): AmbientLight {
+    const light = new AmbientLight(config);
+    this.addEntity(light);
+    return light;
+  }
+
+  createDirectionalLight(config?: any): DirectionalLight {
+    const light = new DirectionalLight(config);
+    this.addEntity(light);
+    return light;
+  }
+
+  createPointLight(config?: any): PointLight {
+    const light = new PointLight(config);
+    this.addEntity(light);
+    return light;
+  }
+
+  createSpotLight(config?: any): SpotLight {
+    const light = new SpotLight(config);
+    this.addEntity(light);
+    return light;
+  }
+
   private addEntity(entity: Entity): void {
     const metadata = {
       type: entity.metadata.type,
@@ -159,9 +190,25 @@ export class GameWorld {
       created: entity.metadata.created,
     };
     
+    console.log(`Adding entity to game world: ${entity.entityName} (${entity.metadata.type})`);
     this.entities.add(entity.entityId, entity.entityName, entity, metadata);
     this.scene.add(entity);
     this.interactionManager.add(entity);
+
+    // Special handling for light entities
+    if (entity.metadata.type === "light") {
+      console.log(`Light entity added to scene:`, entity);
+      console.log(`Scene now has ${this.scene.children.length} children`);
+      
+      // List all lights in the scene
+      const lights: THREE.Light[] = [];
+      this.scene.traverse((child) => {
+        if (child instanceof THREE.Light) {
+          lights.push(child);
+        }
+      });
+      console.log(`Total lights in scene: ${lights.length}`, lights.map(l => ({ type: l.type, name: l.name })));
+    }
 
     this.updateState();
   }
@@ -237,20 +284,133 @@ export class GameWorld {
     return this.cameraControlManager.getControls(id);
   }
 
+  // Start continuous render loop (separate from physics simulation)
+  private startRenderLoop(): void {
+    if (this.renderLoopId) return;
+    this.renderLoop();
+  }
+
+  // Continuous render loop - always renders the scene
+  private renderLoop = (): void => {
+    this.renderLoopId = requestAnimationFrame(this.renderLoop);
+    
+    // Always update camera and camera controls for UI responsiveness
+    this.debugRenderer.update();
+    this.cameraManager.update();
+    this.cameraControlManager.update();
+
+    // Always render the scene
+    if (this.cameraManager.getActiveCamera()) {
+      this.renderer.render(this.scene, this.cameraManager.getActiveCamera()!);
+    }
+  };
+
+  // Stop the render loop
+  private stopRenderLoop(): void {
+    if (this.renderLoopId) {
+      cancelAnimationFrame(this.renderLoopId);
+      this.renderLoopId = null;
+    }
+  }
+
   start(): void {
     if (this.isRunning) return;
+    
+    // Take snapshots before starting
+    this.takeSnapshots();
+    
     this.isRunning = true;
+    this.isPaused = false;
+    this.clock.start();
     this.animate();
   }
 
   stop(): void {
     this.isRunning = false;
+    this.isPaused = false;
+    this.clock.stop();
+    
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
     }
+    
+    // Restore both physics and entity transforms
+    this.restoreSnapshots();
   }
 
+  private takeSnapshots(): void {
+    // Take entity transform snapshot
+    this.entityTransformSnapshot = new Map();
+    this.entities.forEach((entity) => {
+      this.entityTransformSnapshot!.set(entity.entityId, {
+        position: entity.position.clone(),
+        rotation: entity.rotation.clone(),
+        scale: entity.scale.clone()
+      });
+    });
+    
+    console.log(`Entity snapshots taken: ${this.entityTransformSnapshot.size} entities`);
+  }
+
+  private restoreSnapshots(): void {
+    let entitiesRestored = false;
+    
+    // Restore entity transforms from snapshot
+    if (this.entityTransformSnapshot) {
+      this.entities.forEach((entity) => {
+        const snapshot = this.entityTransformSnapshot!.get(entity.entityId);
+        if (snapshot) {
+          // Restore visual transform
+          entity.position.copy(snapshot.position);
+          entity.rotation.copy(snapshot.rotation);
+          entity.scale.copy(snapshot.scale);
+          
+          // Reset physics body if entity has physics (but keep the same world)
+          const rigidBodyId = entity.getRigidBodyId();
+          if (rigidBodyId && this.physicsManager) {
+            const rigidBody = this.physicsManager.getRigidBody(rigidBodyId);
+            if (rigidBody) {
+              // Reset position and rotation
+              rigidBody.setTranslation(entity.position, true);
+              rigidBody.setRotation(entity.quaternion, true);
+              // Reset velocities to zero
+              rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+              rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+              // Wake up the body to ensure it's active
+              rigidBody.wakeUp();
+            }
+          }
+          entitiesRestored = true;
+        }
+      });
+    }
+    
+    // Clear snapshots after use
+    this.entityTransformSnapshot = null;
+    
+    console.log(`Entities restored: ${entitiesRestored}`);
+  }
+
+  pause(): void {
+    this.isPaused = true;
+    this.clock.stop();
+  }
+
+  resume(): void {
+    this.isPaused = false;
+    this.clock.start();
+  }
+
+  isPausedState(): boolean {
+    return this.isPaused;
+  }
+
+  isRunningState(): boolean {
+    return this.isRunning;
+  }
+
+  // Physics and entity animation loop - only runs when game is playing
   private animate = (): void => {
     if (!this.isRunning) return;
 
@@ -259,34 +419,25 @@ export class GameWorld {
     const delta = this.clock.getDelta();
     const currentTime = performance.now();
     
-    if (this.physicsManager.isEnabled()) {
+    // Only step physics if not paused
+    if (!this.isPaused && this.physicsManager.isEnabled()) {
       this.physicsManager.step();
     }
 
-    this.entities.forEach((entity) => {
-      if (!entity.isDestroyed()) {
-        entity.syncPhysics();
-        entity.updateTweens(delta);
-      }
-    });
-
-    // Update debug renderer
-    this.debugRenderer.update();
-
-    // Update camera manager (for transitions)
-    this.cameraManager.update();
-
-    // Update camera controls through the control manager
-    this.cameraControlManager.update();
+    // Only update entities if not paused
+    if (!this.isPaused) {
+      this.entities.forEach((entity) => {
+        if (!entity.isDestroyed()) {
+          entity.syncPhysics();
+          entity.updateTweens(delta);
+        }
+      });
+    }
 
     // Throttle state updates to avoid performance issues
     if (currentTime - this.lastStateUpdate >= this.stateUpdateInterval) {
       this.updateState();
       this.lastStateUpdate = currentTime;
-    }
-
-    if (this.cameraManager.getActiveCamera()) {
-      this.renderer.render(this.scene, this.cameraManager.getActiveCamera()!);
     }
   };
 
@@ -356,6 +507,7 @@ export class GameWorld {
 
   dispose(): void {
     this.stop();
+    this.stopRenderLoop();
     
     if (this.debugRenderer) {
       this.debugRenderer.dispose();

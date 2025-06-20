@@ -173,8 +173,8 @@ export async function createKitchenSinkExampleV4(canvas: HTMLCanvasElement) {
                 color: 0x4a5a3a,
                 metalness: 0.1,
                 roughness: 0.95,
-                transparent: true,
-                opacity: 0.5,
+                // transparent: true,
+                // opacity: 0.5,
                 side: THREE.DoubleSide,
             }),
             
@@ -280,32 +280,40 @@ export async function createKitchenSinkExampleV4(canvas: HTMLCanvasElement) {
 
     // Create terrain using heightfield
     const createTerrain = () => {
-        const terrainSize = 180;
-        const terrainResolution = 128;
+        // Create a complex terrain with reasonable parameters to avoid stack overflow
+        const terrainSize = 500; // Large but reasonable terrain size
+        const terrainResolution = 128; // Moderate resolution for good detail without stack overflow
         
+        // Main base terrain with fractal brownian motion for realistic mountain ranges
         const terrain = new Heightfield({
             width: terrainSize,
             depth: terrainSize,
             rows: terrainResolution,
             columns: terrainResolution,
-            minElevation: 0,
-            maxElevation: 15,
-            algorithm: "voronoi",
-            frequency: 0.05,
-            amplitude: 1.0,
-            octaves: 4,
+            minElevation: -15,  // Allow valleys and underwater areas
+            maxElevation: 60,   // Dramatic mountain peaks
+            algorithm: "voronoi",   // Fractal Brownian Motion for realistic terrain
+            seed: 42,           // Fixed seed for reproducible terrain
+            frequency: 0.015,   // Adjusted frequency for good features at this size
+            amplitude: 8,       // Good amplitude for dramatic elevation
+            octaves: 6,         // Reasonable octaves for detail without stack overflow
+            persistence: 0.6,   // Good persistence for rugged features
+            lacunarity: 2.0,    // Standard lacunarity for frequency scaling
+            displacementScale: 1, // Good displacement
+            smoothing: false,   // Keep sharp features for realism
+            uvScale: { x: 4, y: 4 }, // Texture tiling
             material: materials.terrain,
-            name: "Terrain"
+            name: "Complex Terrain"
         });
         
-        // Position terrain at ground level (y=0) instead of y=-8
-        terrain.setPosition(0, 0, 0);
+        // Position terrain to accommodate negative elevations
+        terrain.setPosition(0, -30, 0);
         terrain.addTag("terrain");
+        terrain.addTag("complex-terrain");
         
         // IMPORTANT: Add entity to game world FIRST, then enable physics
         game.createEntity(terrain);
-        terrain.enableStaticPhysics(0.8, 0.7);
-
+        terrain.enableStaticPhysics(0.9, 0.8); // Higher friction for mountain climbing
         return terrain;
     };
 
@@ -317,13 +325,14 @@ export async function createKitchenSinkExampleV4(canvas: HTMLCanvasElement) {
         const materialList = Object.values(materials).filter(m => m !== materials.terrain && m !== materials.character);
         
         // Create diverse primitives using available create methods and direct instantiation
-        for (let i = 0; i < 40; i++) {
+        for (let i = 0; i < 45; i++) { // Good number of objects for the terrain
             const material = materialList[Math.floor(Math.random() * materialList.length)];
-            const scale = 0.5 + Math.random() * 1.5;
+            const scale = 0.5 + Math.random() * 2.0; // Slightly larger objects
             
-            const x = (Math.random() - 0.5) * 60;
-            const z = (Math.random() - 0.5) * 60;
-            const y = 20 + Math.random() * 15; // Start above terrain (terrain goes up to y=15)
+            // Spread objects across the terrain
+            const x = (Math.random() - 0.5) * 180; // Spread for 200x200 terrain
+            const z = (Math.random() - 0.5) * 180;
+            const y = 90 + Math.random() * 30; // Start high above the terrain
             
             let primitive;
             const primitiveType = Math.floor(Math.random() * 11);
@@ -480,7 +489,7 @@ export async function createKitchenSinkExampleV4(canvas: HTMLCanvasElement) {
         });
         
         game.createEntity(player);
-        player.setPosition(0, 20, 0); // Start well above terrain (terrain goes up to y=15)
+        player.setPosition(0, 80, 0); // Start high above the terrain
         player.enableKinematicPhysics(); 
         player.addTag("player");
 
@@ -490,16 +499,25 @@ export async function createKitchenSinkExampleV4(canvas: HTMLCanvasElement) {
     const player = createPlayer();
     entities.push(player);
 
-    // Setup third person character controller
+    // Setup third person character controller with enhanced jumping capabilities
     const characterConfig: Partial<CharacterControllerConfig> = {
         ...THIRD_PERSON_CHARACTER_CONFIG,
-        cameraDistance: -8.0,
-        cameraHeight: 3.0,
-        maxSpeed: 15.0,
-        jumpForce: 20.0,
+        cameraDistance: -10.0,     // Good camera distance for terrain view
+        cameraHeight: 3.5,         // Camera height for terrain
+        maxSpeed: 16.0,            // Good movement speed for terrain
+        acceleration: 50.0,        // Good acceleration for responsive controls
+        jumpForce: 20.0,           // Good jump force for terrain navigation
+        sprintMultiplier: 2.0,     // Sprint multiplier for covering terrain
+        gravityScale: 20.0,        // Gravity to counteract jump
+        maxFallSpeed: -30.0,       // Fall speed for terrain
+        snapToGroundDistance: 2, // Ground snapping for uneven terrain
         autoStepIncludeDynamic: true,
-        autoStepMinWidth: 0.5,
-        autoStepMaxHeight: 1.5,
+        autoStepMinWidth: 0.6,     // Steps for rough terrain
+        autoStepMaxHeight: 2.0,    // Step height for terrain climbing
+        maxSlopeClimbAngle: Math.PI / 3.8, // Slope climbing (about 47 degrees)
+        minSlopeSlideAngle: Math.PI / 4.5,  // Slide control
+        offset: 0.02,              // Offset for rough terrain
+        cameraSensitivity: 0.0005,  // Camera sensitivity
     };
 
     const characterController = new CharacterController(
@@ -528,15 +546,15 @@ export async function createKitchenSinkExampleV4(canvas: HTMLCanvasElement) {
 
     const resetScene = () => {
         // Reset player
-        player.setPosition(0, 20, 0); // Start well above terrain
+        player.setPosition(0, 80, 0); // Start high above the terrain
         player.setVelocity(new THREE.Vector3(0, 0, 0));
 
         // Reset all dynamic objects
         const dynamicObjects = entities.filter(e => e.hasTag("dynamic"));
         dynamicObjects.forEach((obj, index) => {
-            const x = (Math.random() - 0.5) * 60;
-            const z = (Math.random() - 0.5) * 60;
-            const y = 20 + Math.random() * 15; // Start above terrain (terrain goes up to y=15)
+            const x = (Math.random() - 0.5) * 180; // Spread for 200x200 terrain
+            const z = (Math.random() - 0.5) * 180;
+            const y = 90 + Math.random() * 30; // Start high above the terrain
             
             obj.setPosition(x, y, z);
             obj.setVelocity(new THREE.Vector3(0, 0, 0));
@@ -602,12 +620,6 @@ export async function createKitchenSinkExampleV4(canvas: HTMLCanvasElement) {
                     const enabled = game.isPhysicsDebugRenderEnabled();
                     console.log(`Physics debug rendering: ${enabled ? 'ON' : 'OFF'}`);
                 }
-            },
-            {
-                id: "toggle-entity-debug-render",
-                name: "Toggle Entity Debug Rendering",
-                inputs: [{ type: "keyboard", key: "KeyD" }],
-                callback: toggleEntityDebugRender
             },
             {
                 id: "log-physics-info",
@@ -688,7 +700,7 @@ export async function createKitchenSinkExampleV4(canvas: HTMLCanvasElement) {
             const entityDebug = firstEntity ? firstEntity.isDebugRenderEnabled() : false;
             
             statusDiv.innerHTML = `
-                <div style="font-weight: bold; margin-bottom: 5px;">Kitchen Sink Debug Status</div>
+                <div style="font-weight: bold; margin-bottom: 5px;">Kitchen Sink v4 Debug Status</div>
                 <div>Physics Debug: <span style="color: ${physicsDebug ? '#00ff00' : '#ff0000'}">${physicsDebug ? 'ON' : 'OFF'}</span></div>
                 <div>Entity Debug: <span style="color: ${entityDebug ? '#00ff00' : '#ff0000'}">${entityDebug ? 'ON' : 'OFF'}</span></div>
                 <div>Bodies: ${bodyCount}</div>

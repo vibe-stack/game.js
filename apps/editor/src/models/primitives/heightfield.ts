@@ -202,20 +202,33 @@ export class Heightfield extends Entity {
     if (!this.physicsManager || !this.rigidBodyId) return;
 
     // The physics collider needs to account for the geometry being rotated -90° around X
-    // In Rapier, heightfields are oriented in the XZ plane by default (Y is up)
-    // Our geometry is also in XZ plane after rotation, so this should align correctly
+    // When we rotate the geometry by -90° around X:
+    // - The geometry's width (originally X) becomes the physics Z dimension
+    // - The geometry's depth (originally Z) becomes the physics X dimension
+    // - We need to transpose the height data to match this coordinate system
     
+    // Transpose the height data to match the rotated coordinate system
+    const transposedHeights: number[][] = [];
+    for (let j = 0; j < this.dimensions.columns; j++) {
+      transposedHeights[j] = [];
+      for (let i = 0; i < this.dimensions.rows; i++) {
+        transposedHeights[j][i] = this.heights[i][j];
+      }
+    }
+    
+    // Scale represents the total dimensions of the heightfield in world units
+    // After rotation: geometry width -> physics Z, geometry depth -> physics X
     const scale = new THREE.Vector3(
-      this.dimensions.width / (this.dimensions.columns - 1),  // X scale: world width per sample
-      this.displacementScale,                                  // Y scale: height multiplier  
-      this.dimensions.depth / (this.dimensions.rows - 1)      // Z scale: world depth per sample
+      this.dimensions.depth,     // X scale: depth becomes X after rotation
+      this.displacementScale,    // Y scale: height multiplier  
+      this.dimensions.width      // Z scale: width becomes Z after rotation
     );
 
     this.physicsManager.createCollider(
       this.colliderId!,
       this.rigidBodyId,
       "heightfield",
-      { heights: this.heights, scale }
+      { heights: transposedHeights, scale }
     );
   }
 
@@ -345,6 +358,7 @@ export class Heightfield extends Entity {
 
   getHeightAt(x: number, z: number): number {
     // Convert world coordinates to heightfield coordinates
+    // Account for the -90° rotation around X axis
     const col = Math.floor(((x + this.dimensions.width / 2) / this.dimensions.width) * (this.dimensions.columns - 1));
     const row = Math.floor(((z + this.dimensions.depth / 2) / this.dimensions.depth) * (this.dimensions.rows - 1));
     

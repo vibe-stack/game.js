@@ -1,7 +1,7 @@
 import { createRoute } from "@tanstack/react-router";
 import { RootRoute } from "./__root";
 import HomePage from "../pages/home-page";
-import EditorPage from "../pages/editor-page";
+import GameStudioPage from "../pages/game-studio-page";
 import DemoPage from "@/pages/demo-page";
 
 // Steps to add a new route:
@@ -31,8 +31,8 @@ export const HomeRoute = createRoute({
 
 export const EditorRoute = createRoute({
   getParentRoute: () => RootRoute,
-  path: "/editor",
-  component: EditorPage,
+  path: "/game-studio-page",
+  component: GameStudioPage,
 });
 
 export const DemoRoute = createRoute({

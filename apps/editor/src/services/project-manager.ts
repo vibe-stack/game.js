@@ -59,6 +59,9 @@ export class ProjectManager {
   async createProject(
     projectName: string,
     customPath?: string,
+    template: string = "empty",
+    description?: string,
+    author?: string,
   ): Promise<GameProject> {
     const projectPath = customPath
       ? path.join(customPath, projectName)
@@ -75,11 +78,7 @@ export class ProjectManager {
     }
 
     // Create project directory structure
-    await fs.mkdir(projectPath, { recursive: true });
-    await fs.mkdir(path.join(projectPath, "scenes"), { recursive: true });
-    await fs.mkdir(path.join(projectPath, "assets"), { recursive: true });
-    await fs.mkdir(path.join(projectPath, "scripts"), { recursive: true });
-    await fs.mkdir(path.join(projectPath, "src"), { recursive: true });
+    await this.createProjectStructure(projectPath);
 
     const now = new Date();
 
@@ -118,8 +117,8 @@ export class ProjectManager {
       metadata: {
         created: now,
         version: "1.0.0",
-        description: `A GameJS project: ${projectName}`,
-        author: os.userInfo().username,
+        description: description || `A GameJS project: ${projectName}`,
+        author: author || os.userInfo().username,
       },
     };
 
@@ -127,8 +126,504 @@ export class ProjectManager {
     await this.saveProjectConfig(projectPath, project);
     await this.savePackageJson(projectPath, project.packageJson);
     await this.saveTsConfig(projectPath);
+    await this.createGitIgnore(projectPath);
+
+    // Create default scene based on template
+    await this.createDefaultScene(projectPath, template);
 
     return project;
+  }
+
+  private async createProjectStructure(projectPath: string): Promise<void> {
+    // Create main directories
+    await fs.mkdir(projectPath, { recursive: true });
+    await fs.mkdir(path.join(projectPath, "scenes"), { recursive: true });
+    await fs.mkdir(path.join(projectPath, "assets"), { recursive: true });
+    await fs.mkdir(path.join(projectPath, "assets", "textures"), { recursive: true });
+    await fs.mkdir(path.join(projectPath, "assets", "models"), { recursive: true });
+    await fs.mkdir(path.join(projectPath, "assets", "audio"), { recursive: true });
+    await fs.mkdir(path.join(projectPath, "assets", "materials"), { recursive: true });
+    await fs.mkdir(path.join(projectPath, "scripts"), { recursive: true });
+    await fs.mkdir(path.join(projectPath, "src"), { recursive: true });
+  }
+
+  private async createDefaultScene(projectPath: string, template: string): Promise<void> {
+    const sceneData = this.generateSceneTemplate(template);
+    const scenePath = path.join(projectPath, "scenes", "main-scene.json");
+    await fs.writeFile(scenePath, JSON.stringify(sceneData, null, 2), "utf-8");
+  }
+
+  private generateSceneTemplate(template: string): any {
+    const now = new Date();
+    
+    const baseScene = {
+      id: `scene_${Date.now()}`,
+      name: "Main Scene",
+      entities: [] as any[],
+      
+      // World configuration matching GameWorld
+      world: {
+        gravity: { x: 0, y: -9.81, z: 0 },
+        physics: {
+          enabled: true,
+          timeStep: 1/60,
+          maxSubSteps: 10,
+        },
+        rendering: {
+          backgroundColor: "#87CEEB",
+          environment: "",
+          fog: {
+            enabled: false,
+            color: "#ffffff",
+            near: 10,
+            far: 100,
+          },
+          shadows: {
+            enabled: true,
+            type: "pcfsoft" as const,
+          },
+          antialias: true,
+          pixelRatio: 1,
+        },
+      },
+      
+      // Active references
+      activeCamera: "default-camera",
+      activeLighting: "default-lighting",
+      
+      // Assets used in this scene
+      assets: [],
+      
+      // Editor-specific data
+      editor: {
+        showGrid: true,
+        gridSize: 1,
+        showHelpers: true,
+        showWireframe: false,
+        debugPhysics: false,
+      },
+      
+      metadata: {
+        created: now,
+        modified: now,
+        version: "1.0.0",
+      },
+    };
+
+    // Add default entities (camera + lighting)
+    baseScene.entities = [...this.createDefaultEntities()];
+
+    // Add template-specific entities
+    switch (template) {
+      case "basic":
+        baseScene.entities.push(...this.createBasicTemplateEntities());
+        break;
+      case "platformer":
+        baseScene.entities.push(...this.createPlatformerTemplateEntities());
+        break;
+      case "fps":
+        baseScene.entities.push(...this.createFPSTemplateEntities());
+        break;
+      default: // empty
+        break;
+    }
+
+    return baseScene;
+  }
+
+  private createDefaultEntities(): any[] {
+    const now = Date.now();
+    
+    return [
+      {
+        id: "default-camera",
+        name: "Main Camera",
+        type: "camera",
+        transform: {
+          position: { x: 0, y: 5, z: 10 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 },
+        },
+        physics: {
+          enabled: false,
+        },
+        material: null,
+        tags: ["camera"],
+        layer: 0,
+        visible: true,
+        castShadow: false,
+        receiveShadow: false,
+        children: [],
+        properties: {
+          type: "perspective",
+          fov: 75,
+          aspect: 16/9,
+          near: 0.1,
+          far: 1000,
+          isActive: true,
+        },
+        metadata: {
+          created: now,
+          updated: now,
+        },
+      },
+      {
+        id: "ambient-light",
+        name: "Ambient Light",
+        type: "light",
+        transform: {
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 },
+        },
+        physics: {
+          enabled: false,
+        },
+        material: null,
+        tags: ["light", "ambient"],
+        layer: 0,
+        visible: true,
+        castShadow: false,
+        receiveShadow: false,
+        children: [],
+        properties: {
+          type: "ambient",
+          color: "#404040",
+          intensity: 0.4,
+        },
+        metadata: {
+          created: now,
+          updated: now,
+        },
+      },
+      {
+        id: "directional-light",
+        name: "Directional Light",
+        type: "light",
+        transform: {
+          position: { x: 10, y: 10, z: 10 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 },
+        },
+        physics: {
+          enabled: false,
+        },
+        material: null,
+        tags: ["light", "directional"],
+        layer: 0,
+        visible: true,
+        castShadow: false,
+        receiveShadow: false,
+        children: [],
+        properties: {
+          type: "directional",
+          color: "#ffffff",
+          intensity: 0.8,
+          castShadow: true,
+        },
+        metadata: {
+          created: now,
+          updated: now,
+        },
+      },
+    ];
+  }
+
+  private createBasicTemplateEntities(): any[] {
+    const now = Date.now();
+    
+    return [
+      // Ground - Box entity with static physics
+      {
+        id: "ground",
+        name: "Ground",
+        type: "box",
+        transform: {
+          position: { x: 0, y: -2, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 20, y: 1, z: 20 },
+        },
+        physics: {
+          enabled: true,
+          type: "static",
+          mass: 0,
+          restitution: 0.2,
+          friction: 0.8,
+        },
+        material: {
+          type: "standard",
+          properties: {
+            type: "standard",
+            color: "#8FBC8F",
+            opacity: 1,
+            transparent: false,
+            roughness: 0.8,
+            metalness: 0.1,
+          },
+        },
+        tags: ["ground", "platform"],
+        layer: 0,
+        visible: true,
+        castShadow: false,
+        receiveShadow: true,
+        children: [],
+        properties: {
+          width: 20,
+          height: 1,
+          depth: 20,
+          widthSegments: 1,
+          heightSegments: 1,
+          depthSegments: 1,
+        },
+        metadata: {
+          created: now,
+          updated: now,
+        },
+      },
+      // Cube - Box entity with dynamic physics
+      {
+        id: "cube",
+        name: "Cube",
+        type: "box",
+        transform: {
+          position: { x: 0, y: 2, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 },
+        },
+        physics: {
+          enabled: true,
+          type: "dynamic",
+          mass: 1,
+          restitution: 0.3,
+          friction: 0.7,
+          linearDamping: 0.1,
+          angularDamping: 0.1,
+        },
+        material: {
+          type: "standard",
+          properties: {
+            type: "standard",
+            color: "#FF6B6B",
+            opacity: 1,
+            transparent: false,
+            roughness: 0.5,
+            metalness: 0.0,
+          },
+        },
+        tags: ["interactive", "dynamic"],
+        layer: 0,
+        visible: true,
+        castShadow: true,
+        receiveShadow: true,
+        children: [],
+        properties: {
+          width: 1,
+          height: 1,
+          depth: 1,
+          widthSegments: 1,
+          heightSegments: 1,
+          depthSegments: 1,
+        },
+        metadata: {
+          created: now,
+          updated: now,
+        },
+      },
+    ];
+  }
+
+  private createPlatformerTemplateEntities(): any[] {
+    const now = Date.now();
+    
+    return [
+      // Ground
+      {
+        id: "ground",
+        name: "Ground",
+        type: "box",
+        transform: {
+          position: { x: 0, y: -2, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 30, y: 1, z: 10 },
+        },
+        physics: {
+          enabled: true,
+          type: "static",
+          mass: 0,
+          restitution: 0.0,
+          friction: 0.8,
+        },
+        material: {
+          type: "standard",
+          properties: {
+            type: "standard",
+            color: "#8B4513",
+            opacity: 1,
+            transparent: false,
+            roughness: 0.9,
+            metalness: 0.0,
+          },
+        },
+        tags: ["ground", "platform"],
+        layer: 0,
+        visible: true,
+        castShadow: false,
+        receiveShadow: true,
+        children: [],
+        properties: {
+          width: 30,
+          height: 1,
+          depth: 10,
+        },
+        metadata: {
+          created: now,
+          updated: now,
+        },
+      },
+      // Platform 1
+      {
+        id: "platform1",
+        name: "Platform 1",
+        type: "box",
+        transform: {
+          position: { x: 5, y: 1, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 4, y: 0.5, z: 2 },
+        },
+        physics: {
+          enabled: true,
+          type: "static",
+          mass: 0,
+          restitution: 0.0,
+          friction: 0.8,
+        },
+        material: {
+          type: "standard",
+          properties: {
+            type: "standard",
+            color: "#228B22",
+            opacity: 1,
+            transparent: false,
+            roughness: 0.7,
+            metalness: 0.0,
+          },
+        },
+        tags: ["platform"],
+        layer: 0,
+        visible: true,
+        castShadow: true,
+        receiveShadow: true,
+        children: [],
+        properties: {
+          width: 4,
+          height: 0.5,
+          depth: 2,
+        },
+        metadata: {
+          created: now,
+          updated: now,
+        },
+      },
+    ];
+  }
+
+  private createFPSTemplateEntities(): any[] {
+    const now = Date.now();
+    
+    return [
+      // Large ground for FPS
+      {
+        id: "ground",
+        name: "Ground",
+        type: "box",
+        transform: {
+          position: { x: 0, y: -2, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 50, y: 1, z: 50 },
+        },
+        physics: {
+          enabled: true,
+          type: "static",
+          mass: 0,
+          restitution: 0.0,
+          friction: 0.8,
+        },
+        material: {
+          type: "standard",
+          properties: {
+            type: "standard",
+            color: "#556B2F",
+            opacity: 1,
+            transparent: false,
+            roughness: 0.8,
+            metalness: 0.1,
+          },
+        },
+        tags: ["ground", "terrain"],
+        layer: 0,
+        visible: true,
+        castShadow: false,
+        receiveShadow: true,
+        children: [],
+        properties: {
+          width: 50,
+          height: 1,
+          depth: 50,
+        },
+        metadata: {
+          created: now,
+          updated: now,
+        },
+      },
+    ];
+  }
+
+
+
+
+
+  private async createGitIgnore(projectPath: string): Promise<void> {
+    const gitIgnoreContent = `# Dependencies
+node_modules/
+pnpm-lock.yaml
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Runtime files
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Temporary files
+tmp/
+temp/
+`;
+
+    const gitIgnorePath = path.join(projectPath, ".gitignore");
+    await fs.writeFile(gitIgnorePath, gitIgnoreContent, "utf-8");
   }
 
   async selectProjectDirectory(): Promise<string | undefined> {
@@ -159,6 +654,16 @@ export class ProjectManager {
 
   async openProjectFolder(projectPath: string): Promise<void> {
     await shell.openPath(projectPath);
+  }
+
+  async deleteProject(projectPath: string): Promise<void> {
+    try {
+      // Remove the entire project directory
+      await fs.rm(projectPath, { recursive: true, force: true });
+    } catch (error) {
+      console.error("Failed to delete project:", error);
+      throw new Error(`Failed to delete project: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private async saveProjectConfig(

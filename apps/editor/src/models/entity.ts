@@ -311,4 +311,12 @@ export class Entity extends THREE.Object3D {
   isDebugRenderEnabled(): boolean {
     return this.debugRenderEnabled;
   }
+
+  getRigidBodyId(): string | null {
+    return this.rigidBodyId;
+  }
+
+  getColliderId(): string | null {
+    return this.colliderId;
+  }
 } 
