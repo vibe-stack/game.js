@@ -3,10 +3,10 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Folder, Calendar, FileText, Package } from "lucide-react";
-import useEditorStore from "@/stores/editor-store";
+import useGameStudioStore from "@/stores/game-studio-store";
 
 export default function ProjectInfoPanel() {
-  const { currentProject } = useEditorStore();
+  const { currentProject } = useGameStudioStore();
 
   if (!currentProject) {
     return (
@@ -68,7 +68,7 @@ export default function ProjectInfoPanel() {
             <div>
               <Label className="text-xs text-muted-foreground">Available Scenes</Label>
               <div className="flex flex-wrap gap-1 mt-1">
-                {currentProject.scenes?.map((scene, index) => (
+                {currentProject.scenes?.map((scene: string, index: number) => (
                   <Badge key={index} variant="outline" className="text-xs">
                     {scene}
                   </Badge>

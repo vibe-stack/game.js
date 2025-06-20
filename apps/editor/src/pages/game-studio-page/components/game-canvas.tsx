@@ -80,9 +80,11 @@ export default function GameCanvas({ gameWorldService }: GameCanvasProps) {
           console.log("Loading demo scene");
           await gameWorldService.current!.loadDefaultScene();
         } else {
-          console.log("Loading project scene via IPC:", currentSceneName);
-          // Load scene JSON data via IPC bridge
-          const sceneData = await window.projectAPI.loadScene(currentProject.path, currentSceneName);
+          console.log("Loading project scene via file system:", currentSceneName);
+          // Load scene JSON data via file system
+          const scenePath = `${currentProject.path}/scenes/${currentSceneName}.json`;
+          const sceneContent = await window.projectAPI.readFile(scenePath);
+          const sceneData = JSON.parse(sceneContent);
           console.log("Scene data loaded, now loading into game world:", sceneData);
           // Pass the actual JSON data to the service
           await gameWorldService.current!.loadScene(sceneData);

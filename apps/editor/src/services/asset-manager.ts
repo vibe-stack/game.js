@@ -4,13 +4,25 @@ import path from "path";
 import express, { Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 
-export class AssetManager {
-  private assetServer: any = null;
-  private assetServerPort: number = 0;
+// Import the correct type from project types
+import type { AssetReference } from "../types/project";
 
-  private async startAssetServer(projectPath: string): Promise<number> {
-    if (this.assetServer) {
-      return this.assetServerPort;
+export interface GameScene {
+  assets: AssetReference[];
+  metadata: {
+    modified: Date;
+  };
+}
+
+export class AssetManager {
+  private static assetServer: any = null;
+  private static assetServerPort: number = 0;
+
+  private constructor() {} // Prevent instantiation
+
+  private static async startAssetServer(projectPath: string): Promise<number> {
+    if (AssetManager.assetServer) {
+      return AssetManager.assetServerPort;
     }
 
     const app = express();
@@ -46,27 +58,27 @@ export class AssetManager {
       });
     });
 
-    this.assetServer = server;
-    this.assetServerPort = port;
+    AssetManager.assetServer = server;
+    AssetManager.assetServerPort = port;
     
     console.log(`Asset server started on port ${port} serving ${projectPath}`);
     return port;
   }
 
-  private stopAssetServer() {
-    if (this.assetServer) {
-      this.assetServer.close();
-      this.assetServer = null;
-      this.assetServerPort = 0;
+  private static stopAssetServer() {
+    if (AssetManager.assetServer) {
+      AssetManager.assetServer.close();
+      AssetManager.assetServer = null;
+      AssetManager.assetServerPort = 0;
       console.log('Asset server stopped');
     }
   }
 
-  async getAssetServerPort(projectPath: string): Promise<number> {
-    return await this.startAssetServer(projectPath);
+  static async getAssetServerPort(projectPath: string): Promise<number> {
+    return await AssetManager.startAssetServer(projectPath);
   }
 
-  async getAssetUrl(projectPath: string, assetPath: string): Promise<string | null> {
+  static async getAssetUrl(projectPath: string, assetPath: string): Promise<string | null> {
     try {
       const fullAssetPath = path.resolve(projectPath, assetPath);
       const projectDir = path.resolve(projectPath);
@@ -75,7 +87,7 @@ export class AssetManager {
         throw new Error("Asset path is outside project directory");
       }
 
-      if (!(await this.fileExists(fullAssetPath))) {
+      if (!(await AssetManager.fileExists(fullAssetPath))) {
         console.warn("Asset file does not exist:", fullAssetPath);
         return null;
       }
@@ -84,19 +96,19 @@ export class AssetManager {
       
       // For multi-file formats like GLTF, use HTTP server
       if (extension === '.gltf') {
-        const port = await this.startAssetServer(projectPath);
+        const port = await AssetManager.startAssetServer(projectPath);
         return `http://localhost:${port}/${assetPath}`;
       }
       
       // For single-file formats like GLB, use data URL (existing behavior)
-      return this.getAssetDataUrl(projectPath, assetPath);
+      return AssetManager.getAssetDataUrl(projectPath, assetPath);
     } catch (error) {
       console.error("Error getting asset URL:", error);
       return null;
     }
   }
 
-  async selectAssetFiles(): Promise<string[]> {
+  static async selectAssetFiles(): Promise<string[]> {
     const result = await dialog.showOpenDialog({
       properties: ["openFile", "multiSelections"],
       filters: [
@@ -162,7 +174,7 @@ export class AssetManager {
     return result.canceled ? [] : result.filePaths;
   }
 
-  async importAssetFromData(
+  static async importAssetFromData(
     projectPath: string,
     fileName: string,
     fileData: Buffer,
@@ -175,14 +187,14 @@ export class AssetManager {
     const nameWithoutExt = path.basename(fileName, fileExtension);
 
     // Determine asset type based on extension
-    const assetType = this.getAssetTypeFromExtension(fileExtension);
+    const assetType = AssetManager.getAssetTypeFromExtension(fileExtension);
 
     // Create unique filename to avoid conflicts
     let counter = 0;
     let finalFileName = fileName;
     let destinationPath = path.join(assetsDir, finalFileName);
 
-    while (await this.fileExists(destinationPath)) {
+    while (await AssetManager.fileExists(destinationPath)) {
       counter++;
       finalFileName = `${nameWithoutExt}_${counter}${fileExtension}`;
       destinationPath = path.join(assetsDir, finalFileName);
@@ -202,7 +214,7 @@ export class AssetManager {
     return assetReference;
   }
 
-  async importAsset(
+  static async importAsset(
     projectPath: string,
     assetPath: string,
   ): Promise<AssetReference> {
@@ -215,14 +227,14 @@ export class AssetManager {
     const nameWithoutExt = path.basename(fileName, fileExtension);
 
     // Determine asset type based on extension
-    const assetType = this.getAssetTypeFromExtension(fileExtension);
+    const assetType = AssetManager.getAssetTypeFromExtension(fileExtension);
 
     // Create unique filename to avoid conflicts
     let counter = 0;
     let finalFileName = fileName;
     let destinationPath = path.join(assetsDir, finalFileName);
 
-    while (await this.fileExists(destinationPath)) {
+    while (await AssetManager.fileExists(destinationPath)) {
       counter++;
       finalFileName = `${nameWithoutExt}_${counter}${fileExtension}`;
       destinationPath = path.join(assetsDir, finalFileName);
@@ -242,7 +254,7 @@ export class AssetManager {
     return assetReference;
   }
 
-  async deleteAsset(projectPath: string, assetId: string): Promise<void> {
+  static async deleteAsset(projectPath: string, assetId: string): Promise<void> {
     // Get current scene to find the asset
     const scenesDir = path.join(projectPath, "scenes");
     
@@ -259,7 +271,7 @@ export class AssetManager {
           const scene = JSON.parse(sceneContent) as GameScene;
           
           const assetIndex = scene.assets.findIndex(
-            (asset) => asset.id === assetId,
+            (asset: AssetReference) => asset.id === assetId,
           );
 
           if (assetIndex >= 0) {
@@ -289,10 +301,10 @@ export class AssetManager {
     }
   }
 
-  async getAssets(projectPath: string): Promise<AssetReference[]> {
+  static async getAssets(projectPath: string): Promise<AssetReference[]> {
     const assetsDir = path.join(projectPath, "assets");
 
-    if (!(await this.fileExists(assetsDir))) {
+    if (!(await AssetManager.fileExists(assetsDir))) {
       return [];
     }
 
@@ -309,7 +321,7 @@ export class AssetManager {
           const nameWithoutExt = path.basename(file, fileExtension);
 
           // Determine asset type based on extension
-          const assetType = this.getAssetTypeFromExtension(fileExtension);
+          const assetType = AssetManager.getAssetTypeFromExtension(fileExtension);
 
           const asset: AssetReference = {
             id: `asset_${file}_${stat.mtime.getTime()}`,
@@ -329,7 +341,7 @@ export class AssetManager {
     }
   }
 
-  async getAssetDataUrl(
+  static async getAssetDataUrl(
     projectPath: string,
     assetPath: string,
   ): Promise<string | null> {
@@ -342,7 +354,7 @@ export class AssetManager {
         throw new Error("Asset path is outside project directory");
       }
 
-      if (!(await this.fileExists(fullAssetPath))) {
+      if (!(await AssetManager.fileExists(fullAssetPath))) {
         console.warn("Asset file does not exist:", fullAssetPath);
         return null;
       }
@@ -352,7 +364,7 @@ export class AssetManager {
 
       // Determine MIME type based on file extension
       const extension = path.extname(assetPath).toLowerCase();
-      const mimeType = this.getMimeTypeFromExtension(extension);
+      const mimeType = AssetManager.getMimeTypeFromExtension(extension);
 
       // Convert to base64 data URL
       const base64Data = fileBuffer.toString("base64");
@@ -363,7 +375,7 @@ export class AssetManager {
     }
   }
 
-  private getAssetTypeFromExtension(fileExtension: string): AssetReference["type"] {
+  private static getAssetTypeFromExtension(fileExtension: string): AssetReference["type"] {
     if (
       [
         ".jpg",
@@ -392,13 +404,13 @@ export class AssetManager {
     } else if (
       [".glsl", ".vert", ".frag", ".vs", ".fs"].includes(fileExtension)
     ) {
-      return "shader";
+      return "material";
     } else {
       return "texture"; // Default fallback
     }
   }
 
-  private getMimeTypeFromExtension(extension: string): string {
+  private static getMimeTypeFromExtension(extension: string): string {
     switch (extension) {
       case ".jpg":
       case ".jpeg":
@@ -434,7 +446,7 @@ export class AssetManager {
     }
   }
 
-  private async fileExists(filePath: string): Promise<boolean> {
+  private static async fileExists(filePath: string): Promise<boolean> {
     try {
       await fs.access(filePath);
       return true;

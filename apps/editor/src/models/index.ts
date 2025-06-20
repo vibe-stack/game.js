@@ -29,7 +29,6 @@ export {
   LightingLoader,
   PhysicsLoader,
   SceneSerializer,
-  DEMO_SCENE_DATA 
 } from "./scene-loader";
 
 // Character controller

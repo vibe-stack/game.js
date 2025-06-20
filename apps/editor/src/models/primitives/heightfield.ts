@@ -2,6 +2,7 @@ import * as THREE from "three/webgpu";
 import { Entity } from "../entity";
 import { EntityConfig } from "../types";
 import { generateHeightfieldData } from "../../utils/heightfield-generator";
+import { EntityData } from "../scene-loader";
 
 export interface HeightfieldConfig extends EntityConfig {
   // Dimensions
@@ -9,15 +10,15 @@ export interface HeightfieldConfig extends EntityConfig {
   depth?: number; // world units (Z axis)
   rows?: number; // number of height samples along depth (Z)
   columns?: number; // number of height samples along width (X)
-  
+
   // Elevation
   minElevation?: number;
   maxElevation?: number;
-  
+
   // Generation algorithm
   algorithm?: "perlin" | "simplex" | "ridged" | "fbm" | "voronoi" | "diamond-square" | "random" | "flat";
   seed?: number;
-  
+
   // Noise settings
   frequency?: number;
   amplitude?: number;
@@ -27,18 +28,18 @@ export interface HeightfieldConfig extends EntityConfig {
   ridgeOffset?: number; // For ridged noise
   voronoiPoints?: number; // For voronoi
   voronoiRandomness?: number; // For voronoi
-  
+
   // Visual properties
   displacementScale?: number;
   smoothing?: boolean;
   wireframe?: boolean;
-  
+
   // UV scaling
   uvScale?: { x: number; y: number };
-  
+
   // Material
   material?: THREE.Material;
-  
+
   // Shadow settings
   castShadow?: boolean;
   receiveShadow?: boolean;
@@ -62,11 +63,15 @@ export class Heightfield extends Entity {
   public readonly displacementScale: number;
   public readonly smoothing: boolean;
   public readonly uvScale: { x: number; y: number };
-  
+
   private mesh: THREE.Mesh;
   private geometry: THREE.PlaneGeometry;
   private heights: number[][] = [];
-  private _needsPhysicsUpdate = false;
+  protected _needsPhysicsUpdate = false;
+
+  get needsPhysicsUpdate(): boolean {
+    return this._needsPhysicsUpdate;
+  }
 
   constructor(config: HeightfieldConfig = {}) {
     super(config);
@@ -106,7 +111,7 @@ export class Heightfield extends Entity {
     this.smoothing = config.smoothing ?? false;
     this.uvScale = config.uvScale ?? { x: 1, y: 1 };
 
-    const material = config.material ?? new THREE.MeshStandardMaterial({ 
+    const material = config.material ?? new THREE.MeshStandardMaterial({
       color: 0x6b7c54,
       wireframe: config.wireframe ?? false
     });
@@ -146,7 +151,7 @@ export class Heightfield extends Entity {
     this.addTag("terrain");
   }
 
-  private generateHeightfield(): void {
+  protected generateHeightfield(): void {
     const heightfieldProperties = {
       width: this.dimensions.width,
       depth: this.dimensions.depth,
@@ -158,22 +163,16 @@ export class Heightfield extends Entity {
       seed: this.seed,
       noise: this.noiseSettings,
       customHeights: undefined,
-      heights: [],
-      displacementScale: this.displacementScale,
-      smoothing: this.smoothing,
-      wireframe: false,
-      lod: { enabled: false, levels: 1, distances: [50], simplificationRatio: [0.5] },
       uvScale: this.uvScale,
-      autoRegenerate: false,
-      lastGenerated: new Date(),
-      castShadow: true,
-      receiveShadow: true
+      smoothing: this.smoothing,
+      wireframe: false
     };
 
-    this.heights = generateHeightfieldData(heightfieldProperties);
+    const result = generateHeightfieldData(heightfieldProperties);
+    this.heights = result.heights;
   }
 
-  private applyDisplacement(): void {
+  protected applyDisplacement(): void {
     const positions = this.geometry.attributes.position;
     const vertices = positions.array;
 
@@ -206,7 +205,7 @@ export class Heightfield extends Entity {
     // - The geometry's width (originally X) becomes the physics Z dimension
     // - The geometry's depth (originally Z) becomes the physics X dimension
     // - We need to transpose the height data to match this coordinate system
-    
+
     // Transpose the height data to match the rotated coordinate system
     const transposedHeights: number[][] = [];
     for (let j = 0; j < this.dimensions.columns; j++) {
@@ -215,7 +214,7 @@ export class Heightfield extends Entity {
         transposedHeights[j][i] = this.heights[i][j];
       }
     }
-    
+
     // Scale represents the total dimensions of the heightfield in world units
     // After rotation: geometry width -> physics Z, geometry depth -> physics X
     const scale = new THREE.Vector3(
@@ -238,7 +237,7 @@ export class Heightfield extends Entity {
     (this.dimensions as any).depth = depth;
     if (rows !== undefined) (this.dimensions as any).rows = rows;
     if (columns !== undefined) (this.dimensions as any).columns = columns;
-    
+
     this.regenerateGeometry();
     return this;
   }
@@ -246,7 +245,7 @@ export class Heightfield extends Entity {
   setElevationRange(min: number, max: number): this {
     (this.elevationRange as any).min = min;
     (this.elevationRange as any).max = max;
-    
+
     this.regenerateHeightfield();
     return this;
   }
@@ -281,7 +280,7 @@ export class Heightfield extends Entity {
   setUVScale(x: number, y: number): this {
     (this.uvScale as any).x = x;
     (this.uvScale as any).y = y;
-    
+
     this.geometry.attributes.uv.array.forEach((_, i) => {
       if (i % 2 === 0) {
         this.geometry.attributes.uv.array[i] = (this.geometry.attributes.uv.array[i] / this.uvScale.x) * x;
@@ -289,7 +288,7 @@ export class Heightfield extends Entity {
         this.geometry.attributes.uv.array[i] = (this.geometry.attributes.uv.array[i] / this.uvScale.y) * y;
       }
     });
-    
+
     this.geometry.attributes.uv.needsUpdate = true;
     return this;
   }
@@ -323,20 +322,20 @@ export class Heightfield extends Entity {
       this.dimensions.columns - 1,
       this.dimensions.rows - 1
     );
-    
+
     this.geometry.rotateX(-Math.PI / 2);
     this.generateHeightfield();
     this.applyDisplacement();
     this.mesh.geometry = this.geometry;
-    
+
     if (this._needsPhysicsUpdate) {
       this.updatePhysics();
     }
   }
 
-  private updatePhysics(): void {
+  protected updatePhysics(): void {
     if (!this.physicsManager || !this.colliderId) return;
-    
+
     // Remove old collider and create new one
     // this.physicsManager.removeCollider(this.colliderId);
     // this.createCollider();
@@ -361,10 +360,10 @@ export class Heightfield extends Entity {
     // Account for the -90° rotation around X axis
     const col = Math.floor(((x + this.dimensions.width / 2) / this.dimensions.width) * (this.dimensions.columns - 1));
     const row = Math.floor(((z + this.dimensions.depth / 2) / this.dimensions.depth) * (this.dimensions.rows - 1));
-    
+
     const clampedCol = Math.max(0, Math.min(this.dimensions.columns - 1, col));
     const clampedRow = Math.max(0, Math.min(this.dimensions.rows - 1, row));
-    
+
     return this.heights[clampedRow][clampedCol] * this.displacementScale;
   }
 
@@ -424,7 +423,7 @@ export class Heightfield extends Entity {
   // Debug method for testing physics
   static createDebugTerrain(config: Partial<HeightfieldConfig> = {}): Heightfield {
     console.log("Creating debug heightfield terrain for physics testing...");
-    
+
     const terrain = new Heightfield({
       width: 20,
       depth: 20,
@@ -434,9 +433,9 @@ export class Heightfield extends Entity {
       maxElevation: 5,
       algorithm: "flat",  // Start with flat terrain
       displacementScale: 1.0,
-      material: new THREE.MeshStandardMaterial({ 
+      material: new THREE.MeshStandardMaterial({
         color: 0x00ff00,  // Bright green for visibility
-        wireframe: false 
+        wireframe: false
       }),
       name: "Debug Heightfield",
       ...config
@@ -461,5 +460,19 @@ export class Heightfield extends Entity {
 
     console.log("Debug terrain created with manual height data");
     return terrain;
+  }
+
+  serialize(): EntityData {
+    return {
+      id: this.entityId, name: this.entityName, type: "heightfield",
+      transform: {
+        position: { x: this.position.x, y: this.position.y, z: this.position.z },
+        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
+        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
+      },
+      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
+      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      geometry: { type: "HeightfieldGeometry", parameters: { width: this.dimensions.width, depth: this.dimensions.depth, rows: this.dimensions.rows, columns: this.dimensions.columns, minElevation: this.elevationRange.min, maxElevation: this.elevationRange.max, customHeights: this.getHeights(), algorithm: this.algorithm, seed: this.seed, frequency: this.noiseSettings.frequency, amplitude: this.noiseSettings.amplitude, octaves: this.noiseSettings.octaves, persistence: this.noiseSettings.persistence, lacunarity: this.noiseSettings.lacunarity, displacementScale: this.displacementScale, smoothing: this.smoothing, uvScale: this.uvScale, enableVertexManipulation: this.enableVertexManipulation, heightConstraints: this.heightConstraints, smoothRadius: this.smoothRadius, smoothFalloff: this.smoothFalloff } }
+    };
   }
 }

@@ -38,13 +38,9 @@ export default function EditorModeToolbar() {
   // Update cameras when scene changes
   useEffect(() => {
     if (currentScene) {
-      // TODO: Implement camera discovery when scene system is available
+      // For now, create a simple mock camera list
       console.log("Discovering cameras - placeholder");
-      const mockCameras = [
-        { id: "main-camera", name: "Main Camera", components: [{ type: "PerspectiveCamera" }] },
-        { id: "secondary-camera", name: "Secondary Camera", components: [{ type: "OrthographicCamera" }] }
-      ] as GameObject[];
-      setAvailableCameras(mockCameras);
+      setAvailableCameras([]);
     } else {
       setAvailableCameras([]);
     }
@@ -112,14 +108,6 @@ export default function EditorModeToolbar() {
   const handleViewportModeToggle = () => {
     const newMode = viewportMode === 'orbit' ? 'camera' : 'orbit';
     setViewportMode(newMode);
-    
-    // If switching to camera mode but no camera is selected, select the first available
-    if (newMode === 'camera' && (!activeCamera || availableCameras.length === 0)) {
-      const defaultCamera = getDefaultCamera() || availableCameras[0];
-      if (defaultCamera) {
-        setActiveCamera(defaultCamera.id);
-      }
-    }
   };
 
   const getCurrentCameraName = () => {
@@ -127,24 +115,8 @@ export default function EditorModeToolbar() {
       return "Editor Camera";
     }
     
-    const activeCameraObj = availableCameras.find(cam => cam.id === activeCamera);
-    return activeCameraObj?.name || "Unknown Camera";
-  };
-
-  const getDefaultCamera = () => {
-    return availableCameras.find(camera => {
-      const cameraComponent = camera.components.find(
-        comp => comp.type === 'PerspectiveCamera' || comp.type === 'OrthographicCamera'
-      );
-      return (cameraComponent?.properties as any)?.isMain === true;
-    });
-  };
-
-  const getCameraType = (camera: GameObject) => {
-    const cameraComponent = camera.components.find(
-      comp => comp.type === 'PerspectiveCamera' || comp.type === 'OrthographicCamera'
-    );
-    return cameraComponent?.type === 'PerspectiveCamera' ? 'Perspective' : 'Orthographic';
+    const activeCameraObj = availableCameras.find(cam => cam.entityId === activeCamera);
+    return activeCameraObj?.entityName || "Unknown Camera";
   };
 
   return (
@@ -173,20 +145,18 @@ export default function EditorModeToolbar() {
           <DropdownMenuSeparator />
           {availableCameras.length > 0 ? (
             availableCameras.map((camera) => {
-              const isActive = activeCamera === camera.id;
-              const isDefault = getDefaultCamera()?.id === camera.id;
+              const isActive = activeCamera === camera.entityId;
               
               return (
                 <DropdownMenuItem
-                  key={camera.id}
-                  onClick={(e) => handleCameraSelect(camera.id, e)}
+                  key={camera.entityId}
+                  onClick={(e) => handleCameraSelect(camera.entityId, e)}
                   className="flex items-center justify-between hover:bg-accent/60 transition-colors duration-150"
                 >
                   <div className="flex flex-col">
-                    <span className="font-medium">{camera.name}</span>
+                    <span className="font-medium">{camera.entityName}</span>
                     <span className="text-xs text-muted-foreground">
-                      {getCameraType(camera)}
-                      {isDefault && " • Default"}
+                      Camera
                     </span>
                   </div>
                   {isActive && (

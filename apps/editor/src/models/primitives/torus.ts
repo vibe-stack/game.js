@@ -1,6 +1,7 @@
 import * as THREE from "three/webgpu";
 import { Entity } from "../entity";
 import { EntityConfig } from "../types";
+import { EntityData } from "../scene-loader";
 
 export interface TorusConfig extends EntityConfig {
   // Basic dimensions
@@ -169,5 +170,19 @@ export class Torus extends Entity {
       ...config,
       arc: Math.PI
     });
+  }
+
+  serialize(): EntityData {
+    return {
+      id: this.entityId, name: this.entityName, type: "torus",
+      transform: {
+        position: { x: this.position.x, y: this.position.y, z: this.position.z },
+        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
+        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
+      },
+      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
+      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      geometry: { type: "TorusGeometry", parameters: { radius: this.dimensions.radius, tube: this.dimensions.tube, radialSegments: this.segmentConfig.radial, tubularSegments: this.segmentConfig.tubular, arc: this.segmentConfig.arc } }
+    };
   }
 } 

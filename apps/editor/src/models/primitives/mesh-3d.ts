@@ -2,6 +2,7 @@ import * as THREE from "three/webgpu";
 import { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { Entity } from "../entity";
 import { AssetManager } from "../asset-manager";
+import { EntityData } from "../scene-loader";
 
 export interface Mesh3DConfig {
   name?: string;
@@ -50,6 +51,8 @@ export class Mesh3D extends Entity {
   private originalGLTF: GLTF | null = null;
   private loadedGeometry: THREE.BufferGeometry | null = null;
   private loadedMaterials: THREE.Material[] = [];
+
+  private modelId: string | null = null;  
 
   constructor(config: Mesh3DConfig = {}) {
     super({
@@ -428,7 +431,7 @@ export class Mesh3D extends Entity {
 
   // Physics collider creation helper
   protected createCollider(config: any): void {
-    if (!this.physicsManager || !this.colliderId) return;
+    if (!this.physicsManager || !this.colliderId || !this.rigidBodyId) return;
 
     const geometry = this.getGeometry();
     if (!geometry) return;
@@ -438,13 +441,12 @@ export class Mesh3D extends Entity {
       const size = new THREE.Vector3();
       geometry.computeBoundingBox();
       geometry.boundingBox!.getSize(size);
-      this.physicsManager.createBoxCollider(this.colliderId, this.rigidBodyId!, size);
+      this.physicsManager.createCollider(this.colliderId, this.rigidBodyId, "cuboid", size, config);
     } else if (geometry instanceof THREE.SphereGeometry) {
-      this.physicsManager.createSphereCollider(this.colliderId, this.rigidBodyId!, geometry.parameters.radius);
+      this.physicsManager.createCollider(this.colliderId, this.rigidBodyId, "ball", geometry.parameters.radius, config);
     } else {
-      // Use convex hull for complex geometry
-      const vertices = geometry.attributes.position.array;
-      this.physicsManager.createConvexCollider(this.colliderId, this.rigidBodyId!, vertices as Float32Array);
+      // Use trimesh for complex geometry (convex not supported in current API)
+      this.physicsManager.createCollider(this.colliderId, this.rigidBodyId, "trimesh", new THREE.Vector3(1, 1, 1), config);
     }
   }
 
@@ -507,5 +509,19 @@ export class Mesh3D extends Entity {
     config: Omit<Mesh3DConfig, 'geometry' | 'material'> = {}
   ): Mesh3D {
     return new Mesh3D({ ...config, geometry, material });
+  }
+
+  serialize(): EntityData {
+    return {
+      id: this.entityId, name: this.entityName, type: "mesh3d",
+      transform: {
+        position: { x: this.position.x, y: this.position.y, z: this.position.z },
+        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
+        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
+      },
+      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
+      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      geometry: { type: "Mesh3D", parameters: { modelId: this.modelId, geometry: this.loadedGeometry, material: this.loadedMaterials } }  
+    };
   }
 } 

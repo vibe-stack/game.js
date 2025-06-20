@@ -1,6 +1,5 @@
 import { app, BrowserWindow } from "electron";
 import registerListeners from "./helpers/ipc/listeners-register";
-import { ProjectService } from "./services/project-service";
 // "electron-squirrel-startup" seems broken when packaging with vite
 //import started from "electron-squirrel-startup";
 import path from "path";
@@ -24,10 +23,6 @@ function createWindow() {
     },
     titleBarStyle: "default",
   });
-  
-  // Initialize services
-  const projectService = new ProjectService();
-  projectService.registerIpcHandlers();
   
   registerListeners(mainWindow);
 

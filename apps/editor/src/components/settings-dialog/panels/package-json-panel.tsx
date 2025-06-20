@@ -10,7 +10,7 @@ import {
   Download,
   Loader2
 } from "lucide-react";
-import useEditorStore from "@/stores/editor-store";
+import useGameStudioStore from "@/stores/game-studio-store";
 
 interface PackageJson {
   name?: string;
@@ -34,7 +34,7 @@ interface PackageJson {
 }
 
 export default function PackageJsonPanel() {
-  const { currentProject } = useEditorStore();
+  const { currentProject } = useGameStudioStore();
   const [packageJson, setPackageJson] = useState<PackageJson>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);

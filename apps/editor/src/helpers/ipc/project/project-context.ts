@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { GameProject, AssetReference } from "@/types/project";
 
 export function exposeProjectContext() {
+  console.log("Exposing project context...");
+  
   contextBridge.exposeInMainWorld("projectAPI", {
     // Project Management
     loadProjects: () => ipcRenderer.invoke("project:load-projects"),
@@ -16,20 +19,6 @@ export function exposeProjectContext() {
       ipcRenderer.invoke("project:open-folder", projectPath),
     selectProjectDirectory: () => 
       ipcRenderer.invoke("project:select-directory"),
-    
-    // Scene Management
-    loadScene: (projectPath: string, sceneName: string) => 
-      ipcRenderer.invoke("project:load-scene", projectPath, sceneName),
-    saveScene: (projectPath: string, scene: GameScene) => 
-      ipcRenderer.invoke("project:save-scene", projectPath, scene),
-    createScene: (projectPath: string, sceneName: string) => 
-      ipcRenderer.invoke("project:create-scene", projectPath, sceneName),
-    deleteScene: (projectPath: string, sceneName: string) => 
-      ipcRenderer.invoke("project:delete-scene", projectPath, sceneName),
-    duplicateScene: (projectPath: string, sceneName: string, newName: string) => 
-      ipcRenderer.invoke("project:duplicate-scene", projectPath, sceneName, newName),
-    listScenes: (projectPath: string) => 
-      ipcRenderer.invoke("project:list-scenes", projectPath),
     
     // Asset Management
     selectAssetFiles: () => 
@@ -61,7 +50,6 @@ export function exposeProjectContext() {
     getFileStats: (filePath: string) => 
       ipcRenderer.invoke("project:get-file-stats", filePath),
     
-    // New File System Operations
     createFile: (filePath: string, content?: string) => 
       ipcRenderer.invoke("project:create-file", filePath, content || ""),
     createDirectory: (dirPath: string) => 
@@ -73,22 +61,40 @@ export function exposeProjectContext() {
     renameItem: (oldPath: string, newPath: string) => 
       ipcRenderer.invoke("project:rename-item", oldPath, newPath),
     
-    // Legacy - keeping for backward compatibility
-    installPackages: (projectName: string) => 
-      ipcRenderer.invoke("project:install-packages", projectName),
-    startDevServer: (projectName: string) => 
-      ipcRenderer.invoke("project:start-dev-server", projectName),
-    stopDevServer: (projectName: string) => 
-      ipcRenderer.invoke("project:stop-dev-server", projectName),
-    isDevServerRunning: (projectName: string) => 
-      ipcRenderer.invoke("project:is-dev-server-running", projectName),
-    getServerInfo: (projectName: string) => 
-      ipcRenderer.invoke("project:get-server-info", projectName),
-    connectToEditor: (projectName: string) => 
-      ipcRenderer.invoke("project:connect-to-editor", projectName),
-    sendPropertyUpdate: (projectName: string, property: string, value: unknown, temporary?: boolean) => 
-      ipcRenderer.invoke("project:send-property-update", projectName, property, value, temporary),
-    getSceneInfo: (projectName: string) => 
-      ipcRenderer.invoke("project:get-scene-info", projectName)
+    // Legacy - keeping for backward compatibility but may be removed later
+    installPackages: (projectName: string) => {
+        console.warn("Legacy API 'installPackages' is deprecated.");
+        return Promise.resolve();
+    },
+    startDevServer: (projectName: string) => {
+        console.warn("Legacy API 'startDevServer' is deprecated.");
+        return Promise.resolve({ port: 0, url: '' });
+    },
+    stopDevServer: (projectName: string) => {
+        console.warn("Legacy API 'stopDevServer' is deprecated.");
+        return Promise.resolve();
+    },
+    isDevServerRunning: (projectName: string) => {
+        console.warn("Legacy API 'isDevServerRunning' is deprecated.");
+        return Promise.resolve(false);
+    },
+    getServerInfo: (projectName: string) => {
+        console.warn("Legacy API 'getServerInfo' is deprecated.");
+        return Promise.resolve(undefined);
+    },
+    connectToEditor: (projectName: string) => {
+        console.warn("Legacy API 'connectToEditor' is deprecated.");
+        return Promise.resolve();
+    },
+    sendPropertyUpdate: (projectName: string, property: string, value: unknown, temporary?: boolean) => {
+        console.warn("Legacy API 'sendPropertyUpdate' is deprecated.");
+        return Promise.resolve();
+    },
+    getSceneInfo: (projectName: string) => {
+        console.warn("Legacy API 'getSceneInfo' is deprecated.");
+        return Promise.resolve(null);
+    }
   });
-} 
+  
+  console.log("Project context exposed successfully");
+}

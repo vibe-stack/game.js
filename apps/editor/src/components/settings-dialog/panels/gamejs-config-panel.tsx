@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Save, RotateCcw } from "lucide-react";
-import useEditorStore from "@/stores/editor-store";
+import useGameStudioStore from "@/stores/game-studio-store";
 
 interface GameJSConfig {
   name?: string;
@@ -55,7 +55,7 @@ const defaultConfig: GameJSConfig = {
 };
 
 export default function GameJSConfigPanel() {
-  const { currentProject } = useEditorStore();
+  const { currentProject } = useGameStudioStore();
   const [config, setConfig] = useState<GameJSConfig>(defaultConfig);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);

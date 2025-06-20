@@ -21,7 +21,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, FolderOpen, Play, Settings, Folder, Trash2, GamepadIcon } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
-import useEditorStore from "@/stores/editor-store";
+import useGameStudioStore from "@/stores/game-studio-store";
+import { GameProject } from "@/types/project";
 // Using existing GameProject type from d.ts for now
 interface CreateProjectOptions {
   name: string;
@@ -69,7 +70,7 @@ export default function HomePage() {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   
   const navigate = useNavigate();
-  const { setCurrentProject, setProjects: setStoreProjects } = useEditorStore();
+  const { setCurrentProject, setCurrentProject: setStoreCurrentProject } = useGameStudioStore();
 
   useEffect(() => {
     loadProjects();
@@ -77,9 +78,14 @@ export default function HomePage() {
 
   const loadProjects = async () => {
     try {
+      console.log("Loading projects...");
+      console.log("projectAPI available:", !!window.projectAPI);
+      console.log("loadProjects method available:", !!window.projectAPI?.loadProjects);
+      
       const loadedProjects = await window.projectAPI.loadProjects();
+      console.log("Projects loaded:", loadedProjects);
       setProjects(loadedProjects);
-      setStoreProjects(loadedProjects);
+      setStoreCurrentProject(loadedProjects[0]);
     } catch (error) {
       console.error("Failed to load projects:", error);
       setProjects([]);
@@ -127,6 +133,10 @@ export default function HomePage() {
 
   const openProject = async (project: GameProject) => {
     try {
+      console.log("Opening project:", project.path);
+      console.log("projectAPI available:", !!window.projectAPI);
+      console.log("openProject method available:", !!window.projectAPI?.openProject);
+      
       // Load fresh project data
       const freshProject = await window.projectAPI.openProject(project.path);
       setCurrentProject(freshProject);

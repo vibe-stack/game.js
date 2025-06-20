@@ -11,17 +11,19 @@ export interface FileSystemItem {
 }
 
 export class FileSystemManager {
-  async readFile(filePath: string): Promise<string> {
+  private constructor() {} // Prevent instantiation
+
+  static async readFile(filePath: string): Promise<string> {
     return fs.readFile(filePath, "utf-8");
   }
 
-  async writeFile(filePath: string, content: string): Promise<void> {
+  static async writeFile(filePath: string, content: string): Promise<void> {
     const dir = path.dirname(filePath);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(filePath, content, "utf-8");
   }
 
-  async fileExists(filePath: string): Promise<boolean> {
+  static async fileExists(filePath: string): Promise<boolean> {
     try {
       await fs.access(filePath);
       return true;
@@ -30,29 +32,29 @@ export class FileSystemManager {
     }
   }
 
-  async createFile(filePath: string, content: string = ""): Promise<void> {
+  static async createFile(filePath: string, content: string = ""): Promise<void> {
     const dir = path.dirname(filePath);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(filePath, content, "utf-8");
   }
 
-  async createDirectory(dirPath: string): Promise<void> {
+  static async createDirectory(dirPath: string): Promise<void> {
     await fs.mkdir(dirPath, { recursive: true });
   }
 
-  async deleteFile(filePath: string): Promise<void> {
+  static async deleteFile(filePath: string): Promise<void> {
     await fs.unlink(filePath);
   }
 
-  async deleteDirectory(dirPath: string): Promise<void> {
+  static async deleteDirectory(dirPath: string): Promise<void> {
     await fs.rmdir(dirPath, { recursive: true });
   }
 
-  async renameItem(oldPath: string, newPath: string): Promise<void> {
+  static async renameItem(oldPath: string, newPath: string): Promise<void> {
     await fs.rename(oldPath, newPath);
   }
 
-  async listDirectory(dirPath: string): Promise<FileSystemItem[]> {
+  static async listDirectory(dirPath: string): Promise<FileSystemItem[]> {
     try {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
       const items: FileSystemItem[] = [];
@@ -91,7 +93,7 @@ export class FileSystemManager {
     }
   }
 
-  async getFileStats(filePath: string): Promise<{ size: number; modified: Date }> {
+  static async getFileStats(filePath: string): Promise<{ size: number; modified: Date }> {
     try {
       const stats = await fs.stat(filePath);
       return {

@@ -1,5 +1,3 @@
-import { EntityConfig, EntityMetadata } from "../models/types";
-import * as THREE from "three/webgpu";
 
 // Vector3 utility type
 export interface Vector3 {
@@ -43,15 +41,14 @@ export interface PhysicsConfig {
   mass?: number;
   restitution?: number;
   friction?: number;
-  // Rapier3D specific
   linearDamping?: number;
   angularDamping?: number;
   gravityScale?: number;
   canSleep?: boolean;
 }
 
-// Entity types matching your new system
 export type EntityType = 
+  | "entity"
   | "box" 
   | "sphere" 
   | "cylinder" 
@@ -74,175 +71,18 @@ export interface SceneEntity {
   type: EntityType;
   transform: Transform;
   physics?: PhysicsConfig;
-  material?: MaterialReference;
+  materialId?: string; // Reference to a material in the library
   tags: string[];
   layer: number;
   visible: boolean;
   castShadow?: boolean;
   receiveShadow?: boolean;
   children: SceneEntity[];
-  // Entity-specific properties
-  properties: Record<string, any>;
+  properties: Record<string, any>; // Entity-specific properties
   metadata: {
     created: number;
     updated: number;
   };
-}
-
-// Primitive-specific configurations
-export interface BoxProperties {
-  width: number;
-  height: number;
-  depth: number;
-  widthSegments?: number;
-  heightSegments?: number;
-  depthSegments?: number;
-}
-
-export interface SphereProperties {
-  radius: number;
-  widthSegments?: number;
-  heightSegments?: number;
-  phiStart?: number;
-  phiLength?: number;
-  thetaStart?: number;
-  thetaLength?: number;
-}
-
-export interface CylinderProperties {
-  radiusTop: number;
-  radiusBottom: number;
-  height: number;
-  radialSegments?: number;
-  heightSegments?: number;
-  openEnded?: boolean;
-  thetaStart?: number;
-  thetaLength?: number;
-}
-
-export interface PlaneProperties {
-  width: number;
-  height: number;
-  widthSegments?: number;
-  heightSegments?: number;
-}
-
-export interface ConeProperties {
-  radius: number;
-  height: number;
-  radialSegments?: number;
-  heightSegments?: number;
-  openEnded?: boolean;
-  thetaStart?: number;
-  thetaLength?: number;
-}
-
-export interface TorusProperties {
-  radius: number;
-  tubeRadius: number;
-  radialSegments?: number;
-  tubularSegments?: number;
-  arc?: number;
-}
-
-export interface CapsuleProperties {
-  radius: number;
-  length: number;
-  capSegments?: number;
-  radialSegments?: number;
-}
-
-export interface RingProperties {
-  innerRadius: number;
-  outerRadius: number;
-  thetaSegments?: number;
-  phiSegments?: number;
-  thetaStart?: number;
-  thetaLength?: number;
-}
-
-export interface HeightfieldProperties {
-  width: number;
-  depth: number;
-  rows: number;
-  columns: number;
-  minElevation: number;
-  maxElevation: number;
-  algorithm: "perlin" | "simplex" | "ridged" | "fbm" | "voronoi" | "diamond-square" | "random" | "flat" | "custom";
-  seed: number;
-  noise: {
-    frequency: number;
-    amplitude: number;
-    octaves: number;
-    persistence: number;
-    lacunarity: number;
-  };
-  customHeights?: number[][];
-  uvScale: { x: number; y: number };
-  smoothing: boolean;
-  wireframe: boolean;
-}
-
-export interface Mesh3DProperties {
-  geometry: string; // Asset reference
-  animations?: string[];
-}
-
-export interface CameraProperties {
-  type: "perspective" | "orthographic";
-  fov?: number;
-  aspect?: number;
-  near: number;
-  far: number;
-  zoom?: number;
-  left?: number;
-  right?: number;
-  top?: number;
-  bottom?: number;
-  isActive: boolean;
-}
-
-export interface LightProperties {
-  type: "ambient" | "directional" | "point" | "spot" | "hemisphere";
-  color: string;
-  intensity: number;
-  castShadow?: boolean;
-  // Directional/Spot light
-  target?: { x: number; y: number; z: number };
-  // Point/Spot light
-  distance?: number;
-  decay?: number;
-  // Spot light
-  angle?: number;
-  penumbra?: number;
-  // Hemisphere light
-  groundColor?: string;
-}
-
-// Material system
-export interface MaterialReference {
-  type: "library" | "inline" | "standard";
-  materialId?: string;
-  properties?: MaterialProperties;
-}
-
-export interface MaterialProperties {
-  type: "basic" | "standard" | "physical" | "lambert" | "phong" | "toon";
-  color: string;
-  opacity: number;
-  transparent: boolean;
-  roughness?: number;
-  metalness?: number;
-  emissive?: string;
-  emissiveIntensity?: number;
-  wireframe?: boolean;
-  // Texture maps
-  map?: string; // Asset reference
-  normalMap?: string;
-  roughnessMap?: string;
-  metalnessMap?: string;
-  emissiveMap?: string;
-  aoMap?: string;
 }
 
 // Asset references
@@ -254,13 +94,44 @@ export interface AssetReference {
   metadata?: Record<string, any>;
 }
 
+// Full project structure (what gets saved to disk)
+export interface GameProject {
+  name: string;
+  path: string;
+  lastModified: Date;
+  isRunning?: boolean;
+  
+  // New unified data structure
+  data?: {
+    config: ProjectConfig;
+    scenes: Record<string, string>; // sceneName -> filePath
+    assets: AssetReference[];
+    scripts: string[];
+    dependencies: Record<string, string>;
+    metadata: {
+      created: Date;
+      modified: Date;
+      lastOpened?: Date;
+    };
+  };
+
+  // Legacy compatibility
+  scenes: string[];
+  currentScene?: string;
+  packageJson?: any;
+  metadata: {
+    created: Date;
+    version: string;
+    description?: string;
+    author?: string;
+  };
+}
+
 // Scene data structure matching your GameWorld
 export interface SceneData {
   id: string;
   name: string;
   entities: SceneEntity[];
-  
-  // World configuration
   world: {
     gravity: { x: number; y: number; z: number };
     physics: {
@@ -285,15 +156,8 @@ export interface SceneData {
       pixelRatio?: number;
     };
   };
-  
-  // Active references
   activeCamera?: string;
-  activeLighting?: string;
-  
-  // Assets used in this scene
   assets: AssetReference[];
-  
-  // Editor-specific data
   editor: {
     showGrid: boolean;
     gridSize: number;
@@ -301,97 +165,85 @@ export interface SceneData {
     showWireframe: boolean;
     debugPhysics: boolean;
   };
-  
   metadata: {
-    created: Date;
-    modified: Date;
+    created: Date | number;
+    modified: Date | number;
     version: string;
   };
 }
 
-// Project structure
-export interface ProjectData {
-  config: ProjectConfig;
-  scenes: Record<string, string>; // sceneName -> filePath
-  assets: AssetReference[];
-  scripts: string[];
-  dependencies: Record<string, string>;
-  metadata: {
-    created: Date;
-    modified: Date;
-    lastOpened?: Date;
-  };
-}
+// Type aliases for compatibility
+export type GameScene = SceneData;
+export type GameObject = SceneEntity;
 
-// Editor-specific configuration
-export interface EditorConfig {
-  theme: "light" | "dark" | "system";
-  viewport: {
-    showGrid: boolean;
-    gridSize: number;
-    showGizmos: boolean;
-    cameraSpeed: number;
-    background: string;
-  };
-  shortcuts: Record<string, string>;
-  panels: {
-    sceneTree: { visible: boolean; width: number };
-    inspector: { visible: boolean; width: number };
-    assets: { visible: boolean; height: number };
-  };
-  autoSave: {
-    enabled: boolean;
-    interval: number; // seconds
-  };
-}
-
-// Full project structure (what gets saved to disk)
-export interface GameProject {
+// Material System Types from Guide
+export interface MaterialLibrary {
+  id: string;
   name: string;
-  path: string;
-  data: ProjectData;
-  editorConfig: EditorConfig;
-  
-  // Runtime data
-  lastModified: Date;
-  isRunning?: boolean;
-  
-  // Legacy compatibility
-  scenes: string[];
-  currentScene?: string;
-  packageJson?: any;
+  version: string;
+  description?: string;
+  materials: MaterialDefinition[];
+  sharedShaderGraphs: TSLShaderGraph[];
+  sharedTextures: TextureReference[];
   metadata: {
-    created: Date;
-    version: string;
+    created: Date | number;
+    modified: Date | number;
+    author?: string;
+    tags?: string[];
+  };
+}
+
+export interface MaterialDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  type: "basic" | "standard" | "physical" | "lambert" | "phong" | "toon" | "shader";
+  properties: Record<string, any>;
+  shaderGraph?: string;
+  metadata: {
+    category: string;
+    tags: string[];
+    preview?: string;
+  };
+}
+
+export interface TSLShaderGraph {
+  id: string;
+  name: string;
+  version: string;
+  nodes: any[];
+  connections: any[];
+  inputs: any[];
+  outputs: any[];
+  metadata: {
     description?: string;
     author?: string;
+    created: Date | number;
+    modified: Date | number;
   };
 }
 
-// Project creation options
-export interface CreateProjectOptions {
-  name: string;
-  path?: string;
-  template?: "empty" | "basic" | "platformer" | "fps";
-  description?: string;
-  author?: string;
+export interface TextureReference {
+  id: string;
+  assetId: string;
+  type: string;
+  wrapS?: "repeat" | "clampToEdge" | "mirroredRepeat";
+  wrapT?: "repeat" | "clampToEdge" | "mirroredRepeat";
+  repeat?: Vector2;
+  offset?: Vector2;
+  rotation?: number;
+  anisotropy?: number;
+  flipY?: boolean;
+  generateMipmaps?: boolean;
+  premultiplyAlpha?: boolean;
+  unpackAlignment?: number;
+  colorSpace?: 'sRGB' | 'Linear';
 }
 
-// Project loading result
-export interface LoadProjectResult {
-  project: GameProject;
-  scenes: Map<string, SceneData>;
-  errors?: string[];
+export interface EnhancedAssetReference extends AssetReference {
+  url?: string;
+  dataUrl?: string;
+  blob?: Blob;
+  buffer?: ArrayBuffer;
+  textureProperties?: TextureReference;
 }
-
-// Template system
-export type ProjectTemplate = "empty" | "basic" | "platformer" | "fps";
-
-export interface TemplateConfig {
-  id: ProjectTemplate;
-  name: string;
-  description: string;
-  icon: string;
-  entities: Partial<SceneEntity>[];
-  worldConfig: Partial<SceneData["world"]>;
-} 

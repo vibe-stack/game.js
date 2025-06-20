@@ -1,17 +1,19 @@
 import * as THREE from "three/webgpu";
 import { Heightfield, HeightfieldConfig } from "./heightfield";
+import { EntityConfig } from "../types";
+import { EntityData } from "../scene-loader";
 
 export interface CustomHeightfieldConfig extends HeightfieldConfig {
   // Initial custom height data
   customHeights?: number[][];
-  
+
   // Enable vertex manipulation
   enableVertexManipulation?: boolean;
-  
+
   // Constraints for editing
   minHeight?: number;
   maxHeight?: number;
-  
+
   // Interpolation settings for smooth editing
   smoothRadius?: number; // How many neighboring vertices to affect
   smoothFalloff?: "linear" | "quadratic" | "cubic"; // Falloff curve
@@ -37,7 +39,7 @@ export class CustomHeightfield extends Heightfield {
   public readonly heightConstraints: { min: number; max: number };
   public readonly smoothRadius: number;
   public readonly smoothFalloff: string;
-  
+
   private editHistory: HeightfieldEdit[] = [];
   private maxHistorySize = 100;
   private originalHeights: number[][] = [];
@@ -49,7 +51,8 @@ export class CustomHeightfield extends Heightfield {
       const columns = config.customHeights[0]?.length || 1;
       config.rows = config.rows ?? rows;
       config.columns = config.columns ?? columns;
-      config.algorithm = "custom";
+      // Extend the algorithm type to include "custom"
+      (config as any).algorithm = "custom";
     }
 
     super(config);
@@ -89,11 +92,11 @@ export class CustomHeightfield extends Heightfield {
 
     (this as any).heights = heights.map(row => [...row]);
     this.applyDisplacement();
-    
+
     if (this.needsPhysicsUpdate) {
       this.updatePhysics();
     }
-    
+
     return this;
   }
 
@@ -110,7 +113,7 @@ export class CustomHeightfield extends Heightfield {
     }
 
     const clampedHeight = Math.max(this.heightConstraints.min, Math.min(this.heightConstraints.max, height));
-    
+
     const edit: HeightfieldEdit = {
       row,
       column,
@@ -126,11 +129,11 @@ export class CustomHeightfield extends Heightfield {
 
     this.addToHistory(edit);
     this.applyDisplacement();
-    
+
     if (this.needsPhysicsUpdate) {
       this.updatePhysics();
     }
-    
+
     return this;
   }
 
@@ -142,7 +145,7 @@ export class CustomHeightfield extends Heightfield {
     }
 
     const { startRow, endRow, startColumn, endColumn } = region;
-    
+
     for (let row = Math.max(0, startRow); row <= Math.min(this.dimensions.rows - 1, endRow); row++) {
       for (let col = Math.max(0, startColumn); col <= Math.min(this.dimensions.columns - 1, endColumn); col++) {
         const newHeight = typeof height === 'function' ? height(row, col) : height;
@@ -152,11 +155,11 @@ export class CustomHeightfield extends Heightfield {
     }
 
     this.applyDisplacement();
-    
+
     if (this.needsPhysicsUpdate) {
       this.updatePhysics();
     }
-    
+
     return this;
   }
 
@@ -230,7 +233,7 @@ export class CustomHeightfield extends Heightfield {
     for (let row = Math.max(0, centerRow - radius); row <= Math.min(this.dimensions.rows - 1, centerRow + radius); row++) {
       for (let col = Math.max(0, centerColumn - radius); col <= Math.min(this.dimensions.columns - 1, centerColumn + radius); col++) {
         const distance = Math.sqrt((row - centerRow) ** 2 + (col - centerColumn) ** 2);
-        
+
         if (distance <= radius) {
           const currentHeight = (this as any).heights[row][col];
           const newHeight = heightModifier(currentHeight);
@@ -241,11 +244,11 @@ export class CustomHeightfield extends Heightfield {
     }
 
     this.applyDisplacement();
-    
+
     if (this.needsPhysicsUpdate) {
       this.updatePhysics();
     }
-    
+
     return this;
   }
 
@@ -271,11 +274,11 @@ export class CustomHeightfield extends Heightfield {
     }
 
     this.applyDisplacement();
-    
+
     if (this.needsPhysicsUpdate) {
       this.updatePhysics();
     }
-    
+
     return this;
   }
 
@@ -288,7 +291,7 @@ export class CustomHeightfield extends Heightfield {
 
     for (let iter = 0; iter < iterations; iter++) {
       const newHeights = this.getHeights();
-      
+
       for (let row = Math.max(1, region.startRow); row <= Math.min(this.dimensions.rows - 2, region.endRow); row++) {
         for (let col = Math.max(1, region.startColumn); col <= Math.min(this.dimensions.columns - 2, region.endColumn); col++) {
           // Average with neighbors
@@ -298,28 +301,28 @@ export class CustomHeightfield extends Heightfield {
             (this as any).heights[row][col - 1],
             (this as any).heights[row][col + 1]
           ];
-          
+
           const average = neighbors.reduce((sum, h) => sum + h, 0) / neighbors.length;
           newHeights[row][col] = average;
         }
       }
-      
+
       (this as any).heights = newHeights;
     }
 
     this.applyDisplacement();
-    
+
     if (this.needsPhysicsUpdate) {
       this.updatePhysics();
     }
-    
+
     return this;
   }
 
   // History management
   private addToHistory(edit: HeightfieldEdit): void {
     this.editHistory.push({ ...edit });
-    
+
     if (this.editHistory.length > this.maxHistorySize) {
       this.editHistory.shift();
     }
@@ -353,7 +356,7 @@ export class CustomHeightfield extends Heightfield {
     }
 
     const { startRow, endRow, startColumn, endColumn } = region;
-    
+
     for (let row = Math.max(0, startRow); row <= Math.min(this.dimensions.rows - 1, endRow); row++) {
       for (let col = Math.max(0, startColumn); col <= Math.min(this.dimensions.columns - 1, endColumn); col++) {
         (this as any).heights[row][col] = this.originalHeights[row][col];
@@ -361,11 +364,11 @@ export class CustomHeightfield extends Heightfield {
     }
 
     this.applyDisplacement();
-    
+
     if (this.needsPhysicsUpdate) {
       this.updatePhysics();
     }
-    
+
     return this;
   }
 
@@ -382,25 +385,17 @@ export class CustomHeightfield extends Heightfield {
   }
 
   // Serialization support
-  serialize(): any {
+  serialize(): EntityData {
     return {
-      type: "CustomHeightfield",
-      dimensions: this.dimensions,
-      elevationRange: this.elevationRange,
-      heights: this.getHeights(),
-      algorithm: this.algorithm,
-      seed: this.seed,
-      noiseSettings: this.noiseSettings,
-      displacementScale: this.displacementScale,
-      smoothing: this.smoothing,
-      uvScale: this.uvScale,
-      enableVertexManipulation: this.enableVertexManipulation,
-      heightConstraints: this.heightConstraints,
-      smoothRadius: this.smoothRadius,
-      smoothFalloff: this.smoothFalloff,
-      position: this.position.toArray(),
-      rotation: this.rotation.toArray(),
-      scale: this.scale.toArray()
+      id: this.entityId, name: this.entityName, type: "custom-heightfield",
+      transform: {
+        position: { x: this.position.x, y: this.position.y, z: this.position.z },
+        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
+        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
+      },
+      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
+      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      geometry: { type: "CustomHeightfield", parameters: { width: this.dimensions.width, depth: this.dimensions.depth, rows: this.dimensions.rows, columns: this.dimensions.columns, minElevation: this.elevationRange.min, maxElevation: this.elevationRange.max, customHeights: this.getHeights(), algorithm: this.algorithm, seed: this.seed, frequency: this.noiseSettings.frequency, amplitude: this.noiseSettings.amplitude, octaves: this.noiseSettings.octaves, persistence: this.noiseSettings.persistence, lacunarity: this.noiseSettings.lacunarity, displacementScale: this.displacementScale, smoothing: this.smoothing, uvScale: this.uvScale, enableVertexManipulation: this.enableVertexManipulation, heightConstraints: this.heightConstraints, smoothRadius: this.smoothRadius, smoothFalloff: this.smoothFalloff } }
     };
   }
 
@@ -474,7 +469,7 @@ export class CustomHeightfield extends Heightfield {
         const r = data[pixelIndex];
         const g = data[pixelIndex + 1];
         const b = data[pixelIndex + 2];
-        
+
         // Convert RGB to grayscale height value (0-1)
         const grayscale = (r + g + b) / (3 * 255);
         row.push(grayscale);

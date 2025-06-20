@@ -10,7 +10,9 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: ["esbuild", "esbuild-wasm", "chokidar"],
+      // Add 'chokidar' and other Node.js specific modules to external
+      // This prevents Vite from trying to bundle them for the browser environment.
+      external: ["esbuild", "esbuild-wasm", "chokidar", "electron", "fs", "path", "os", "child_process"],
     },
   },
 });

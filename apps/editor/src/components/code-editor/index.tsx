@@ -5,7 +5,7 @@ import * as monaco from "monaco-editor";
 import { X, Save, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import useEditorStore from "@/stores/editor-store";
+import useGameStudioStore from "@/stores/game-studio-store";
 import { configureMonaco } from "./monaco-config";
 
 // Configure Monaco to load locally instead of from CDN
@@ -26,7 +26,7 @@ interface CodeEditorProps {
 }
 
 export default function CodeEditor({ isOpen, onClose, initialFile }: CodeEditorProps) {
-  const { currentProject } = useEditorStore();
+  const { currentProject } = useGameStudioStore();
   const [openFiles, setOpenFiles] = useState<CodeFile[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [position, setPosition] = useState({ x: 100, y: 100 });

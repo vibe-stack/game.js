@@ -1,273 +1,118 @@
 import { ipcMain } from "electron";
 import { ProjectManager } from "./project-manager";
-import { SceneManager } from "./scene-manager";
 import { AssetManager } from "./asset-manager";
 import { FileSystemManager } from "./file-system-manager";
+import type { GameProject, AssetReference } from "../types/project";
 
 export class ProjectService {
-  private projectManager: ProjectManager;
-  private sceneManager: SceneManager;
-  private assetManager: AssetManager;
-  private fileSystemManager: FileSystemManager;
+  private constructor() {} // Prevent instantiation
 
-  constructor() {
-    this.projectManager = new ProjectManager();
-    this.sceneManager = new SceneManager(this.projectManager);
-    this.assetManager = new AssetManager();
-    this.fileSystemManager = new FileSystemManager();
+  // Project Management
+  static async loadProjects(): Promise<GameProject[]> {
+    return ProjectManager.loadProjects();
   }
 
-  // Project Management - delegate to ProjectManager
-  async loadProjects(): Promise<GameProject[]> {
-    return this.projectManager.loadProjects();
+  static async createProject(projectName: string, customPath?: string, template: string = "empty", description?: string, author?: string): Promise<GameProject> {
+    return ProjectManager.createProject(projectName, customPath, template, description, author);
   }
 
-  async createProject(
-    projectName: string,
-    customPath?: string,
-    template: string = "empty",
-    description?: string,
-    author?: string,
-  ): Promise<GameProject> {
-    // The ProjectManager now handles scene creation internally
-    return this.projectManager.createProject(projectName, customPath, template, description, author);
+  static async selectProjectDirectory(): Promise<string | undefined> {
+    return ProjectManager.selectProjectDirectory();
   }
 
-  async selectProjectDirectory(): Promise<string | undefined> {
-    return this.projectManager.selectProjectDirectory();
+  static async openProject(projectPath: string): Promise<GameProject> {
+    return ProjectManager.openProject(projectPath);
   }
 
-  async openProject(projectPath: string): Promise<GameProject> {
-    return this.projectManager.openProject(projectPath);
+  static async saveProject(project: GameProject): Promise<void> {
+    return ProjectManager.saveProject(project);
   }
 
-  async saveProject(project: GameProject): Promise<void> {
-    return this.projectManager.saveProject(project);
+  static async openProjectFolder(projectPath: string): Promise<void> {
+    return ProjectManager.openProjectFolder(projectPath);
   }
 
-  async openProjectFolder(projectPath: string): Promise<void> {
-    return this.projectManager.openProjectFolder(projectPath);
+  static async deleteProject(projectPath: string): Promise<void> {
+    return ProjectManager.deleteProject(projectPath);
   }
 
-  async deleteProject(projectPath: string): Promise<void> {
-    return this.projectManager.deleteProject(projectPath);
+  // Asset Management
+  static async selectAssetFiles(): Promise<string[]> {
+    return AssetManager.selectAssetFiles();
   }
 
-  // Scene Management - delegate to SceneManager
-  async loadScene(projectPath: string, sceneName: string): Promise<GameScene> {
-    return this.sceneManager.loadScene(projectPath, sceneName);
+  static async importAssetFromData(projectPath: string, fileName: string, fileData: Buffer): Promise<AssetReference> {
+    return AssetManager.importAssetFromData(projectPath, fileName, fileData);
   }
 
-  async saveScene(projectPath: string, scene: GameScene): Promise<void> {
-    return this.sceneManager.saveScene(projectPath, scene);
+  static async importAsset(projectPath: string, assetPath: string): Promise<AssetReference> {
+    return AssetManager.importAsset(projectPath, assetPath);
   }
 
-  async createScene(
-    projectPath: string,
-    sceneName: string,
-  ): Promise<GameScene> {
-    return this.sceneManager.createScene(projectPath, sceneName);
+  static async deleteAsset(projectPath: string, assetId: string): Promise<void> {
+    return AssetManager.deleteAsset(projectPath, assetId);
   }
 
-  async listScenes(projectPath: string): Promise<string[]> {
-    return this.sceneManager.listScenes(projectPath);
+  static async getAssets(projectPath: string): Promise<AssetReference[]> {
+    return AssetManager.getAssets(projectPath);
   }
 
-  // Asset Management - delegate to AssetManager
-  async selectAssetFiles(): Promise<string[]> {
-    return this.assetManager.selectAssetFiles();
+  static async getAssetDataUrl(projectPath: string, assetPath: string): Promise<string | null> {
+    return AssetManager.getAssetDataUrl(projectPath, assetPath);
   }
 
-  async importAssetFromData(
-    projectPath: string,
-    fileName: string,
-    fileData: Buffer,
-  ): Promise<AssetReference> {
-    return this.assetManager.importAssetFromData(projectPath, fileName, fileData);
+  static async getAssetUrl(projectPath: string, assetPath: string): Promise<string | null> {
+    return AssetManager.getAssetUrl(projectPath, assetPath);
   }
 
-  async importAsset(
-    projectPath: string,
-    assetPath: string,
-  ): Promise<AssetReference> {
-    return this.assetManager.importAsset(projectPath, assetPath);
+  static async getAssetServerPort(projectPath: string): Promise<number> {
+    return AssetManager.getAssetServerPort(projectPath);
   }
 
-  async deleteAsset(projectPath: string, assetId: string): Promise<void> {
-    return this.assetManager.deleteAsset(projectPath, assetId);
-  }
+  // File System Operations
+  static async readFile(filePath: string): Promise<string> { return FileSystemManager.readFile(filePath); }
+  static async writeFile(filePath: string, content: string): Promise<void> { return FileSystemManager.writeFile(filePath, content); }
+  static async fileExists(filePath: string): Promise<boolean> { return FileSystemManager.fileExists(filePath); }
+  static async listDirectory(dirPath: string): Promise<import('./file-system-manager').FileSystemItem[]> { return FileSystemManager.listDirectory(dirPath); }
+  static async getFileStats(filePath: string): Promise<{ size: number; modified: Date }> { return FileSystemManager.getFileStats(filePath); }
+  static async createFile(filePath: string, content: string = ""): Promise<void> { return FileSystemManager.createFile(filePath, content); }
+  static async createDirectory(dirPath: string): Promise<void> { return FileSystemManager.createDirectory(dirPath); }
+  static async deleteFile(filePath: string): Promise<void> { return FileSystemManager.deleteFile(filePath); }
+  static async deleteDirectory(dirPath: string): Promise<void> { return FileSystemManager.deleteDirectory(dirPath); }
+  static async renameItem(oldPath: string, newPath: string): Promise<void> { return FileSystemManager.renameItem(oldPath, newPath); }
 
-  async getAssets(projectPath: string): Promise<AssetReference[]> {
-    return this.assetManager.getAssets(projectPath);
-  }
-
-  async getAssetDataUrl(
-    projectPath: string,
-    assetPath: string,
-  ): Promise<string | null> {
-    return this.assetManager.getAssetDataUrl(projectPath, assetPath);
-  }
-
-  async getAssetUrl(
-    projectPath: string,
-    assetPath: string,
-  ): Promise<string | null> {
-    return this.assetManager.getAssetUrl(projectPath, assetPath);
-  }
-
-  async getAssetServerPort(projectPath: string): Promise<number> {
-    return this.assetManager.getAssetServerPort(projectPath);
-  }
-
-  // File System Operations - delegate to FileSystemManager
-  async readFile(filePath: string): Promise<string> {
-    return this.fileSystemManager.readFile(filePath);
-  }
-
-  async writeFile(filePath: string, content: string): Promise<void> {
-    return this.fileSystemManager.writeFile(filePath, content);
-  }
-
-  async fileExists(filePath: string): Promise<boolean> {
-    return this.fileSystemManager.fileExists(filePath);
-  }
-
-  async listDirectory(dirPath: string): Promise<import('./file-system-manager').FileSystemItem[]> {
-    return this.fileSystemManager.listDirectory(dirPath);
-  }
-
-  async getFileStats(filePath: string): Promise<{ size: number; modified: Date }> {
-    return this.fileSystemManager.getFileStats(filePath);
-  }
-
-  async createFile(filePath: string, content: string = ""): Promise<void> {
-    return this.fileSystemManager.createFile(filePath, content);
-  }
-
-  async createDirectory(dirPath: string): Promise<void> {
-    return this.fileSystemManager.createDirectory(dirPath);
-  }
-
-  async deleteFile(filePath: string): Promise<void> {
-    return this.fileSystemManager.deleteFile(filePath);
-  }
-
-  async deleteDirectory(dirPath: string): Promise<void> {
-    return this.fileSystemManager.deleteDirectory(dirPath);
-  }
-
-  async renameItem(oldPath: string, newPath: string): Promise<void> {
-    return this.fileSystemManager.renameItem(oldPath, newPath);
-  }
-
-  // IPC Registration - unchanged
-  registerIpcHandlers() {
-    ipcMain.handle("project:load-projects", () => this.loadProjects());
-    ipcMain.handle(
-      "project:create-project",
-      (_, projectName: string, projectPath?: string, template?: string, description?: string, author?: string) =>
-        this.createProject(projectName, projectPath, template, description, author),
-    );
-    ipcMain.handle("project:select-directory", () =>
-      this.selectProjectDirectory(),
-    );
-    ipcMain.handle("project:open-project", (_, projectPath: string) =>
-      this.openProject(projectPath),
-    );
-    ipcMain.handle("project:save-project", (_, project: GameProject) =>
-      this.saveProject(project),
-    );
-    ipcMain.handle("project:open-folder", (_, projectPath: string) =>
-      this.openProjectFolder(projectPath),
-    );
-    ipcMain.handle("project:delete-project", (_, projectPath: string) =>
-      this.deleteProject(projectPath),
-    );
-    ipcMain.handle(
-      "project:load-scene",
-      (_, projectPath: string, sceneName: string) =>
-        this.loadScene(projectPath, sceneName),
-    );
-    ipcMain.handle(
-      "project:save-scene",
-      (_, projectPath: string, scene: GameScene) =>
-        this.saveScene(projectPath, scene),
-    );
-    ipcMain.handle(
-      "project:create-scene",
-      (_, projectPath: string, sceneName: string) =>
-        this.createScene(projectPath, sceneName),
-    );
-    ipcMain.handle("project:list-scenes", (_, projectPath: string) =>
-      this.listScenes(projectPath),
-    );
-
-    // Asset Management
-    ipcMain.handle("project:select-asset-files", () => this.selectAssetFiles());
-    ipcMain.handle(
-      "project:import-asset-from-data",
-      (_, projectPath: string, fileName: string, fileData: Buffer) =>
-        this.importAssetFromData(projectPath, fileName, fileData),
-    );
-    ipcMain.handle(
-      "project:import-asset",
-      (_, projectPath: string, assetPath: string) =>
-        this.importAsset(projectPath, assetPath),
-    );
-    ipcMain.handle(
-      "project:delete-asset",
-      (_, projectPath: string, assetId: string) =>
-        this.deleteAsset(projectPath, assetId),
-    );
-    ipcMain.handle("project:get-assets", (_, projectPath: string) =>
-      this.getAssets(projectPath),
-    );
-    ipcMain.handle(
-      "project:get-asset-data-url",
-      (_, projectPath: string, assetPath: string) =>
-        this.getAssetDataUrl(projectPath, assetPath),
-    );
-    ipcMain.handle(
-      "project:get-asset-url",
-      (_, projectPath: string, assetPath: string) =>
-        this.getAssetUrl(projectPath, assetPath),
-    );
-    ipcMain.handle("project:get-asset-server-port", (_, projectPath: string) =>
-      this.getAssetServerPort(projectPath),
-    );
-
-    // File System Operations
-    ipcMain.handle("project:read-file", (_, filePath: string) =>
-      this.readFile(filePath),
-    );
-    ipcMain.handle(
-      "project:write-file",
-      (_, filePath: string, content: string) =>
-        this.writeFile(filePath, content),
-    );
-    ipcMain.handle("project:file-exists", (_, filePath: string) =>
-      this.fileExists(filePath),
-    );
-    ipcMain.handle("project:list-directory", (_, dirPath: string) =>
-      this.listDirectory(dirPath),
-    );
-    ipcMain.handle("project:get-file-stats", (_, filePath: string) =>
-      this.getFileStats(filePath),
-    );
-    ipcMain.handle("project:create-file", (_, filePath: string, content: string) =>
-      this.createFile(filePath, content),
-    );
-    ipcMain.handle("project:create-directory", (_, dirPath: string) =>
-      this.createDirectory(dirPath),
-    );
-    ipcMain.handle("project:delete-file", (_, filePath: string) =>
-      this.deleteFile(filePath),
-    );
-    ipcMain.handle("project:delete-directory", (_, dirPath: string) =>
-      this.deleteDirectory(dirPath),
-    );
-    ipcMain.handle("project:rename-item", (_, oldPath: string, newPath: string) =>
-      this.renameItem(oldPath, newPath),
-    );
+  static registerIpcHandlers() {
+    console.log("Registering project IPC handlers...");
+    
+    // Project
+    ipcMain.handle("project:load-projects", () => ProjectService.loadProjects());
+    ipcMain.handle("project:create-project", (_, ...args: [string, string?, string?, string?, string?]) => ProjectService.createProject(...args));
+    ipcMain.handle("project:select-directory", () => ProjectService.selectProjectDirectory());
+    ipcMain.handle("project:open-project", (_, ...args: [string]) => ProjectService.openProject(...args));
+    ipcMain.handle("project:save-project", (_, ...args: [GameProject]) => ProjectService.saveProject(...args));
+    ipcMain.handle("project:open-folder", (_, ...args: [string]) => ProjectService.openProjectFolder(...args));
+    ipcMain.handle("project:delete-project", (_, ...args: [string]) => ProjectService.deleteProject(...args));
+    // Assets
+    ipcMain.handle("project:select-asset-files", () => ProjectService.selectAssetFiles());
+    ipcMain.handle("project:import-asset-from-data", (_, ...args: [string, string, Buffer]) => ProjectService.importAssetFromData(...args));
+    ipcMain.handle("project:import-asset", (_, ...args: [string, string]) => ProjectService.importAsset(...args));
+    ipcMain.handle("project:delete-asset", (_, ...args: [string, string]) => ProjectService.deleteAsset(...args));
+    ipcMain.handle("project:get-assets", (_, ...args: [string]) => ProjectService.getAssets(...args));
+    ipcMain.handle("project:get-asset-data-url", (_, ...args: [string, string]) => ProjectService.getAssetDataUrl(...args));
+    ipcMain.handle("project:get-asset-url", (_, ...args: [string, string]) => ProjectService.getAssetUrl(...args));
+    ipcMain.handle("project:get-asset-server-port", (_, ...args: [string]) => ProjectService.getAssetServerPort(...args));
+    // Filesystem
+    ipcMain.handle("project:read-file", (_, ...args: [string]) => ProjectService.readFile(...args));
+    ipcMain.handle("project:write-file", (_, ...args: [string, string]) => ProjectService.writeFile(...args));
+    ipcMain.handle("project:file-exists", (_, ...args: [string]) => ProjectService.fileExists(...args));
+    ipcMain.handle("project:list-directory", (_, ...args: [string]) => ProjectService.listDirectory(...args));
+    ipcMain.handle("project:get-file-stats", (_, ...args: [string]) => ProjectService.getFileStats(...args));
+    ipcMain.handle("project:create-file", (_, ...args: [string, string]) => ProjectService.createFile(...args));
+    ipcMain.handle("project:create-directory", (_, ...args: [string]) => ProjectService.createDirectory(...args));
+    ipcMain.handle("project:delete-file", (_, ...args: [string]) => ProjectService.deleteFile(...args));
+    ipcMain.handle("project:delete-directory", (_, ...args: [string]) => ProjectService.deleteDirectory(...args));
+    ipcMain.handle("project:rename-item", (_, ...args: [string, string]) => ProjectService.renameItem(...args));
+    
+    console.log("Project IPC handlers registered successfully");
   }
 }

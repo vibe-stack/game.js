@@ -13,7 +13,7 @@ export class GameWorldService {
   }
 
   async initialize(canvas: HTMLCanvasElement): Promise<void> {
-    const { setGameWorld, setInitialized, setError, setGameState } = useGameStudioStore.getState();
+    const { setInitialized, setError, setGameState } = useGameStudioStore.getState();
 
     try {
       this.gameWorld = new GameWorld({
@@ -24,9 +24,10 @@ export class GameWorldService {
       });
 
       await this.gameWorld.initialize();
-      setGameWorld(this.gameWorld);
+      // The gameWorld instance itself is not stored in zustand to avoid serialization issues.
+      // We manage its lifecycle here and interact with it.
       setInitialized(true);
-      setGameState("initial"); // Ensure game starts in initial/stopped state
+      setGameState("initial");
       setError(null);
     } catch (error) {
       console.error("Failed to initialize game world:", error);
@@ -36,26 +37,15 @@ export class GameWorldService {
   }
 
   async loadScene(sceneData: any): Promise<void> {
-    if (!this.gameWorld) {
-      throw new Error("Game world not initialized");
-    }
-
+    if (!this.gameWorld) throw new Error("Game world not initialized");
     const { setCurrentScene, setGameState } = useGameStudioStore.getState();
 
     try {
-      console.log("Loading scene:", sceneData.name);
-      console.log("Scene data entities:", sceneData.entities?.map((e: any) => ({ name: e.name, type: e.type })));
-      
       if (SceneLoader.validateSceneData(sceneData)) {
-        // Stop the game world before loading new scene to prevent duplication
-        if (this.gameWorld.isRunningState()) {
-          this.gameWorld.stop();
-        }
-        
         await this.sceneLoader.loadScene(this.gameWorld, sceneData);
-        this.currentSceneData = sceneData;
-        setCurrentScene(sceneData as any);
-        setGameState("initial"); // Ensure game remains in initial state after loading
+        this.currentSceneData = sceneData; // Keep a copy for reset
+        setCurrentScene(sceneData);
+        setGameState("initial");
       } else {
         throw new Error("Invalid scene data format");
       }
@@ -66,91 +56,54 @@ export class GameWorldService {
   }
 
   async loadDefaultScene(): Promise<void> {
-    if (!this.gameWorld) {
-      throw new Error("Game world not initialized");
-    }
-
-    try {
-      const defaultSceneData = SceneLoader.getDefaultSceneData();
-      await this.loadScene(defaultSceneData);
-    } catch (error) {
-      console.error("Failed to load default scene:", error);
-      throw error;
-    }
+    if (!this.gameWorld) throw new Error("Game world not initialized");
+    const defaultSceneData = SceneLoader.getDefaultSceneData();
+    await this.loadScene(defaultSceneData);
   }
 
   async saveScene(): Promise<void> {
-    if (!this.gameWorld) {
-      throw new Error("Game world not initialized");
-    }
+    if (!this.gameWorld) throw new Error("Game world not initialized");
+    const { currentScene } = useGameStudioStore.getState();
+    if (!currentScene) throw new Error("No scene loaded");
 
-    const { currentProject, currentScene } = useGameStudioStore.getState();
-
-    if (!currentProject || !currentScene) {
-      throw new Error("No project or scene loaded");
-    }
-
-    try {
-      const sceneData = await this.sceneSerializer.serializeScene(
-        this.gameWorld,
-        currentScene.name || "Untitled Scene"
-      );
-
-      // TODO: Implement actual scene saving when project API is available
-      console.log("Saving scene:", sceneData);
-    } catch (error) {
-      console.error("Failed to save scene:", error);
-      throw error;
-    }
+    const sceneData = await this.sceneSerializer.serializeScene(this.gameWorld, currentScene.name || "Untitled Scene");
+    // TODO: Use projectAPI to write this to a file
+    console.log("Saving scene (data):", sceneData);
   }
 
-  start(): void {
+  play(): void {
     if (this.gameWorld) {
       this.gameWorld.start();
-    }
-  }
-
-  stop(): void {
-    if (this.gameWorld) {
-      this.gameWorld.stop();
+      useGameStudioStore.getState().setGameState('playing');
     }
   }
 
   pause(): void {
     if (this.gameWorld) {
       this.gameWorld.pause();
+      useGameStudioStore.getState().setGameState('paused');
     }
   }
 
   resume(): void {
     if (this.gameWorld) {
       this.gameWorld.resume();
+      useGameStudioStore.getState().setGameState('playing');
     }
   }
 
   reset(): void {
     if (this.gameWorld) {
-      // Stop the simulation first
-      this.gameWorld.stop();
-      
-      // Optionally reload the current scene to ensure clean state
-      if (this.currentSceneData) {
-        try {
-          this.sceneLoader.loadScene(this.gameWorld, this.currentSceneData);
-          console.log("Scene reloaded for reset");
-        } catch (error) {
-          console.error("Failed to reload scene during reset:", error);
-        }
-      }
+      this.gameWorld.reset();
+      useGameStudioStore.getState().setGameState('initial');
     }
   }
-
-  isRunning(): boolean {
-    return this.gameWorld ? this.gameWorld.isRunningState() : false;
-  }
-
-  isPaused(): boolean {
-    return this.gameWorld ? this.gameWorld.isPausedState() : false;
+  
+  stop(): void {
+    if (this.gameWorld) {
+      this.gameWorld.stop();
+      useGameStudioStore.getState().setGameState('initial');
+    }
   }
 
   dispose(): void {
@@ -163,4 +116,4 @@ export class GameWorldService {
   getGameWorld(): GameWorld | null {
     return this.gameWorld;
   }
-} 
+}

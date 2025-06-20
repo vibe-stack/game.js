@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import useGameStudioStore from "@/stores/game-studio-store";
+import { GameScene } from "@/types/project";
 
 interface ProjectInfoToolbarProps {
   projectName?: string;
@@ -38,7 +39,7 @@ export default function ProjectInfoToolbar({
     try {
       // TODO: Implement scene listing when project API is available in game studio
       console.log("Loading available scenes - placeholder");
-      const mockScenes = ["main-scene", "demo-scene"];
+      const mockScenes = ["main-scene"];
       setAvailableScenes(mockScenes);
     } catch (error) {
       console.error('Failed to load scenes:', error);

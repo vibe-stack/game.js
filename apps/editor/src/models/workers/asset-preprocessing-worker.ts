@@ -47,7 +47,7 @@ class AssetPreprocessingWorker {
   private initializeCanvas(): void {
     try {
       this.canvas = new OffscreenCanvas(1, 1);
-      this.ctx = this.canvas.getContext('2d');
+      this.ctx = this.canvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
     } catch (error) {
       console.warn('OffscreenCanvas not available in this worker');
     }

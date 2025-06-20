@@ -1,6 +1,9 @@
 import { GameWorld } from "../game-world";
-import { Entity } from "../entity";
+import { SceneData as ProjectSceneData } from "../../types/project";
 import * as THREE from "three/webgpu";
+
+// Re-export the main SceneData type for clarity
+export type SceneData = ProjectSceneData;
 
 export interface LoaderContext {
   gameWorld: GameWorld;
@@ -9,30 +12,16 @@ export interface LoaderContext {
   textures: Map<string, THREE.Texture>;
 }
 
-export interface SceneData {
-  version: string;
-  name: string;
-  metadata: {
-    created: number;
-    lastModified: number;
-    author?: string;
-    description?: string;
-  };
-  cameras: CameraData[];
-  lighting: LightingData;
-  physics: PhysicsData;
-  entities: EntityData[];
-  materials: MaterialData[];
-  textures: TextureData[];
-}
-
+// Keep other types for loader-specific data shapes if they differ
 export interface EntityData {
   id: string;
   name: string;
   type: string;
-  position: [number, number, number];
-  rotation: [number, number, number];
-  scale: [number, number, number];
+  transform: {
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number };
+    scale: { x: number; y: number; z: number };
+  }
   visible: boolean;
   castShadow: boolean;
   receiveShadow: boolean;
@@ -56,6 +45,7 @@ export interface EntityData {
     type: string;
     properties: Record<string, any>;
   };
+  properties?: Record<string, any>;
   children?: EntityData[];
 }
 
@@ -86,68 +76,10 @@ export interface CameraData {
 }
 
 export interface LightingData {
-  ambient: {
-    color: number;
-    intensity: number;
-  };
-  directional: Array<{
-    id: string;
-    name: string;
-    color: number;
-    intensity: number;
-    position: [number, number, number];
-    target?: [number, number, number];
-    castShadow: boolean;
-    shadow?: {
-      mapSize: [number, number];
-      camera: {
-        near: number;
-        far: number;
-        left: number;
-        right: number;
-        top: number;
-        bottom: number;
-      };
-    };
-  }>;
-  point: Array<{
-    id: string;
-    name: string;
-    color: number;
-    intensity: number;
-    distance: number;
-    decay: number;
-    position: [number, number, number];
-    castShadow: boolean;
-    shadow?: {
-      mapSize: [number, number];
-      camera: {
-        near: number;
-        far: number;
-      };
-    };
-  }>;
-  spot: Array<{
-    id: string;
-    name: string;
-    color: number;
-    intensity: number;
-    distance: number;
-    angle: number;
-    penumbra: number;
-    decay: number;
-    position: [number, number, number];
-    target: [number, number, number];
-    castShadow: boolean;
-    shadow?: {
-      mapSize: [number, number];
-      camera: {
-        near: number;
-        far: number;
-        fov: number;
-      };
-    };
-  }>;
+  ambient: { color: number; intensity: number; };
+  directional: Array<{ id: string; name: string; color: number; intensity: number; position: [number, number, number]; target?: [number, number, number]; castShadow: boolean; shadow?: any; }>;
+  point: Array<{ id: string; name: string; color: number; intensity: number; distance: number; decay: number; position: [number, number, number]; castShadow: boolean; shadow?: any; }>;
+  spot: Array<{ id: string; name: string; color: number; intensity: number; distance: number; angle: number; penumbra: number; decay: number; position: [number, number, number]; target: [number, number, number]; castShadow: boolean; shadow?: any; }>;
 }
 
 export interface PhysicsData {
@@ -165,17 +97,7 @@ export interface MaterialData {
   name: string;
   type: string;
   properties: Record<string, any>;
-  maps?: {
-    map?: string;
-    normalMap?: string;
-    roughnessMap?: string;
-    metalnessMap?: string;
-    emissiveMap?: string;
-    bumpMap?: string;
-    displacementMap?: string;
-    alphaMap?: string;
-    envMap?: string;
-  };
+  maps?: Record<string, string>;
 }
 
 export interface TextureData {
@@ -192,4 +114,4 @@ export interface TextureData {
   encoding: number;
   flipY: boolean;
   generateMipmaps: boolean;
-} 
+}

@@ -1,6 +1,7 @@
 import * as THREE from "three/webgpu";
 import { Entity } from "../entity";
 import { EntityConfig } from "../types";
+import { EntityData } from "../scene-loader";
 
 export interface ConeConfig extends EntityConfig {
   // Basic dimensions
@@ -197,5 +198,19 @@ export class Cone extends Entity {
       ...config,
       openEnded: true
     });
+  }
+
+  serialize(): EntityData {
+    return {
+      id: this.entityId, name: this.entityName, type: "cone",
+      transform: {
+        position: { x: this.position.x, y: this.position.y, z: this.position.z },
+        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
+        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
+      },
+      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
+      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      geometry: { type: "ConeGeometry", parameters: { radius: this.radius, height: this.height, radialSegments: this.segmentConfig.radial, heightSegments: this.segmentConfig.height, openEnded: this.segmentConfig.openEnded, thetaStart: this.segmentConfig.thetaStart, thetaLength: this.segmentConfig.thetaLength } }
+    };
   }
 } 

@@ -79,7 +79,7 @@ export interface InteractionCallbacks {
   onPointerUp?: (event: any) => void;
 }
 
-export type EntityType = "mesh" | "sphere" | "box" | "mesh3d" | "light" | "camera" | "group" | "primitive";
+export type EntityType = "mesh" | "sphere" | "box" | "mesh3d" | "light" | "camera" | "group" | "primitive" | "entity";
 
 export interface EntityMetadata {
   type: EntityType;

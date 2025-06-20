@@ -5,10 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Save, RotateCcw, AlertTriangle, CheckCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import useEditorStore from "@/stores/editor-store";
+import useGameStudioStore from "@/stores/game-studio-store";
 
 export default function AdvancedPanel() {
-  const { currentProject } = useEditorStore();
+  const { currentProject } = useGameStudioStore();
   const [gameJSConfig, setGameJSConfig] = useState("");
   const [packageJson, setPackageJson] = useState("");
   const [loading, setLoading] = useState(false);
