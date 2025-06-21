@@ -7,6 +7,7 @@ import GameCanvas from "./components/game-canvas";
 import LoadingOverlay from "./components/loading-overlay";
 import ErrorDisplay from "./components/error-display";
 import SceneSidebar from "./components/scene-sidebar";
+import PropertiesSidebar from "./components/properties-sidebar";
 
 export default function GameStudioPage() {
   const navigate = useNavigate();
@@ -27,6 +28,14 @@ export default function GameStudioPage() {
     }
     navigate({ to: "/" });
   };
+
+  useEffect(() => {
+    return () => {
+      if (gameWorldServiceRef.current) {
+        gameWorldServiceRef.current.dispose();
+      }
+    }
+  }, []);
 
   const handleSave = async () => {
     if (!gameWorldServiceRef.current) return;
@@ -62,6 +71,7 @@ export default function GameStudioPage() {
     <div className="relative h-screen overflow-hidden bg-gray-900">
       <LoadingOverlay />
       <SceneSidebar gameWorldService={gameWorldServiceRef} />
+      <PropertiesSidebar gameWorldService={gameWorldServiceRef} />
       <FloatingToolbar
         onHome={handleGoHome}
         onSave={handleSave}

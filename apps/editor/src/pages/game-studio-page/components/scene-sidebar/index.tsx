@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Entity } from "@/models";
 import { GameWorldService } from "../../services/game-world-service";
+import useGameStudioStore from "@/stores/game-studio-store";
 import SceneTree from "./scene-tree";
 import AddEntityMenu from "./add-entity-menu";
 
@@ -15,8 +16,8 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
   const [activeTab, setActiveTab] = useState("scene");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-  const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [sceneEntities, setSceneEntities] = useState<Entity[]>([]);
+  const { selectedEntity, setSelectedEntity } = useGameStudioStore();
 
   // Poll for scene entities periodically and when entities are added
   const updateEntities = React.useCallback(() => {
@@ -26,6 +27,10 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
       if (entitiesRegistry) {
         const entities = entitiesRegistry.getAllItems();
         setSceneEntities(entities);
+        
+        // Refresh entity interactions when entities are updated
+        const selectionManager = gameWorldService.current?.getSelectionManager();
+        selectionManager?.refreshInteractions();
       }
     }
   }, [gameWorldService]);

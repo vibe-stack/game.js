@@ -15,6 +15,9 @@ export abstract class Entity extends THREE.Object3D {
   private interactionCallbacks: InteractionCallbacks = {};
   private destroyed = false;
   private debugRenderEnabled = false;
+  
+  // Event system for React synchronization
+  private changeListeners: Set<() => void> = new Set();
 
   constructor(config: EntityConfig = {}) {
     super();
@@ -33,6 +36,93 @@ export abstract class Entity extends THREE.Object3D {
     if (config.position) this.position.copy(config.position);
     if (config.rotation) this.rotation.copy(config.rotation);
     if (config.scale) this.scale.copy(config.scale);
+  }
+
+  /**
+   * Properties that require geometry rebuilding when changed.
+   * Override this in subclasses to define which properties need rebuilding.
+   */
+  protected getGeometryRebuildProperties(): string[] {
+    return [];
+  }
+
+  /**
+   * Rebuild the geometry of this entity.
+   * Override this in subclasses that have rebuildable geometry.
+   */
+  protected rebuildGeometry(): void {
+    // Default implementation does nothing
+    // Subclasses should override this to handle their specific geometry rebuilding
+  }
+
+  /**
+   * Generic method to update a property that may require geometry rebuilding.
+   * This handles the disposal, recreation, and change notification automatically.
+   */
+  protected updateGeometryProperty<T>(propertyName: string, newValue: T, updateFn: (value: T) => void): boolean {
+    const rebuildProperties = this.getGeometryRebuildProperties();
+    const requiresRebuild = rebuildProperties.includes(propertyName);
+    
+    try {
+      if (requiresRebuild) {
+        // Call the update function (which should modify internal state)
+        updateFn(newValue);
+        
+        // Rebuild geometry
+        this.rebuildGeometry();
+        
+        // Recreate physics collider if it exists
+        if (this.physicsManager && this.rigidBodyId && this.colliderId) {
+          this.physicsManager.removeCollider(this.colliderId);
+          this.createCollider({}); // Recreate with updated geometry
+        }
+      } else {
+        // Just update the property normally
+        updateFn(newValue);
+      }
+      
+      // Emit change for React synchronization
+      this.emitChange();
+      return true;
+    } catch (error) {
+      console.error(`Failed to update property ${propertyName}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Convenience method to update multiple geometry properties at once.
+   * This is more efficient than updating them individually as it only rebuilds once.
+   */
+  protected updateGeometryProperties(updates: Record<string, any>): boolean {
+    const rebuildProperties = this.getGeometryRebuildProperties();
+    const requiresRebuild = Object.keys(updates).some(key => rebuildProperties.includes(key));
+    
+    try {
+      // Apply all updates first
+      Object.entries(updates).forEach(([key, value]) => {
+        // This assumes a direct property assignment, but could be customized
+        (this as any)[key] = value;
+      });
+      
+      if (requiresRebuild) {
+        // Rebuild geometry once after all updates
+        this.rebuildGeometry();
+        
+        // Recreate physics collider if it exists
+        if (this.physicsManager && this.rigidBodyId && this.colliderId) {
+          this.physicsManager.removeCollider(this.colliderId);
+          this.createCollider({}); // Recreate with updated geometry
+        }
+      }
+      
+      // Emit change for React synchronization
+      this.emitChange();
+      return true;
+    } catch (error) {
+      console.error(`Failed to update properties:`, error);
+      return false;
+    }
   }
 
   abstract serialize(): EntityData;
@@ -77,17 +167,20 @@ export abstract class Entity extends THREE.Object3D {
   setPosition(x: number, y: number, z: number): this {
     this.position.set(x, y, z);
     this.updatePhysicsTransform();
+    this.emitChange();
     return this;
   }
 
   setRotation(x: number, y: number, z: number): this {
     this.rotation.set(x, y, z);
     this.updatePhysicsTransform();
+    this.emitChange();
     return this;
   }
 
   setScale(x: number, y: number = x, z: number = x): this {
     this.scale.set(x, y, z);
+    this.emitChange();
     return this;
   }
 
@@ -105,7 +198,30 @@ export abstract class Entity extends THREE.Object3D {
     const rigidBody = this.physicsManager.getRigidBody(this.rigidBodyId);
     if (rigidBody?.isDynamic()) {
       this.physicsManager.syncTransform(this.rigidBodyId, this);
+      this.emitChange();
     }
+  }
+
+  // Event system methods for React synchronization
+  private emitChange(): void {
+    this.changeListeners.forEach(listener => listener());
+  }
+
+  public addChangeListener(listener: () => void): void {
+    this.changeListeners.add(listener);
+  }
+
+  public removeChangeListener(listener: () => void): void {
+    this.changeListeners.delete(listener);
+  }
+
+  // Method to set visibility with change emission
+  public setVisible(value: boolean): this {
+    if (this.visible !== value) {
+      this.visible = value;
+      this.emitChange();
+    }
+    return this;
   }
 
   addEntity(child: Entity): this { this.add(child); return this; }
@@ -117,7 +233,26 @@ export abstract class Entity extends THREE.Object3D {
   onMouseLeave(callback: (event: any) => void): this { this.interactionCallbacks.onMouseLeave = callback; return this; }
   onPointerDown(callback: (event: any) => void): this { this.interactionCallbacks.onPointerDown = callback; return this; }
   onPointerUp(callback: (event: any) => void): this { this.interactionCallbacks.onPointerUp = callback; return this; }
-  handleInteraction(eventType: string, event: any): void { /* ... */ }
+  handleInteraction(eventType: string, event: any): void { 
+    // Handle direct event type callbacks
+    const callback = this.interactionCallbacks[eventType as keyof InteractionCallbacks];
+    if (callback) callback(event);
+    
+    // Handle legacy API callbacks
+    if (eventType === 'click' && this.interactionCallbacks.onClick) {
+      this.interactionCallbacks.onClick(event);
+    } else if (eventType === 'mouseover' && this.interactionCallbacks.onHover) {
+      this.interactionCallbacks.onHover(event);
+    } else if (eventType === 'mouseenter' && this.interactionCallbacks.onMouseEnter) {
+      this.interactionCallbacks.onMouseEnter(event);
+    } else if (eventType === 'mouseleave' && this.interactionCallbacks.onMouseLeave) {
+      this.interactionCallbacks.onMouseLeave(event);
+    } else if (eventType === 'pointerdown' && this.interactionCallbacks.onPointerDown) {
+      this.interactionCallbacks.onPointerDown(event);
+    } else if (eventType === 'pointerup' && this.interactionCallbacks.onPointerUp) {
+      this.interactionCallbacks.onPointerUp(event);
+    }
+  }
   applyForce(force: THREE.Vector3, point?: THREE.Vector3): this { if (this.physicsManager && this.rigidBodyId) this.physicsManager.applyForce(this.rigidBodyId, force, point); return this; }
   applyImpulse(impulse: THREE.Vector3, point?: THREE.Vector3): this { if (this.physicsManager && this.rigidBodyId) this.physicsManager.applyImpulse(this.rigidBodyId, impulse, point); return this; }
   setVelocity(velocity: THREE.Vector3): this { if (this.physicsManager && this.rigidBodyId) this.physicsManager.setVelocity(this.rigidBodyId, velocity); return this; }

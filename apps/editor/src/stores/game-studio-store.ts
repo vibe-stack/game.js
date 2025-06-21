@@ -22,6 +22,7 @@ interface GameStudioState {
   currentSceneName: string | null;
   shouldLoadScene: boolean;
   gameWorldService: GameWorldService | null;
+  selectedEntity: string | null;
 
   // Actions - These should mostly set state, logic is in services/models
   setCurrentProject: (project: GameProject | null) => void;
@@ -41,6 +42,7 @@ interface GameStudioState {
   setCurrentSceneName: (sceneName: string | null) => void;
   setShouldLoadScene: (should: boolean) => void;
   setGameWorldService: (service: GameWorldService | null) => void;
+  setSelectedEntity: (entityId: string | null) => void;
   loadScene: (sceneName: string) => void;
   loadDefaultScene: () => void;
 
@@ -70,6 +72,7 @@ const useGameStudioStore = create<GameStudioState>()(
     currentSceneName: null,
     shouldLoadScene: false,
     gameWorldService: null,
+    selectedEntity: null,
 
     // Basic Setters
     setCurrentProject: (project) => {
@@ -92,6 +95,7 @@ const useGameStudioStore = create<GameStudioState>()(
     setCurrentSceneName: (sceneName) => set({ currentSceneName: sceneName }),
     setShouldLoadScene: (should) => set({ shouldLoadScene: should }),
     setGameWorldService: (service) => set({ gameWorldService: service }),
+    setSelectedEntity: (entityId) => set({ selectedEntity: entityId }),
 
     loadScene: (sceneName) => {
       set({ currentSceneName: sceneName, shouldLoadScene: true, isLoading: true, error: null });

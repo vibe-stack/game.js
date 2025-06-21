@@ -1,6 +1,7 @@
 import { GameWorld, SceneLoader, SceneSerializer } from "@/models";
 import useGameStudioStore from "@/stores/game-studio-store";
 import { EditorCameraService } from "./editor-camera-service";
+import { SelectionManager } from "./selection-manager";
 
 export class GameWorldService {
   private gameWorld: GameWorld | null = null;
@@ -8,11 +9,13 @@ export class GameWorldService {
   private sceneSerializer: SceneSerializer;
   private currentSceneData: any = null;
   private editorCameraService: EditorCameraService;
+  private selectionManager: SelectionManager;
 
   constructor() {
     this.sceneLoader = new SceneLoader();
     this.sceneSerializer = new SceneSerializer();
     this.editorCameraService = new EditorCameraService();
+    this.selectionManager = new SelectionManager();
   }
 
   async initialize(canvas: HTMLCanvasElement): Promise<void> {
@@ -33,12 +36,17 @@ export class GameWorldService {
       });
 
       await this.gameWorld.initialize();
-      
+      this.gameWorld.enablePhysicsDebugRender();
+      this.gameWorld.enablePhysicsDebugRender();
+      this.gameWorld.enablePhysicsDebugRender();
       // Initialize editor camera service
       this.editorCameraService.initialize(this.gameWorld, canvas);
       
       // Set editor camera as default active camera for viewport
       this.editorCameraService.switchToEditorCamera();
+
+      // Initialize selection manager
+      this.selectionManager.initialize(this.gameWorld);
       
       // The gameWorld instance itself is not stored in zustand to avoid serialization issues.
       // We manage its lifecycle here and interact with it.
@@ -79,6 +87,9 @@ export class GameWorldService {
         // Reinitialize editor camera service after scene reload
         this.editorCameraService.initialize(this.gameWorld, canvas);
         
+        // Reinitialize selection manager after scene reload
+        this.selectionManager.initialize(this.gameWorld);
+        
         // Discover and update available cameras in the store
         this.updateAvailableCameras();
         
@@ -116,6 +127,7 @@ export class GameWorldService {
     if (this.gameWorld) {
       this.gameWorld.start();
       useGameStudioStore.getState().setGameState('playing');
+      this.selectionManager.onGameStateChanged('playing');
     }
   }
 
@@ -123,6 +135,7 @@ export class GameWorldService {
     if (this.gameWorld) {
       this.gameWorld.pause();
       useGameStudioStore.getState().setGameState('paused');
+      this.selectionManager.onGameStateChanged('paused');
     }
   }
 
@@ -130,6 +143,7 @@ export class GameWorldService {
     if (this.gameWorld) {
       this.gameWorld.resume();
       useGameStudioStore.getState().setGameState('playing');
+      this.selectionManager.onGameStateChanged('playing');
     }
   }
 
@@ -137,6 +151,7 @@ export class GameWorldService {
     if (this.gameWorld) {
       this.gameWorld.reset();
       useGameStudioStore.getState().setGameState('initial');
+      this.selectionManager.onGameStateChanged('initial');
     }
   }
   
@@ -153,10 +168,15 @@ export class GameWorldService {
       this.gameWorld = null;
     }
     this.editorCameraService.dispose();
+    this.selectionManager.dispose();
   }
 
   getGameWorld(): GameWorld | null {
     return this.gameWorld;
+  }
+
+  getSelectionManager(): SelectionManager {
+    return this.selectionManager;
   }
 
   // Camera Management Methods

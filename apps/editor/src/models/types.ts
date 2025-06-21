@@ -71,6 +71,16 @@ export interface GameState {
 }
 
 export interface InteractionCallbacks {
+  click?: (event: any) => void;
+  mouseover?: (event: any) => void;
+  mouseout?: (event: any) => void;
+  mouseenter?: (event: any) => void;
+  mouseleave?: (event: any) => void;
+  mousedown?: (event: any) => void;
+  mouseup?: (event: any) => void;
+  pointerdown?: (event: any) => void;
+  pointerup?: (event: any) => void;
+  // Legacy API for backwards compatibility
   onClick?: (event: any) => void;
   onHover?: (event: any) => void;
   onMouseEnter?: (event: any) => void;
