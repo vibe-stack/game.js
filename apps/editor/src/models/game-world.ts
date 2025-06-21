@@ -34,7 +34,7 @@ export class GameWorld {
   private isPaused = false;
   private renderLoopId: number | null = null;
   
-  private sceneSnapshot: SceneData | null = null;
+  private sceneSnapshot: Map<string, any> | null = null;
 
   constructor(config: GameConfig) {
     this.scene = new THREE.Scene();
@@ -123,12 +123,9 @@ export class GameWorld {
     this.isPaused = false;
     this.clock.start();
     
-    // Take a snapshot of the current state to allow for resetting
-    const serializer = new SceneSerializer();
-    serializer.serializeScene(this, "runtime-snapshot").then(snapshot => {
-      this.sceneSnapshot = snapshot;
-      console.log("Runtime snapshot created.");
-    });
+    // Take a snapshot of entity states for reset
+    this.takeEntitySnapshot();
+    console.log("Runtime snapshot created.");
 
     this.animate();
   }
@@ -147,13 +144,55 @@ export class GameWorld {
   reset(): void {
     this.stop();
     if (this.sceneSnapshot) {
-      console.log("Resetting scene from snapshot...");
-      const loader = new SceneLoader();
-      // Re-use the existing GameWorld instance
-      loader.loadScene(this, this.sceneSnapshot); 
+      console.log("Resetting entities to snapshot state...");
+      this.restoreEntitySnapshot();
     } else {
-      console.warn("No snapshot available to reset the scene.");
+      console.warn("No snapshot available to reset entities.");
     }
+  }
+
+  private takeEntitySnapshot(): void {
+    this.sceneSnapshot = new Map();
+    this.entities.forEach((entity) => {
+      this.sceneSnapshot!.set(entity.entityId, {
+        position: entity.position.clone(),
+        rotation: entity.rotation.clone(),
+        scale: entity.scale.clone(),
+        visible: entity.visible,
+      });
+    });
+  }
+
+  private restoreEntitySnapshot(): void {
+    if (!this.sceneSnapshot) return;
+    
+    this.entities.forEach((entity) => {
+      const snapshot = this.sceneSnapshot!.get(entity.entityId);
+      if (snapshot) {
+        // Restore transform
+        entity.position.copy(snapshot.position);
+        entity.rotation.copy(snapshot.rotation);
+        entity.scale.copy(snapshot.scale);
+        entity.visible = snapshot.visible;
+        
+        // Update physics body position if it exists
+        if (this.physicsManager && entity.getRigidBodyId()) {
+          const rigidBody = this.physicsManager.getRigidBody(entity.getRigidBodyId()!);
+          if (rigidBody) {
+            rigidBody.setTranslation(entity.position, true);
+            rigidBody.setRotation(entity.quaternion, true);
+            // Reset velocities
+            if (rigidBody.bodyType() === 0) { // Dynamic body
+              rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+              rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+            }
+          }
+        }
+        
+        // Force update
+        entity.updateMatrixWorld(true);
+      }
+    });
   }
 
   pause(): void {
