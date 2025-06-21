@@ -1,4 +1,11 @@
 import React from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const materialTypes = [
   { value: 'basic', label: 'Basic', description: 'Unlit material with basic properties' },
@@ -15,31 +22,34 @@ interface MaterialTypeSelectorProps {
 }
 
 export function MaterialTypeSelector({ selectedType, onChange }: MaterialTypeSelectorProps) {
+  const selectedMaterialType = materialTypes.find(type => type.value === selectedType);
+
   return (
     <div className="space-y-2">
-      {materialTypes.map(type => (
-        <label
-          key={type.value}
-          className={`flex items-start gap-3 p-3 rounded-md cursor-pointer transition-colors ${
-            selectedType === type.value
-              ? 'bg-blue-600/20 border border-blue-500'
-              : 'hover:bg-gray-700/50 border border-transparent'
-          }`}
-        >
-          <input
-            type="radio"
-            name="materialType"
-            value={type.value}
-            checked={selectedType === type.value}
-            onChange={(e) => onChange(e.target.value)}
-            className="mt-1"
-          />
-          <div className="flex-1">
-            <div className="text-sm font-medium text-white">{type.label}</div>
-            <div className="text-xs text-gray-400 mt-1">{type.description}</div>
-          </div>
-        </label>
-      ))}
+      <Select value={selectedType} onValueChange={onChange}>
+        <SelectTrigger className="w-full">
+          <SelectValue>
+            {selectedMaterialType ? (
+              <div className="flex flex-col items-start">
+                <span className="font-medium">{selectedMaterialType.label}</span>
+                <span className="text-xs text-gray-400">{selectedMaterialType.description}</span>
+              </div>
+            ) : (
+              "Select material type..."
+            )}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {materialTypes.map(type => (
+            <SelectItem key={type.value} value={type.value}>
+              <div className="flex flex-col items-start">
+                <span className="font-medium">{type.label}</span>
+                <span className="text-xs text-gray-400">{type.description}</span>
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 } 

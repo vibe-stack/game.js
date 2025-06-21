@@ -28,10 +28,9 @@ export default function PropertiesSidebar({ gameWorldService }: PropertiesSideba
         </TabsList>
         
         <div className="flex-1 flex flex-col min-h-0">
-          <TabsContent value="inspector" className="flex-1 flex flex-col min-h-0 m-2">
-            <ScrollArea className="flex-1">
+          <TabsContent value="inspector" className="flex-1 flex flex-col min-h-0 m-2 overflow-y-auto">
+
               <Inspector gameWorldService={gameWorldService} />
-            </ScrollArea>
           </TabsContent>
           
           <TabsContent value="chat" className="flex-1 flex flex-col min-h-0 m-2">

@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MaterialDefinition } from "@/types/project";
 import { materialSystem } from "@/services/material-system";
+import { CreateMaterialDialog } from "./create-material-dialog";
 
 interface MaterialLibraryProps {
   selectedMaterial: MaterialDefinition | null;
@@ -13,10 +14,12 @@ interface MaterialLibraryProps {
 export function MaterialLibrary({ selectedMaterial, onMaterialSelect }: MaterialLibraryProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const allMaterials = useMemo(() => {
     return materialSystem.getAllMaterialDefinitions();
-  }, []);
+  }, [refreshKey]);
 
   const categories = useMemo(() => {
     const cats = new Set(allMaterials.map(m => m.metadata.category));
@@ -40,8 +43,13 @@ export function MaterialLibrary({ selectedMaterial, onMaterialSelect }: Material
   }, [allMaterials, searchQuery, selectedCategory]);
 
   const handleCreateMaterial = () => {
-    // TODO: Implement material creation
-    console.log("Create new material");
+    setShowCreateDialog(true);
+  };
+
+  const handleMaterialCreated = (newMaterial: MaterialDefinition) => {
+    // Refresh the materials list and select the new material
+    setRefreshKey(prev => prev + 1);
+    onMaterialSelect(newMaterial);
   };
 
   return (
@@ -121,6 +129,12 @@ export function MaterialLibrary({ selectedMaterial, onMaterialSelect }: Material
           </div>
         )}
       </div>
+
+      <CreateMaterialDialog
+        isOpen={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onMaterialCreated={handleMaterialCreated}
+      />
     </div>
   );
 } 
