@@ -44,8 +44,6 @@ export class EntityCreator {
         tags: entity.metadata.tags,
         type: entity.metadata.type,
       });
-      
-      console.log(`Created and registered ${entityType} entity:`, entity.entityId);
       return entity;
     }
 

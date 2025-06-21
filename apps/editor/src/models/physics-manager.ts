@@ -78,7 +78,7 @@ export class PhysicsManager {
     dimensions: THREE.Vector3 | number | { heights: number[][]; scale: THREE.Vector3 },
     config?: PhysicsConfig
   ): RapierType.Collider | null {
-    console.log("createCollider", id, rigidBodyId, shape, dimensions, config);
+
     if (!this.isEnabled() || !this.rapierModule) return null;
 
     const rigidBody = this.bodyMap.get(rigidBodyId);
@@ -346,10 +346,6 @@ export class PhysicsManager {
 
     try {
       const buffers = this.world.debugRender();
-      // Log debug information periodically
-      if (Math.random() < 0.01) { // Log ~1% of the time to avoid spam
-        console.log(`Debug render data: ${buffers.vertices.length} vertices, ${buffers.colors.length} colors`);
-      }
       return {
         vertices: buffers.vertices,
         colors: buffers.colors

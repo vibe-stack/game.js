@@ -60,7 +60,6 @@ export default function MainControlsToolbar({
   const handleExport = async (format: "json" | "threejs" | "glb") => {
     setExporting(true);
     try {
-      console.log(`Exporting as ${format} - placeholder`);
       await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (error) {
       console.error("Export failed:", error);

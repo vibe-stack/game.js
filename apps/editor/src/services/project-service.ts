@@ -50,7 +50,6 @@ export class ProjectService {
       }
       
       const items = await FileSystemManager.listDirectory(scenesDir);
-      console.log("AVAILABLE SCENES", scenesDir, projectPath, items)
       const sceneFiles = items
         .filter(item => item.type === 'file' && item.name.endsWith('.scene.json'))
         .map(item => item.name.replace('.scene.json', ''));

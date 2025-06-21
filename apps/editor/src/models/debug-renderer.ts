@@ -43,7 +43,6 @@ export class DebugRenderer {
       
       // Initialize buffer attributes on first enable
       this.initializeBuffers();
-      console.log("Physics debug renderer enabled");
     }
   }
 
@@ -53,7 +52,6 @@ export class DebugRenderer {
       this.physicsManager.enableDebugRender(false);
       this.linesObject.visible = false;
       this.scene.remove(this.linesObject);
-      console.log("Physics debug renderer disabled");
     }
   }
 
@@ -78,7 +76,6 @@ export class DebugRenderer {
     }
 
     const { vertices, colors } = debugData;
-    console.log(`Initializing debug buffers: ${vertices.length / 3} vertices, ${colors.length / 4} colors`);
 
     // Create buffer attributes
     this.positionAttribute = new THREE.BufferAttribute(vertices, 3);
@@ -100,7 +97,6 @@ export class DebugRenderer {
 
     // Log if vertex count changed (indicates dynamic updates)
     if (vertices.length !== this.lastVertexCount) {
-      console.log(`Debug render vertex count changed: ${this.lastVertexCount} -> ${vertices.length}`);
       this.lastVertexCount = vertices.length;
     }
 
@@ -111,7 +107,6 @@ export class DebugRenderer {
                          this.colorAttribute.array.length !== colors.length;
 
     if (needsRecreate) {
-      console.log("Recreating debug buffers due to size change");
       
       // Recreate buffer attributes with new size
       this.positionAttribute = new THREE.BufferAttribute(vertices, 3);

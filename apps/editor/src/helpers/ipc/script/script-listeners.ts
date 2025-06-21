@@ -349,7 +349,6 @@ export default ${safeName};
       scriptWatcher.compiledScripts.set(relativePath, outputPath);
       scriptWatcher.lastCompilation.set(relativePath, new Date());
 
-      console.log(`Successfully compiled script: ${relativePath} (externals: ${externalDependencies.length})`);
     } catch (error) {
       console.error(`Failed to compile script ${relativePath}:`, error);
     }

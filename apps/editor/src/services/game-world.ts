@@ -447,7 +447,6 @@ export class GameWorld extends SimpleEventEmitter {
       });
     });
     
-    console.log(`Transform snapshots taken for ${this.transformSnapshot.size} objects`);
   }
 
   private restoreSnapshots(): void {
@@ -506,7 +505,6 @@ export class GameWorld extends SimpleEventEmitter {
       this.emit("sceneChanged", { scene: this.scene });
     }
     
-    console.log(`Transforms restored: ${transformsRestored}`);
   }
 
   pause(): void {
@@ -542,7 +540,6 @@ export class GameWorld extends SimpleEventEmitter {
 
     restoreOriginalTransforms(sceneWithOriginalTransforms.entities);
     this.sceneSnapshot = sceneWithOriginalTransforms;
-    console.log("Scene snapshot created with original transforms.");
   }
 
   restoreSceneSnapshot(): void {
@@ -615,13 +612,8 @@ export class GameWorld extends SimpleEventEmitter {
       // Emit an update for the UI (like the inspector) to refresh with restored local transform.
       this.emit("objectTransformUpdate", { objectId, transform });
     });
-
-    console.log(
-      "Scene snapshot restored with synchronized original transforms.",
-    );
     // This will trigger a re-render for UI consistency.
     if (this.scene) {
-      console.log("sending scene event", this.scene);
       this.emit("sceneChanged", { scene: this.scene });
     }
   }

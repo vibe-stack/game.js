@@ -87,7 +87,6 @@ export default function GameJSConfigPanel() {
     try {
       const configPath = `${currentProject.path}/gamejs.config.json`;
       await window.configAPI.writeConfigFile(configPath, config);
-      console.log("GameJS configuration saved successfully");
     } catch {
       console.error("Failed to save GameJS configuration");
     } finally {

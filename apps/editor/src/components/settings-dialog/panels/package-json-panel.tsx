@@ -94,7 +94,6 @@ export default function PackageJsonPanel() {
     try {
       const packagePath = `${currentProject.path}/package.json`;
       await window.configAPI.writeConfigFile(packagePath, packageJson);
-      console.log("package.json saved successfully");
     } catch {
       console.error("Failed to save package.json");
     } finally {
@@ -141,7 +140,6 @@ export default function PackageJsonPanel() {
     setInstalling(true);
     try {
       await window.configAPI.installPackages(currentProject.path, packageManager);
-      console.log("Packages installed successfully");
     } catch {
       console.error("Failed to install packages");
     } finally {

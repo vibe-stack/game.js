@@ -199,9 +199,9 @@ export class CharacterController {
       // Enable snap-to-ground for smooth movement on slopes
       this.rapierCharacterController.enableSnapToGround(this.config.snapToGroundDistance);
       
-      console.log("Rapier character controller created successfully");
     } catch (error) {
       console.error("Failed to create Rapier character controller:", error);
+      throw error;
     }
   }
 

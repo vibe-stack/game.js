@@ -79,7 +79,6 @@ export default function AdvancedPanel() {
       const filePath = `${currentProject.path}/${fileName}`;
       const parsedContent = JSON.parse(content);
       await window.configAPI.writeConfigFile(filePath, parsedContent);
-      console.log(`${fileName} saved successfully`);
     } catch {
       console.error(`Failed to save ${fileName}`);
     } finally {

@@ -38,8 +38,6 @@ export default function EditorModeToolbar() {
   // Update cameras when scene changes
   useEffect(() => {
     const { gameWorldService } = useGameStudioStore.getState();
-    console.log("CURRENT SCENE", currentScene, gameWorldService)
-    console.log("Available cameras in toolbar:", availableCameras);
     if (currentScene && gameWorldService) {
       // Discover cameras from the loaded scene
       gameWorldService.updateAvailableCameras();
@@ -84,8 +82,7 @@ export default function EditorModeToolbar() {
   }, [setEditorMode, viewportMode, setViewportMode]);
 
   const handleUndo = () => {
-    // TODO: Implement undo functionality
-    console.log("Undo action triggered - placeholder");
+    // TODO: Implement undo functionality 
   };
 
   const handleCameraSelect = async (cameraId: string, event: React.MouseEvent) => {

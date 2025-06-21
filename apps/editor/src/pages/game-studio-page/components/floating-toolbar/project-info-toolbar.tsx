@@ -19,15 +19,15 @@ export default function ProjectInfoToolbar({
   projectName,
   onHome,
 }: ProjectInfoToolbarProps) {
-  const { 
-    currentProject, 
-    currentScene, 
-    availableScenes, 
+  const {
+    currentProject,
+    currentScene,
+    availableScenes,
     setAvailableScenes,
     setCurrentScene,
-    gameWorldService 
+    gameWorldService
   } = useGameStudioStore();
-  
+
   const [isCreateSceneOpen, setIsCreateSceneOpen] = useState(false);
   const [newSceneName, setNewSceneName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -40,14 +40,13 @@ export default function ProjectInfoToolbar({
   }, [currentProject]);
 
   const loadAvailableScenes = async () => {
-    console.log("LOADING AVAILABLE SCENES", currentProject)
     if (!currentProject?.path) return;
-    
+
     try {
       setIsLoading(true);
       const scenes = await window.projectAPI.listScenes(currentProject.path);
       setAvailableScenes(scenes);
-      
+
       // If no current scene is selected but scenes exist, select the first one
       if (!currentScene && scenes.length > 0) {
         await handleSceneChange(scenes[0]);
@@ -55,7 +54,7 @@ export default function ProjectInfoToolbar({
     } catch (error) {
       console.error('Failed to load scenes:', error);
       toast.error('Failed to load scenes from project');
-      
+
       // Fallback to default scene if no scenes exist
       if (!currentScene) {
         await createDefaultScene();
@@ -67,26 +66,26 @@ export default function ProjectInfoToolbar({
 
   const createDefaultScene = async () => {
     if (!currentProject?.path) return;
-    
+
     try {
       const defaultSceneData = SceneLoader.getDefaultSceneData();
       const sceneName = "main-scene";
-      
+
       await window.projectAPI.createScene(currentProject.path, sceneName, defaultSceneData);
       setAvailableScenes([sceneName]);
-      
+
       const sceneWithMetadata: GameScene = {
         ...defaultSceneData,
         name: sceneName,
         id: sceneName
       };
       setCurrentScene(sceneWithMetadata);
-      
+
       // Load the scene in the game world
       if (gameWorldService) {
         await gameWorldService.loadScene(defaultSceneData);
       }
-      
+
       toast.success('Default scene created');
     } catch (error) {
       console.error('Failed to create default scene:', error);
@@ -96,7 +95,7 @@ export default function ProjectInfoToolbar({
 
   const getSceneName = (sceneId: string) => {
     // Convert scene ID back to display name
-    return sceneId.split('-').map(word => 
+    return sceneId.split('-').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
   };
@@ -109,15 +108,13 @@ export default function ProjectInfoToolbar({
   const handleSceneChange = async (sceneName: string) => {
     if (!currentProject?.path) return;
 
-    console.log("SWITCHING TO SCENE", sceneName)
-    
+
     try {
       setIsLoading(true);
-      
+
       // Load scene data from project
       const sceneData = await window.projectAPI.loadScene(currentProject.path, sceneName);
-      console.log("SCENE DATA", sceneData)
-      
+
       // Update current scene in store
       const sceneWithMetadata: GameScene = {
         ...sceneData,
@@ -125,15 +122,12 @@ export default function ProjectInfoToolbar({
         id: sceneName
       };
       setCurrentScene(sceneWithMetadata);
-      console.log("SCENE WITH METADATA", sceneWithMetadata)
       // Switch scene in the project
       await window.projectAPI.switchScene(currentProject.path, sceneName);
-      console.log("SWITCHED TO SCENE", sceneName)
       // Load scene in the game world
       if (gameWorldService) {
         await gameWorldService.loadScene(sceneData);
       }
-      console.log("LOADED SCENE IN GAME WORLD", gameWorldService)
       toast.success(`Switched to scene: ${getSceneName(sceneName)}`);
     } catch (error) {
       console.error('Failed to switch scene:', error);
@@ -145,28 +139,28 @@ export default function ProjectInfoToolbar({
 
   const handleCreateScene = async () => {
     if (!currentProject?.path || !newSceneName.trim()) return;
-    
+
     setIsCreating(true);
     try {
       const sceneName = convertDisplayNameToId(newSceneName.trim());
       const defaultSceneData = SceneLoader.getDefaultSceneData();
-      
+
       // Update scene data with user-provided name
       const sceneDataWithName: SceneData = {
         ...defaultSceneData,
         name: newSceneName.trim(),
         id: sceneName
       };
-      
+
       // Create scene in project
       await window.projectAPI.createScene(currentProject.path, sceneName, sceneDataWithName);
-      
+
       // Refresh scene list
       await loadAvailableScenes();
-      
+
       // Switch to the new scene
       await handleSceneChange(sceneName);
-      
+
       setNewSceneName("");
       setIsCreateSceneOpen(false);
       toast.success(`Scene "${newSceneName.trim()}" created successfully`);
@@ -216,7 +210,7 @@ export default function ProjectInfoToolbar({
               ))}
             </SelectContent>
           </Select>
-          
+
           <Popover open={isCreateSceneOpen} onOpenChange={setIsCreateSceneOpen}>
             <PopoverTrigger asChild>
               <Button

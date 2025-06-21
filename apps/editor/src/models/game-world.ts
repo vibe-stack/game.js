@@ -125,7 +125,6 @@ export class GameWorld {
     
     // Take a snapshot of entity states for reset
     this.takeEntitySnapshot();
-    console.log("Runtime snapshot created.");
 
     this.animate();
   }
@@ -144,7 +143,6 @@ export class GameWorld {
   reset(): void {
     this.stop();
     if (this.sceneSnapshot) {
-      console.log("Resetting entities to snapshot state...");
       this.restoreEntitySnapshot();
     } else {
       console.warn("No snapshot available to reset entities.");
