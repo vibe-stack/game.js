@@ -2,6 +2,7 @@ import { GameWorld } from "../game-world";
 import { EntityLoader } from "./entity-loader";
 import { PhysicsLoader } from "./physics-loader";
 import { SceneData, LoaderContext } from "./types";
+import { materialSystem } from "../../services/material-system";
 import * as THREE from "three/webgpu";
 
 export class SceneLoader {
@@ -14,8 +15,6 @@ export class SceneLoader {
   }
 
   async loadScene(gameWorld: GameWorld, sceneData: SceneData): Promise<void> {
-    console.log(`Loading scene: ${sceneData.name} (version ${sceneData.metadata.version || 'unknown'})`);
-
     const context: LoaderContext = {
       gameWorld,
       materials: new Map(),
@@ -26,18 +25,157 @@ export class SceneLoader {
     try {
       gameWorld.scene.clear();
       
-      const physicsData = sceneData.world.physics;
+      // Load materials first
+      await this.loadMaterials(context, sceneData);
+      
+      // Transform physics data to expected format
+      const physicsData = {
+        enabled: sceneData.world.physics.enabled,
+        gravity: [sceneData.world.gravity.x, sceneData.world.gravity.y, sceneData.world.gravity.z] as [number, number, number],
+        debugRender: sceneData.editor?.debugPhysics || false,
+        solver: {
+          iterations: 10,
+          timestep: sceneData.world.physics.timeStep
+        }
+      };
+      
       if (physicsData) {
         await this.physicsLoader.load(context, physicsData);
       }
-      console.log("Loading entities");
-      await this.entityLoader.load(context, sceneData.entities);
+      // Convert SceneEntity to EntityData format for the entity loader
+      // Use type assertion to handle complex type differences temporarily
+      const entityData = sceneData.entities as any[];
+      await this.entityLoader.load(context, entityData);
 
-      console.log(`Scene "${sceneData.name}" loaded with ${sceneData.entities.length} entities.`);
     } catch (error) {
       console.error(`Failed to load scene "${sceneData.name}":`, error);
       throw error;
     }
+  }
+
+  private async loadMaterials(context: LoaderContext, sceneData: SceneData): Promise<void> {
+    // Load materials from the assets array if they exist
+    const materialAssets = sceneData.assets?.filter(asset => asset.type === 'material') || [];
+    
+    for (const materialAsset of materialAssets) {
+      if (materialAsset.metadata?.materialDefinition) {
+        const materialDef = materialAsset.metadata.materialDefinition;
+        
+        // Add the material definition to the material system
+        materialSystem.loadMaterialLibrary({
+          id: `scene-materials-${Date.now()}`,
+          name: 'Scene Materials',
+          version: '1.0.0',
+          materials: [materialDef],
+          sharedShaderGraphs: [],
+          sharedTextures: [],
+          metadata: {
+            created: new Date(),
+            modified: new Date()
+          }
+        });
+        
+        // Create the THREE.js material and store it in the context
+        const threeMaterial = await this.createMaterialFromDefinition(materialDef);
+        context.materials.set(materialDef.id, threeMaterial);
+        
+      }
+    }
+    
+    // Also check if materials are stored in metadata (fallback)
+    if ((sceneData.metadata as any)?.materials) {
+      const materials = (sceneData.metadata as any).materials;
+      for (const materialDef of materials) {
+        if (!context.materials.has(materialDef.id)) {
+          materialSystem.loadMaterialLibrary({
+            id: `scene-materials-metadata-${Date.now()}`,
+            name: 'Scene Materials (Metadata)',
+            version: '1.0.0',
+            materials: [materialDef],
+            sharedShaderGraphs: [],
+            sharedTextures: [],
+            metadata: {
+              created: new Date(),
+              modified: new Date()
+            }
+          });
+          
+          const threeMaterial = await this.createMaterialFromDefinition(materialDef);
+          context.materials.set(materialDef.id, threeMaterial);
+          
+        }
+      }
+    }
+  }
+
+  private async createMaterialFromDefinition(materialDef: any): Promise<THREE.Material> {
+    let material: THREE.Material;
+
+    switch (materialDef.type) {
+      case 'basic':
+        material = new THREE.MeshBasicMaterial();
+        break;
+      case 'lambert':
+        material = new THREE.MeshLambertMaterial();
+        break;
+      case 'phong':
+        material = new THREE.MeshPhongMaterial();
+        break;
+      case 'standard':
+        material = new THREE.MeshStandardMaterial();
+        break;
+      case 'physical':
+        material = new THREE.MeshPhysicalMaterial();
+        break;
+      case 'toon':
+        material = new THREE.MeshToonMaterial();
+        break;
+      default:
+        material = new THREE.MeshStandardMaterial();
+    }
+
+    // Apply properties from the material definition
+    const props = materialDef.properties || {};
+    
+    // Common properties
+    if (props.opacity !== undefined) material.opacity = props.opacity;
+    if (props.transparent !== undefined) material.transparent = props.transparent;
+    if (props.side !== undefined) material.side = props.side;
+    if (props.visible !== undefined) material.visible = props.visible;
+    
+    // Color properties
+    if (props.color && 'color' in material) {
+      (material as any).color.set(props.color);
+    }
+    if (props.emissive && 'emissive' in material) {
+      (material as any).emissive.set(props.emissive);
+    }
+    if (props.emissiveIntensity !== undefined && 'emissiveIntensity' in material) {
+      (material as any).emissiveIntensity = props.emissiveIntensity;
+    }
+    
+    // PBR properties
+    if (props.metalness !== undefined && 'metalness' in material) {
+      (material as any).metalness = props.metalness;
+    }
+    if (props.roughness !== undefined && 'roughness' in material) {
+      (material as any).roughness = props.roughness;
+    }
+    
+    // Phong properties
+    if (props.specular && 'specular' in material) {
+      (material as any).specular.set(props.specular);
+    }
+    if (props.shininess !== undefined && 'shininess' in material) {
+      (material as any).shininess = props.shininess;
+    }
+    
+    // Other properties
+    if (props.wireframe !== undefined && 'wireframe' in material) {
+      (material as any).wireframe = props.wireframe;
+    }
+
+    return material;
   }
 
   static validateSceneData(sceneData: any): sceneData is SceneData {

@@ -82,6 +82,12 @@ export class EditorCameraService {
     }
   }
 
+  forceUpdate(): void {
+    if (this.orbitControls) {
+      this.orbitControls.update();
+    }
+  }
+
   resize(width: number, height: number): void {
     if (this.editorCamera) {
       this.editorCamera.aspect = width / height;

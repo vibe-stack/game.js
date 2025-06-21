@@ -35,7 +35,7 @@ export function Vector3Input({
   return (
     <div className="space-y-2">
       <Label className="text-gray-300 text-xs">{label}</Label>
-      <div className="space-y-1">
+      <div className="space-y-1 flex flex-row gap-1">
         <DragInput
           label="X"
           value={value.x}

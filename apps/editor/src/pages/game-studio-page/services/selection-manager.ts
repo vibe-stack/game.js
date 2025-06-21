@@ -8,6 +8,8 @@ export class SelectionManager {
   private selectedEntity: Entity | null = null;
   private selectionHelper: THREE.BoxHelper | null = null;
   private isInitialized = false;
+  private entityChangeListener: (() => void) | null = null;
+  private animationFrameId: number | null = null;
 
   constructor() {}
 
@@ -65,8 +67,17 @@ export class SelectionManager {
   }
 
   private updateSelection(selectedEntityId: string | null): void {
-    // Clear previous selection visual
-    this.clearSelectionHelper();
+    // Clear previous selection visual and listeners
+    try {
+      this.clearSelectionHelper();
+    } catch (error) {
+      console.error("Error clearing selection helper:", error);
+    }
+    try {
+      this.clearEntityChangeListener();
+    } catch (error) {
+      console.error("Error clearing entity change listener:", error);
+    }
 
     if (!selectedEntityId || !this.gameWorld) {
       this.selectedEntity = null;
@@ -86,6 +97,7 @@ export class SelectionManager {
     const { gameState } = useGameStudioStore.getState();
     if (gameState !== "playing") {
       this.createSelectionHelper(entity);
+      this.setupEntityChangeListener(entity);
     }
   }
 
@@ -102,6 +114,60 @@ export class SelectionManager {
     
     // Add to scene
     this.gameWorld.getScene().add(this.selectionHelper);
+  }
+
+  private setupEntityChangeListener(entity: Entity): void {
+    // Set up listener for entity changes
+    this.entityChangeListener = () => {
+      this.updateSelectionHelper();
+    };
+    
+    entity.addChangeListener(this.entityChangeListener);
+    
+    // Also set up continuous update for real-time changes
+    this.startContinuousUpdate();
+  }
+
+  private startContinuousUpdate(): void {
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    
+    const update = () => {
+      if (this.selectedEntity && this.selectionHelper) {
+        this.updateSelectionHelper();
+      }
+      
+      // Continue updating if we have a selected entity
+      if (this.selectedEntity) {
+        this.animationFrameId = requestAnimationFrame(update);
+      }
+    };
+    
+    this.animationFrameId = requestAnimationFrame(update);
+  }
+
+  private updateSelectionHelper(): void {
+    if (!this.selectionHelper || !this.selectedEntity) return;
+
+    const mesh = this.findMeshInEntity(this.selectedEntity);
+    if (!mesh) return;
+
+    // Update the BoxHelper to reflect the current mesh transform
+    this.selectionHelper.setFromObject(mesh);
+    this.selectionHelper.updateMatrixWorld(true);
+  }
+
+  private clearEntityChangeListener(): void {
+    if (this.entityChangeListener && this.selectedEntity) {
+      this.selectedEntity.removeChangeListener(this.entityChangeListener);
+      this.entityChangeListener = null;
+    }
+    
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
   }
 
   private findMeshInEntity(entity: Entity): THREE.Mesh | null {
@@ -144,9 +210,11 @@ export class SelectionManager {
     if (gameState === "playing") {
       // Hide selection helper when playing
       this.clearSelectionHelper();
+      this.clearEntityChangeListener();
     } else if (this.selectedEntity) {
       // Show selection helper when not playing
       this.createSelectionHelper(this.selectedEntity);
+      this.setupEntityChangeListener(this.selectedEntity);
     }
   }
 
@@ -156,6 +224,7 @@ export class SelectionManager {
 
   dispose(): void {
     this.clearSelectionHelper();
+    this.clearEntityChangeListener();
     this.gameWorld = null;
     this.selectedEntity = null;
     this.isInitialized = false;

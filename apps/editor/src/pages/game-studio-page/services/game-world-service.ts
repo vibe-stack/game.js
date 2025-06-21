@@ -107,20 +107,61 @@ export class GameWorldService {
     }
   }
 
+  // New method to load scene with filename tracking
+  async loadSceneFromFile(sceneData: any, fileName: string): Promise<void> {
+    const { setSceneFileName } = useGameStudioStore.getState();
+    
+    // Store the filename that was used to load this scene
+    setSceneFileName(fileName);
+    
+    // Load the scene normally
+    await this.loadScene(sceneData);
+  }
+
   async loadDefaultScene(): Promise<void> {
     if (!this.gameWorld) throw new Error("Game world not initialized");
+    const { setSceneFileName } = useGameStudioStore.getState();
+    
+    // Clear the scene filename since this is a default scene, not loaded from a file
+    setSceneFileName(null);
+    
     const defaultSceneData = SceneLoader.getDefaultSceneData();
     await this.loadScene(defaultSceneData);
   }
 
   async saveScene(): Promise<void> {
     if (!this.gameWorld) throw new Error("Game world not initialized");
-    const { currentScene } = useGameStudioStore.getState();
+    const { currentProject, currentScene, sceneFileName } = useGameStudioStore.getState();
+    
+    if (!currentProject) throw new Error("No project loaded");
     if (!currentScene) throw new Error("No scene loaded");
 
-    const sceneData = await this.sceneSerializer.serializeScene(this.gameWorld, currentScene.name || "Untitled Scene");
-    // TODO: Use projectAPI to write this to a file
-    console.log("Saving scene (data):", sceneData);
+    try {
+      // Serialize the current scene
+      const sceneData = await this.sceneSerializer.serializeScene(this.gameWorld, currentScene.name || "Untitled Scene");
+      
+      // Use the stored scene filename if available, otherwise fall back to scene ID/name
+      let filenameToUse = sceneFileName;
+      
+      if (!filenameToUse) {
+        // If no filename is stored (e.g., for default scenes), create a new filename
+        filenameToUse = currentScene.id || currentScene.name || "untitled-scene";
+        
+        // Clean the filename to make it filesystem-safe
+        filenameToUse = filenameToUse.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
+        
+        // Store this filename for future saves
+        const { setSceneFileName } = useGameStudioStore.getState();
+        setSceneFileName(filenameToUse);
+      }
+      
+      // Use the proper IPC method to save the scene
+      await window.projectAPI.saveScene(currentProject.path, filenameToUse, sceneData);
+      
+    } catch (error) {
+      console.error("Failed to save scene:", error);
+      throw error;
+    }
   }
 
   play(): void {
@@ -189,12 +230,8 @@ export class GameWorldService {
     const cameraManager = this.gameWorld.getCameraManager();
     const allCameras = cameraManager.getAllCameras();
     
-    console.log("All cameras from camera manager:", allCameras);
-    
     // Filter out the editor camera to get only scene cameras
     const sceneCameras = allCameras.filter(cam => cam.id !== this.editorCameraService.getEditorCameraId());
-    
-    console.log("Scene cameras (filtered):", sceneCameras);
     
     // Convert to the format expected by the store (Entity-like objects)
     const availableCameras = sceneCameras.map(cam => ({
@@ -203,8 +240,6 @@ export class GameWorldService {
       // Add other properties that might be expected
       metadata: { tags: ['camera'] }
     }));
-    
-    console.log("Available cameras for store:", availableCameras);
     
     setAvailableCameras(availableCameras as any);
     

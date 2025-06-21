@@ -45,6 +45,7 @@ export interface EntityData {
     type: string;
     properties: Record<string, any>;
   };
+  materialId?: string;
   properties?: Record<string, any>;
   children?: EntityData[];
 }

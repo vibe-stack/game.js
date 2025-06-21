@@ -25,7 +25,7 @@ interface GameStudioState {
   selectedEntity: string | null;
   materialEditorOpen: boolean;
   materialEditorEntity: string | null;
-
+  sceneFileName: string | null;
   // Actions - These should mostly set state, logic is in services/models
   setCurrentProject: (project: GameProject | null) => void;
   setCurrentScene: (scene: SceneData | null) => void;
@@ -49,7 +49,7 @@ interface GameStudioState {
   loadDefaultScene: () => void;
   setMaterialEditorOpen: (open: boolean) => void;
   setMaterialEditorEntity: (entityId: string | null) => void;
-
+  setSceneFileName: (fileName: string | null) => void;
   // Game control actions - These trigger service calls and update state
   playGame: () => void;
   pauseGame: () => void;
@@ -79,6 +79,7 @@ const useGameStudioStore = create<GameStudioState>()(
     selectedEntity: null,
     materialEditorOpen: false,
     materialEditorEntity: null,
+    sceneFileName: null,
 
     // Basic Setters
     setCurrentProject: (project) => {
@@ -104,7 +105,7 @@ const useGameStudioStore = create<GameStudioState>()(
     setSelectedEntity: (entityId) => set({ selectedEntity: entityId }),
     setMaterialEditorOpen: (open) => set({ materialEditorOpen: open }),
     setMaterialEditorEntity: (entityId) => set({ materialEditorEntity: entityId }),
-
+    setSceneFileName: (fileName) => set({ sceneFileName: fileName }),
     loadScene: (sceneName) => {
       set({ currentSceneName: sceneName, shouldLoadScene: true, isLoading: true, error: null });
     },

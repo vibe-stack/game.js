@@ -69,7 +69,7 @@ export class GameWorld {
     this.cameraControlManager = new CameraControlManager(this.controls, this.stateManager);
     this.setupDefaultCamera(width, height);
     
-    this.interactionManager = new InteractionManager(this.renderer as any, this.cameraManager.getActiveCamera()!, config.canvas);
+    this.interactionManager = new InteractionManager(this.renderer as any, this.cameraManager, config.canvas);
     this.debugRenderer = new DebugRenderer(this.scene, this.physicsManager);
     
     if (config.enablePhysics !== false) {

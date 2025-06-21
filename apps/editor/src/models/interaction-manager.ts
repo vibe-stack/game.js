@@ -1,5 +1,6 @@
 import * as THREE from "three/webgpu";
 import { Raycaster, Vector2 } from "three/webgpu";
+import { CameraManager } from "./camera-manager";
 
 export class InteractiveObject {
   target: THREE.Object3D;
@@ -62,7 +63,7 @@ export class InteractionManagerOptions {
 
 export class InteractionManager {
   renderer: THREE.Renderer;
-  camera: THREE.Camera;
+  cameraManager: CameraManager;
   domElement: HTMLElement;
   bindEventsOnBodyElement: boolean;
   autoAdd: boolean;
@@ -76,12 +77,12 @@ export class InteractionManager {
 
   constructor(
     renderer: THREE.Renderer,
-    camera: THREE.Camera,
+    cameraManager: CameraManager,
     domElement: HTMLElement,
     options?: InteractionManagerOptions,
   ) {
     this.renderer = renderer;
-    this.camera = camera;
+    this.cameraManager = cameraManager;
     this.domElement = domElement;
     this.bindEventsOnBodyElement =
       options && typeof options.bindEventsOnBodyElement !== "undefined"
@@ -237,7 +238,10 @@ export class InteractionManager {
   };
 
   update = () => {
-    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const activeCamera = this.cameraManager.getActiveCamera();
+    if (!activeCamera) return;
+    
+    this.raycaster.setFromCamera(this.mouse, activeCamera);
 
     this.interactiveObjects.forEach((object) => {
       if (object.target) this.checkIntersection(object);
@@ -307,9 +311,13 @@ export class InteractionManager {
 
     const event = new InteractiveEvent("mousemove", mouseEvent);
 
-    this.interactiveObjects.forEach((object) => {
+    // Sort all objects by distance (closest first) and dispatch
+    const sortedObjects = [...this.interactiveObjects].sort((a, b) => a.distance - b.distance);
+
+    for (const object of sortedObjects) {
       this.dispatch(object, event);
-    });
+      if (event.cancelBubble) break;
+    }
   };
 
   onDocumentPointerMove = (pointerEvent: PointerEvent) => {
@@ -323,9 +331,13 @@ export class InteractionManager {
 
     const event = new InteractiveEvent("pointermove", pointerEvent);
 
-    this.interactiveObjects.forEach((object) => {
+    // Sort all objects by distance (closest first) and dispatch
+    const sortedObjects = [...this.interactiveObjects].sort((a, b) => a.distance - b.distance);
+
+    for (const object of sortedObjects) {
       this.dispatch(object, event);
-    });
+      if (event.cancelBubble) break;
+    }
   };
 
   onTouchMove = (touchEvent: TouchEvent) => {
@@ -344,9 +356,13 @@ export class InteractionManager {
       touchEvent,
     );
 
-    this.interactiveObjects.forEach((object) => {
+    // Sort all objects by distance (closest first) and dispatch
+    const sortedObjects = [...this.interactiveObjects].sort((a, b) => a.distance - b.distance);
+
+    for (const object of sortedObjects) {
       this.dispatch(object, event);
-    });
+      if (event.cancelBubble) break;
+    }
   };
 
   onMouseClick = (mouseEvent: MouseEvent) => {
@@ -354,11 +370,16 @@ export class InteractionManager {
 
     const event = new InteractiveEvent("click", mouseEvent);
 
-    this.interactiveObjects.forEach((object) => {
-      if (object.intersected) {
-        this.dispatch(object, event);
-      }
-    });
+    // Get intersected objects sorted by distance (closest first)
+    const intersectedObjects = this.interactiveObjects
+      .filter(object => object.intersected)
+      .sort((a, b) => a.distance - b.distance);
+
+    // Dispatch to closest objects first, stop if propagation is cancelled
+    for (const object of intersectedObjects) {
+      this.dispatch(object, event);
+      if (event.cancelBubble) break;
+    }
   };
 
   onMouseDown = (mouseEvent: MouseEvent) => {
@@ -368,14 +389,21 @@ export class InteractionManager {
 
     const event = new InteractiveEvent("mousedown", mouseEvent);
 
+    // Set wasIntersectedOnMouseDown for all objects first
     this.interactiveObjects.forEach((object) => {
-      if (object.intersected) {
-        object.wasIntersectedOnMouseDown = true;
-        this.dispatch(object, event);
-      } else {
-        object.wasIntersectedOnMouseDown = false;
-      }
+      object.wasIntersectedOnMouseDown = object.intersected;
     });
+
+    // Get intersected objects sorted by distance (closest first)
+    const intersectedObjects = this.interactiveObjects
+      .filter(object => object.intersected)
+      .sort((a, b) => a.distance - b.distance);
+
+    // Dispatch to closest objects first, stop if propagation is cancelled
+    for (const object of intersectedObjects) {
+      this.dispatch(object, event);
+      if (event.cancelBubble) break;
+    }
   };
 
   onPointerDown = (pointerEvent: PointerEvent) => {
@@ -389,11 +417,16 @@ export class InteractionManager {
 
     const event = new InteractiveEvent("pointerdown", pointerEvent);
 
-    this.interactiveObjects.forEach((object) => {
-      if (object.intersected) {
-        this.dispatch(object, event);
-      }
-    });
+    // Get intersected objects sorted by distance (closest first)
+    const intersectedObjects = this.interactiveObjects
+      .filter(object => object.intersected)
+      .sort((a, b) => a.distance - b.distance);
+
+    // Dispatch to closest objects first, stop if propagation is cancelled
+    for (const object of intersectedObjects) {
+      this.dispatch(object, event);
+      if (event.cancelBubble) break;
+    }
   };
 
   onTouchStart = (touchEvent: TouchEvent) => {
@@ -412,27 +445,46 @@ export class InteractionManager {
       touchEvent,
     );
 
-    this.interactiveObjects.forEach((object) => {
-      if (object.intersected) {
-        this.dispatch(object, event);
-      }
-    });
+    // Get intersected objects sorted by distance (closest first)
+    const intersectedObjects = this.interactiveObjects
+      .filter(object => object.intersected)
+      .sort((a, b) => a.distance - b.distance);
+
+    // Dispatch to closest objects first, stop if propagation is cancelled
+    for (const object of intersectedObjects) {
+      this.dispatch(object, event);
+      if (event.cancelBubble) break;
+    }
   };
 
   onMouseUp = (mouseEvent: MouseEvent) => {
     const event = new InteractiveEvent("mouseup", mouseEvent);
 
-    this.interactiveObjects.forEach((object) => {
+    // Get intersected objects sorted by distance (closest first)
+    const intersectedObjects = this.interactiveObjects
+      .filter(object => object.intersected)
+      .sort((a, b) => a.distance - b.distance);
+
+    // Dispatch to closest objects first, stop if propagation is cancelled
+    for (const object of intersectedObjects) {
       this.dispatch(object, event);
-    });
+      if (event.cancelBubble) break;
+    }
   };
 
   onPointerUp = (pointerEvent: PointerEvent) => {
     const event = new InteractiveEvent("pointerup", pointerEvent);
 
-    this.interactiveObjects.forEach((object) => {
+    // Get intersected objects sorted by distance (closest first)
+    const intersectedObjects = this.interactiveObjects
+      .filter(object => object.intersected)
+      .sort((a, b) => a.distance - b.distance);
+
+    // Dispatch to closest objects first, stop if propagation is cancelled
+    for (const object of intersectedObjects) {
       this.dispatch(object, event);
-    });
+      if (event.cancelBubble) break;
+    }
   };
 
   onTouchEnd = (touchEvent: TouchEvent) => {
@@ -451,9 +503,16 @@ export class InteractionManager {
       touchEvent,
     );
 
-    this.interactiveObjects.forEach((object) => {
+    // Get intersected objects sorted by distance (closest first)
+    const intersectedObjects = this.interactiveObjects
+      .filter(object => object.intersected)
+      .sort((a, b) => a.distance - b.distance);
+
+    // Dispatch to closest objects first, stop if propagation is cancelled
+    for (const object of intersectedObjects) {
       this.dispatch(object, event);
-    });
+      if (event.cancelBubble) break;
+    }
   };
 
   dispatch = (object: InteractiveObject, event: InteractiveEvent) => {

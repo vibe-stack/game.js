@@ -18,12 +18,22 @@ export class EntityLoader {
     const { gameWorld } = context;
     let entity: Entity | null = null;
     
+    // Handle material references
+    let material: THREE.Material | undefined = undefined;
+    if (data.materialId && context.materials.has(data.materialId)) {
+      // Use material from context (loaded from scene data)
+      material = context.materials.get(data.materialId);
+    } else if (data.material) {
+      // Create material from inline definition
+      material = this.createMaterialFromData(context, data.material);
+    }
+    
     const config: any = {
       name: data.name,
       position: new THREE.Vector3(data.transform.position.x, data.transform.position.y, data.transform.position.z),
       rotation: new THREE.Euler(data.transform.rotation.x, data.transform.rotation.y, data.transform.rotation.z),
       scale: new THREE.Vector3(data.transform.scale.x, data.transform.scale.y, data.transform.scale.z),
-      material: data.material ? this.createMaterialFromData(context, data.material) : undefined,
+      material: material,
       castShadow: data.castShadow,
       receiveShadow: data.receiveShadow,
       ...data.properties,

@@ -9,6 +9,7 @@ import ErrorDisplay from "./components/error-display";
 import SceneSidebar from "./components/scene-sidebar";
 import PropertiesSidebar from "./components/properties-sidebar";
 import { MaterialEditor } from "./components/material-editor";
+import { toast } from "sonner";
 
 export default function GameStudioPage() {
   const navigate = useNavigate();
@@ -40,11 +41,15 @@ export default function GameStudioPage() {
 
   const handleSave = async () => {
     if (!gameWorldServiceRef.current) return;
+    const { currentScene } = useGameStudioStore.getState();
+    
     setSaving(true);
     try {
       await gameWorldServiceRef.current.saveScene();
+      toast.success(`Scene "${currentScene?.name || 'Untitled'}" saved successfully`);
     } catch (error) {
       console.error("Failed to save scene:", error);
+      toast.error(`Failed to save scene: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setSaving(false);
     }

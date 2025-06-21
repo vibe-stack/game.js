@@ -38,20 +38,16 @@ export default function GameCanvas({ gameWorldService }: GameCanvasProps) {
         
         // Initialize the game world, but don't load any scene yet
         // Scene loading will be handled by the separate effect below
-        console.log("GameWorld initialized successfully");
         setLoading(false);
         
         // Trigger initial scene load based on project
         if (currentProject.currentScene) {
-          console.log("Project has current scene:", currentProject.currentScene);
           setCurrentSceneName(currentProject.currentScene);
           setShouldLoadScene(true);
         } else if (currentProject.scenes && currentProject.scenes.length > 0) {
-          console.log("Loading first available scene:", currentProject.scenes[0]);
           setCurrentSceneName(currentProject.scenes[0]);
           setShouldLoadScene(true);
         } else {
-          console.log("No project scenes found, will wait for user to load scene");
         }
       } catch (error) {
         console.error("Failed to initialize canvas:", error);
@@ -81,22 +77,16 @@ export default function GameCanvas({ gameWorldService }: GameCanvasProps) {
         setError(null);
         
         if (currentSceneName === "Demo Scene") {
-          console.log("Loading demo scene");
           await gameWorldService.current!.loadDefaultScene();
         } else {
-          console.log("Loading project scene via file system:", currentSceneName);
           // Load scene JSON data via file system
           const scenePath = `${currentProject.path}/scenes/${currentSceneName}.json`;
           const sceneContent = await window.projectAPI.readFile(scenePath);
           const sceneData = JSON.parse(sceneContent);
-          console.log("Scene data loaded, now loading into game world:", sceneData);
-          // Pass the actual JSON data to the service
-          await gameWorldService.current!.loadScene(sceneData);
+          // Pass the actual JSON data to the service with filename tracking
+          await gameWorldService.current!.loadSceneFromFile(sceneData, currentSceneName);
         }
 
-        console.log("Scene loaded successfully");
-        console.log("GameWorld entities count:", gameWorldService.current!.getGameWorld()?.getRegistryManager().getRegistry("entities")?.size() || 0);
-        
         setShouldLoadScene(false); // Reset the flag
         setLoading(false);
       } catch (error) {

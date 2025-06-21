@@ -83,7 +83,7 @@ export default function ProjectInfoToolbar({
 
       // Load the scene in the game world
       if (gameWorldService) {
-        await gameWorldService.loadScene(defaultSceneData);
+        await gameWorldService.loadSceneFromFile(defaultSceneData, sceneName);
       }
 
       toast.success('Default scene created');
@@ -108,7 +108,6 @@ export default function ProjectInfoToolbar({
   const handleSceneChange = async (sceneName: string) => {
     if (!currentProject?.path) return;
 
-
     try {
       setIsLoading(true);
 
@@ -124,11 +123,10 @@ export default function ProjectInfoToolbar({
       setCurrentScene(sceneWithMetadata);
       // Switch scene in the project
       await window.projectAPI.switchScene(currentProject.path, sceneName);
-      // Load scene in the game world
+      // Load scene in the game world with filename tracking
       if (gameWorldService) {
-        await gameWorldService.loadScene(sceneData);
+        await gameWorldService.loadSceneFromFile(sceneData, sceneName);
       }
-      toast.success(`Switched to scene: ${getSceneName(sceneName)}`);
     } catch (error) {
       console.error('Failed to switch scene:', error);
       toast.error('Failed to switch scene');
