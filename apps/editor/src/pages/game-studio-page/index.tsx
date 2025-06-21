@@ -8,6 +8,7 @@ import LoadingOverlay from "./components/loading-overlay";
 import ErrorDisplay from "./components/error-display";
 import SceneSidebar from "./components/scene-sidebar";
 import PropertiesSidebar from "./components/properties-sidebar";
+import { MaterialEditor } from "./components/material-editor";
 
 export default function GameStudioPage() {
   const navigate = useNavigate();
@@ -82,6 +83,7 @@ export default function GameStudioPage() {
         onResume={handleResume}
       />
       <GameCanvas gameWorldService={gameWorldServiceRef} />
+      <MaterialEditor />
     </div>
   );
 }

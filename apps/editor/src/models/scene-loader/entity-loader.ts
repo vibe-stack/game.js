@@ -15,7 +15,6 @@ export class EntityLoader {
   }
 
   private async createEntity(context: LoaderContext, data: EntityData, entityMap: Map<string, Entity>): Promise<Entity | null> {
-    console.log("creating entity", context, data, entityMap)
     const { gameWorld } = context;
     let entity: Entity | null = null;
     
@@ -78,7 +77,6 @@ export class EntityLoader {
   }
 
   private createCamera(context: LoaderContext, data: EntityData): void {
-    console.log("creating camera", context, data)
     const cameraManager = context.gameWorld.getCameraManager();
     const camera = data.properties?.type === 'orthographic'
       ? new THREE.OrthographicCamera(data.properties?.left, data.properties?.right, data.properties?.top, data.properties?.bottom, data.properties?.near, data.properties?.far)

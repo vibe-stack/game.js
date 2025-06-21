@@ -114,4 +114,9 @@ export class Sphere extends Entity {
   }
   
   getMesh(): THREE.Mesh { return this.mesh; }
+  getMaterial(): THREE.Material { return this.material; }
+  setMaterial(material: THREE.Material): void { 
+    this.material = material; 
+    this.mesh.material = material; 
+  }
 }

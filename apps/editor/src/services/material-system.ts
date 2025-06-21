@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MaterialLibrary, MaterialDefinition, TSLShaderGraph, TextureReference, EnhancedAssetReference } from '@/types/project';
 
 // Material System Service
 export class MaterialSystem {
@@ -52,7 +53,7 @@ export class MaterialSystem {
     return Array.from(this.materialDefinitions.values())
       .filter((material: MaterialDefinition) => 
         material.name.toLowerCase().includes(lowerQuery) ||
-        material.description.toLowerCase().includes(lowerQuery) ||
+        material.description?.toLowerCase().includes(lowerQuery) ||
         material.metadata.tags.some((tag: string) => tag.toLowerCase().includes(lowerQuery))
       );
   }
@@ -71,10 +72,10 @@ export class MaterialSystem {
     // Apply texture properties
     if (asset.textureProperties) {
       const props = asset.textureProperties;
-      texture.flipY = props.flipY;
-      texture.generateMipmaps = props.generateMipmaps;
-      texture.premultiplyAlpha = props.premultiplyAlpha;
-      texture.unpackAlignment = props.unpackAlignment;
+      if (props.flipY !== undefined) texture.flipY = props.flipY;
+      if (props.generateMipmaps !== undefined) texture.generateMipmaps = props.generateMipmaps;
+      if (props.premultiplyAlpha !== undefined) texture.premultiplyAlpha = props.premultiplyAlpha;
+      if (props.unpackAlignment !== undefined) texture.unpackAlignment = props.unpackAlignment;
       
       // Set color space
       switch (props.colorSpace) {
@@ -124,10 +125,10 @@ export class MaterialSystem {
             // Apply texture reference properties
             texture.wrapS = this.getThreeWrapMode(textureRef.wrapS || 'repeat');
             texture.wrapT = this.getThreeWrapMode(textureRef.wrapT || 'repeat');
-            texture.repeat.set(textureRef.repeat.x, textureRef.repeat.y);
-            texture.offset.set(textureRef.offset.x, textureRef.offset.y);
-            texture.rotation = textureRef.rotation;
-            texture.anisotropy = textureRef.anisotropy;
+            if (textureRef.repeat) texture.repeat.set(textureRef.repeat.x, textureRef.repeat.y);
+            if (textureRef.offset) texture.offset.set(textureRef.offset.x, textureRef.offset.y);
+            if (textureRef.rotation !== undefined) texture.rotation = textureRef.rotation;
+            if (textureRef.anisotropy !== undefined) texture.anisotropy = textureRef.anisotropy;
             
             material.uniforms[`texture_${textureNode.id}`] = { value: texture };
           }
@@ -314,7 +315,7 @@ export class MaterialSystem {
     material.visible = props.visible !== false;
     material.depthTest = props.depthTest !== false;
     material.depthWrite = props.depthWrite !== false;
-    material.fog = props.fog !== false;
+    if ('fog' in material) (material as any).fog = props.fog !== false;
     // Add more base properties as needed...
   }
 
@@ -437,9 +438,6 @@ export class MaterialSystem {
             lighting: 'studio'
           },
           metadata: {
-            created: new Date(),
-            modified: new Date(),
-            version: '1.0.0',
             tags: ['default', 'pbr'],
             category: 'standard'
           }
@@ -449,8 +447,7 @@ export class MaterialSystem {
       sharedShaderGraphs: [],
       metadata: {
         created: new Date(),
-        modified: new Date(),
-        version: '1.0.0'
+        modified: new Date()
       }
     };
 

@@ -151,4 +151,9 @@ export class Box extends Entity {
   get depth(): number { return this.dimensions.z; }
   get size(): THREE.Vector3 { return this.dimensions.clone(); }
   getMesh(): THREE.Mesh { return this.mesh; }
+  getMaterial(): THREE.Material { return this.material; }
+  setMaterial(material: THREE.Material): void { 
+    this.material = material; 
+    this.mesh.material = material; 
+  }
 }

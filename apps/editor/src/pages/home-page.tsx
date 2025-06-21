@@ -23,6 +23,7 @@ import { Plus, FolderOpen, Play, Settings, Folder, Trash2, GamepadIcon } from "l
 import { useNavigate } from "@tanstack/react-router";
 import useGameStudioStore from "@/stores/game-studio-store";
 import { GameProject } from "@/types/project";
+import { toast } from "sonner";
 // Using existing GameProject type from d.ts for now
 interface CreateProjectOptions {
   name: string;
@@ -125,7 +126,7 @@ export default function HomePage() {
       navigate({ to: "/game-studio-page" });
     } catch (error) {
       console.error("Failed to create project:", error);
-      // TODO: Show error toast
+      toast.error("Failed to create project");
     } finally {
       setIsCreating(false);
     }
@@ -143,7 +144,7 @@ export default function HomePage() {
       navigate({ to: "/game-studio-page" });
     } catch (error) {
       console.error("Failed to open project:", error);
-      // TODO: Show error toast
+      toast.error("Failed to open project");
     }
   };
 
@@ -165,7 +166,7 @@ export default function HomePage() {
         await loadProjects();
       } catch (error) {
         console.error("Failed to delete project:", error);
-        // TODO: Show error toast
+        toast.error("Failed to delete project");
       } finally {
         setIsDeleting(null);
       }
