@@ -12,15 +12,15 @@ export abstract class Entity extends THREE.Object3D {
   protected physicsManager: PhysicsManager | null = null;
   protected rigidBodyId: string | null = null;
   protected colliderId: string | null = null;
-  protected physicsConfig: PhysicsConfig | null = null;
+  public physicsConfig: PhysicsConfig | null = null;
   private tweens: TweenConfig[] = [];
   private interactionCallbacks: InteractionCallbacks = {};
   private destroyed = false;
   private debugRenderEnabled = false;
   
   // Character controller support
-  private characterControllerConfig: CharacterControllerConfig | null = null;
-  private hasCharacterController = false;
+  public characterControllerConfig: CharacterControllerConfig | null = null;
+  public hasCharacterController = false;
   
   // Event system for React synchronization
   private changeListeners: Set<() => void> = new Set();
@@ -163,27 +163,49 @@ export abstract class Entity extends THREE.Object3D {
     return this;
   }
 
+  private updatePhysicsConfig(config: PhysicsConfig): this {
+    if (!this.physicsManager) return this;
+
+    // If a rigid body already exists, remove it before creating a new one.
+    if (this.rigidBodyId) {
+      this.physicsManager.removeRigidBody(this.rigidBodyId);
+      this.rigidBodyId = null;
+    }
+    if (this.colliderId) {
+      this.physicsManager.removeCollider(this.colliderId);
+      this.colliderId = null;
+    }
+
+    this.setupPhysics(config);
+
+    if (this.physicsConfig) {
+      this.physicsConfig.friction = config.friction;
+      this.physicsConfig.mass = config.mass;
+      this.physicsConfig.restitution = config.restitution;
+      this.physicsConfig.type = config.type;
+    } else {
+      this.physicsConfig = config;
+    }
+
+    this.emitChange();
+    return this;
+  }
+
   enableDynamicPhysics(mass = 1, restitution = 0.5, friction = 0.7): this {
     const config = { type: "dynamic" as const, mass, restitution, friction };
-    this.physicsConfig = config;
-    this.setupPhysics(config);
-    this.emitChange();
+    this.updatePhysicsConfig(config);
     return this;
   }
 
   enableStaticPhysics(restitution = 0.5, friction = 0.7): this {
     const config = { type: "static" as const, restitution, friction };
-    this.physicsConfig = config;
-    this.setupPhysics(config);
-    this.emitChange();
+    this.updatePhysicsConfig(config);
     return this;
   }
 
   enableKinematicPhysics(): this {
     const config = { type: "kinematic" as const };
-    this.physicsConfig = config;
-    this.setupPhysics(config);
-    this.emitChange();
+    this.updatePhysicsConfig(config);
     return this;
   }
 
@@ -204,11 +226,80 @@ export abstract class Entity extends THREE.Object3D {
   }
 
   getPhysicsConfig(): PhysicsConfig | null {
-    return this.physicsConfig ? { ...this.physicsConfig } : null;
+    return this.physicsConfig ? this.physicsConfig : null;
   }
 
   hasPhysics(): boolean {
     return this.physicsConfig !== null && this.rigidBodyId !== null;
+  }
+
+  // New methods to update individual physics properties without recreating bodies
+  updateMass(mass: number): this {
+    if (!this.hasPhysics() || !this.physicsConfig || this.physicsConfig.type !== 'dynamic') return this;
+    
+    // Always update the config for UI consistency
+    this.physicsConfig.mass = mass;
+    
+    // Try to update the physics manager if available
+    if (this.physicsManager && this.rigidBodyId) {
+      this.physicsManager.updateMass(this.rigidBodyId, mass);
+    }
+    
+    // Always emit change to update UI
+    this.emitChange();
+    return this;
+  }
+
+  updateRestitution(restitution: number): this {
+    if (!this.hasPhysics() || !this.physicsConfig) return this;
+    
+    // Always update the config for UI consistency
+    this.physicsConfig.restitution = restitution;
+    
+    // Try to update the physics manager if available
+    if (this.physicsManager && this.rigidBodyId) {
+      this.physicsManager.updateRestitution(this.rigidBodyId, restitution);
+    }
+    
+    // Always emit change to update UI
+    this.emitChange();
+    return this;
+  }
+
+  updateFriction(friction: number): this {
+    if (!this.hasPhysics() || !this.physicsConfig) return this;
+    
+    // Always update the config for UI consistency
+    this.physicsConfig.friction = friction;
+    
+    // Try to update the physics manager if available
+    if (this.physicsManager && this.rigidBodyId) {
+      this.physicsManager.updateFriction(this.rigidBodyId, friction);
+    }
+    
+    // Always emit change to update UI
+    this.emitChange();
+    return this;
+  }
+
+  updatePhysicsType(type: "static" | "dynamic" | "kinematic"): this {
+    if (!this.hasPhysics() || !this.physicsConfig) return this;
+    
+    // Always update the config for UI consistency
+    this.physicsConfig.type = type;
+    // Clear mass for non-dynamic bodies
+    if (type !== 'dynamic') {
+      delete this.physicsConfig.mass;
+    }
+    
+    // Try to update the physics manager if available
+    if (this.physicsManager && this.rigidBodyId) {
+      this.physicsManager.updatePhysicsType(this.rigidBodyId, type);
+    }
+    
+    // Always emit change to update UI
+    this.emitChange();
+    return this;
   }
 
   private setupPhysics(config: PhysicsConfig): void {
@@ -329,6 +420,23 @@ export abstract class Entity extends THREE.Object3D {
   getRigidBodyId(): string | null { return this.rigidBodyId; }
   getColliderId(): string | null { return this.colliderId; }
 
+  // Physics property getters for React synchronization
+  get physicsType(): string | undefined {
+    return this.physicsConfig?.type;
+  }
+  
+  get physicsMass(): number | undefined {
+    return this.physicsConfig?.mass;
+  }
+  
+  get physicsRestitution(): number | undefined {
+    return this.physicsConfig?.restitution;
+  }
+  
+  get physicsFriction(): number | undefined {
+    return this.physicsConfig?.friction;
+  }
+
   // Character controller methods
   enableCharacterController(config: Partial<CharacterControllerConfig> = {}): this {
     // Default character controller config
@@ -362,7 +470,9 @@ export abstract class Entity extends THREE.Object3D {
     this.hasCharacterController = true;
     
     // Automatically enable kinematic physics for character controller
-    this.enableKinematicPhysics();
+    if (!this.hasPhysics() || this.getPhysicsConfig()?.type !== 'kinematic') {
+      this.enableKinematicPhysics();
+    }
     
     this.emitChange();
     return this;
@@ -376,7 +486,7 @@ export abstract class Entity extends THREE.Object3D {
   }
 
   getCharacterControllerConfig(): CharacterControllerConfig | null {
-    return this.characterControllerConfig ? { ...this.characterControllerConfig } : null;
+    return this.characterControllerConfig ? this.characterControllerConfig : null;
   }
 
   updateCharacterControllerConfig(newConfig: Partial<CharacterControllerConfig>): this {

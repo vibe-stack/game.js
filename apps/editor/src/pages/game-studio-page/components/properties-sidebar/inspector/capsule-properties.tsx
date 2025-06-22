@@ -3,20 +3,20 @@ import { Capsule } from "@/models/primitives/capsule";
 import { DragInput } from "@/components/ui/drag-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useEntityState } from "@/hooks/use-entity-state";
 
 interface CapsulePropertiesProps {
   entity: Capsule;
-  onUpdate: () => void;
 }
 
-export function CapsuleProperties({ entity, onUpdate }: CapsulePropertiesProps) {
+export function CapsuleProperties({ entity }: CapsulePropertiesProps) {
+  useEntityState(entity);
   const handleDimensionChange = (field: 'radius' | 'length', value: number) => {
     if (field === 'radius') {
       entity.setDimensions(value, entity.length);
     } else {
       entity.setDimensions(entity.radius, value);
     }
-    onUpdate();
   };
 
   const handleSegmentChange = (field: 'cap' | 'radial', value: number) => {
@@ -26,7 +26,6 @@ export function CapsuleProperties({ entity, onUpdate }: CapsulePropertiesProps) 
     } else {
       entity.setSegments(entity.segments.cap, intValue);
     }
-    onUpdate();
   };
 
   const handleShadowChange = (field: 'cast' | 'receive', checked: boolean) => {
@@ -35,7 +34,6 @@ export function CapsuleProperties({ entity, onUpdate }: CapsulePropertiesProps) 
     } else {
       entity.setShadowSettings(entity.getMesh().castShadow, checked);
     }
-    onUpdate();
   };
 
   return (
@@ -117,7 +115,7 @@ export function CapsuleProperties({ entity, onUpdate }: CapsulePropertiesProps) 
             <Checkbox
               id="capsule-cast-shadow"
               checked={entity.getMesh().castShadow}
-              onCheckedChange={(checked) => handleShadowChange('cast', checked)}
+              onCheckedChange={(checked) => handleShadowChange('cast', checked as boolean)}
             />
             <Label htmlFor="capsule-cast-shadow" className="text-xs text-gray-400">Cast Shadow</Label>
           </div>
@@ -125,7 +123,7 @@ export function CapsuleProperties({ entity, onUpdate }: CapsulePropertiesProps) 
             <Checkbox
               id="capsule-receive-shadow"
               checked={entity.getMesh().receiveShadow}
-              onCheckedChange={(checked) => handleShadowChange('receive', checked)}
+              onCheckedChange={(checked) => handleShadowChange('receive', checked as boolean)}
             />
             <Label htmlFor="capsule-receive-shadow" className="text-xs text-gray-400">Receive Shadow</Label>
           </div>

@@ -1,31 +1,36 @@
 import React from "react";
-import { Light, AmbientLight, DirectionalLight, PointLight, SpotLight } from "@/models/primitives/light";
+import {
+  Light,
+  AmbientLight,
+  DirectionalLight,
+  PointLight,
+  SpotLight,
+} from "@/models/primitives/light";
 import { DragInput } from "@/components/ui/drag-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Vector3Input } from "./vector3-input";
+import { useEntityState } from "@/hooks/use-entity-state";
+import { Vector3 } from "three";
 
 interface LightPropertiesProps {
   entity: Light;
-  onUpdate: () => void;
 }
 
-export function LightProperties({ entity, onUpdate }: LightPropertiesProps) {
+export function LightProperties({ entity }: LightPropertiesProps) {
+  useEntityState(entity);
   const handleColorChange = (value: string) => {
     entity.setColor(value);
-    onUpdate();
   };
 
   const handleIntensityChange = (value: number) => {
     entity.setIntensity(value);
-    onUpdate();
   };
 
   const handleShadowToggle = (checked: boolean) => {
-    if ('castShadow' in entity.light) {
+    if ("castShadow" in entity.light) {
       (entity.light as any).castShadow = checked;
-      onUpdate();
     }
   };
 
@@ -81,10 +86,9 @@ export function LightProperties({ entity, onUpdate }: LightPropertiesProps) {
         <Vector3Input
           value={light.getTarget()}
           onChange={(target) => {
-            light.setTarget(target);
-            onUpdate();
+            light.setTarget(target as Vector3);
           }}
-          labels={['X', 'Y', 'Z']}
+          label="Target Position"
         />
       </div>
       <div>
@@ -93,7 +97,6 @@ export function LightProperties({ entity, onUpdate }: LightPropertiesProps) {
           value={50}
           onChange={(size) => {
             light.setShadowCameraSize(size);
-            onUpdate();
           }}
           min={1}
           max={200}
@@ -139,7 +142,6 @@ export function LightProperties({ entity, onUpdate }: LightPropertiesProps) {
           value={light.getDistance()}
           onChange={(distance) => {
             light.setDistance(distance);
-            onUpdate();
           }}
           min={0}
           max={1000}
@@ -153,7 +155,6 @@ export function LightProperties({ entity, onUpdate }: LightPropertiesProps) {
           value={light.getDecay()}
           onChange={(decay) => {
             light.setDecay(decay);
-            onUpdate();
           }}
           min={0.1}
           max={5}
@@ -199,7 +200,6 @@ export function LightProperties({ entity, onUpdate }: LightPropertiesProps) {
           value={light.getDistance()}
           onChange={(distance) => {
             light.setDistance(distance);
-            onUpdate();
           }}
           min={0}
           max={1000}
@@ -213,7 +213,6 @@ export function LightProperties({ entity, onUpdate }: LightPropertiesProps) {
           value={light.getAngle()}
           onChange={(angle) => {
             light.setAngle(angle);
-            onUpdate();
           }}
           min={0}
           max={Math.PI / 2}
@@ -221,7 +220,7 @@ export function LightProperties({ entity, onUpdate }: LightPropertiesProps) {
           className="text-xs"
         />
         <Label className="text-xs text-gray-500">
-          Degrees: {(light.getAngle() * 180 / Math.PI).toFixed(1)}°
+          Degrees: {((light.getAngle() * 180) / Math.PI).toFixed(1)}°
         </Label>
       </div>
       <div>
@@ -230,7 +229,6 @@ export function LightProperties({ entity, onUpdate }: LightPropertiesProps) {
           value={light.getPenumbra()}
           onChange={(penumbra) => {
             light.setPenumbra(penumbra);
-            onUpdate();
           }}
           min={0}
           max={1}
@@ -244,7 +242,6 @@ export function LightProperties({ entity, onUpdate }: LightPropertiesProps) {
           value={light.getDecay()}
           onChange={(decay) => {
             light.setDecay(decay);
-            onUpdate();
           }}
           min={0.1}
           max={5}
@@ -257,10 +254,9 @@ export function LightProperties({ entity, onUpdate }: LightPropertiesProps) {
         <Vector3Input
           value={light.getTarget()}
           onChange={(target) => {
-            light.setTarget(target);
-            onUpdate();
+            light.setTarget(target as Vector3);
           }}
-          labels={['X', 'Y', 'Z']}
+          label="Target Position"
         />
       </div>
       <div className="flex items-center space-x-2">
@@ -288,11 +284,12 @@ export function LightProperties({ entity, onUpdate }: LightPropertiesProps) {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-yellow-300 text-sm font-medium border-b border-white/10 pb-1">
-        {entity.lightType.charAt(0).toUpperCase() + entity.lightType.slice(1)} Light Properties
+      <h3 className="border-b border-white/10 pb-1 text-sm font-medium text-yellow-300">
+        {entity.lightType.charAt(0).toUpperCase() + entity.lightType.slice(1)}{" "}
+        Light Properties
       </h3>
-      
+
       {renderProperties()}
     </div>
   );
-} 
+}

@@ -1,13 +1,15 @@
 import React from "react";
 import { DragInput } from "@/components/ui/drag-input";
 import { Box } from "@/models/primitives/box";
+import { useEntityState } from "@/hooks/use-entity-state";
 
 interface BoxPropertiesProps {
   entity: Box;
-  onUpdate: () => void;
 }
 
-export function BoxProperties({ entity, onUpdate }: BoxPropertiesProps) {
+export function BoxProperties({ entity }: BoxPropertiesProps) {
+  useEntityState(entity);
+
   const handleDimensionChange = (dimension: 'width' | 'height' | 'depth', value: number) => {
     let success = false;
 
@@ -23,9 +25,7 @@ export function BoxProperties({ entity, onUpdate }: BoxPropertiesProps) {
         break;
     }
 
-    if (success) {
-      onUpdate();
-    } else {
+    if (!success) {
       console.warn(`Failed to update ${dimension} to ${value}`);
     }
   };
@@ -46,9 +46,7 @@ export function BoxProperties({ entity, onUpdate }: BoxPropertiesProps) {
         break;
     }
 
-    if (success) {
-      onUpdate();
-    } else {
+    if (!success) {
       console.warn(`Failed to update ${segmentType} segments to ${segments}`);
     }
   };

@@ -7,11 +7,11 @@ import { Entity } from "@/models";
  * when the entity properties change externally.
  */
 export function useEntityState(entity: Entity | null) {
-  const [, forceUpdate] = useState({});
+  const [updateCounter, setUpdateCounter] = useState(0);
   
   // Function to force a re-render
   const triggerUpdate = useCallback(() => {
-    forceUpdate({});
+    setUpdateCounter(prev => prev + 1);
   }, []);
 
   useEffect(() => {

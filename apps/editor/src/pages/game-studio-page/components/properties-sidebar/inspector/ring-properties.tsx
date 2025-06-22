@@ -3,20 +3,20 @@ import { Ring } from "@/models/primitives/ring";
 import { DragInput } from "@/components/ui/drag-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useEntityState } from "@/hooks/use-entity-state";
 
 interface RingPropertiesProps {
   entity: Ring;
-  onUpdate: () => void;
 }
 
-export function RingProperties({ entity, onUpdate }: RingPropertiesProps) {
+export function RingProperties({ entity }: RingPropertiesProps) {
+  useEntityState(entity);
   const handleDimensionChange = (field: 'inner' | 'outer', value: number) => {
     if (field === 'inner') {
       entity.setDimensions(value, entity.outerRadius);
     } else {
       entity.setDimensions(entity.innerRadius, value);
     }
-    onUpdate();
   };
 
   const handleSegmentChange = (field: 'theta' | 'phi', value: number) => {
@@ -26,7 +26,6 @@ export function RingProperties({ entity, onUpdate }: RingPropertiesProps) {
     } else {
       entity.setSegments(entity.segmentConfig.theta, intValue);
     }
-    onUpdate();
   };
 
   const handleAngularChange = (field: 'thetaStart' | 'thetaLength', value: number) => {
@@ -35,7 +34,6 @@ export function RingProperties({ entity, onUpdate }: RingPropertiesProps) {
     } else {
       entity.setAngularConfig(entity.segmentConfig.thetaStart, value);
     }
-    onUpdate();
   };
 
   const handleShadowChange = (field: 'cast' | 'receive', checked: boolean) => {
@@ -44,7 +42,6 @@ export function RingProperties({ entity, onUpdate }: RingPropertiesProps) {
     } else {
       entity.setShadowSettings(entity.getMesh().castShadow, checked);
     }
-    onUpdate();
   };
 
   return (
@@ -169,7 +166,7 @@ export function RingProperties({ entity, onUpdate }: RingPropertiesProps) {
             <Checkbox
               id="ring-cast-shadow"
               checked={entity.getMesh().castShadow}
-              onCheckedChange={(checked) => handleShadowChange('cast', checked)}
+              onCheckedChange={(checked) => handleShadowChange('cast', checked as boolean)}
             />
             <Label htmlFor="ring-cast-shadow" className="text-xs text-gray-400">Cast Shadow</Label>
           </div>
@@ -177,7 +174,7 @@ export function RingProperties({ entity, onUpdate }: RingPropertiesProps) {
             <Checkbox
               id="ring-receive-shadow"
               checked={entity.getMesh().receiveShadow}
-              onCheckedChange={(checked) => handleShadowChange('receive', checked)}
+              onCheckedChange={(checked) => handleShadowChange('receive', checked as boolean)}
             />
             <Label htmlFor="ring-receive-shadow" className="text-xs text-gray-400">Receive Shadow</Label>
           </div>

@@ -1,22 +1,23 @@
 import React from "react";
 import { Torus } from "@/models/primitives/torus";
+import { useEntityState } from "@/hooks/use-entity-state";
 import { DragInput } from "@/components/ui/drag-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
 interface TorusPropertiesProps {
   entity: Torus;
-  onUpdate: () => void;
 }
 
-export function TorusProperties({ entity, onUpdate }: TorusPropertiesProps) {
+export function TorusProperties({ entity }: TorusPropertiesProps) {
+  useEntityState(entity);
+
   const handleDimensionChange = (field: 'radius' | 'tube', value: number) => {
     if (field === 'radius') {
       entity.setDimensions(value, entity.tube);
     } else {
       entity.setDimensions(entity.radius, value);
     }
-    onUpdate();
   };
 
   const handleSegmentChange = (field: 'radial' | 'tubular', value: number) => {
@@ -26,12 +27,10 @@ export function TorusProperties({ entity, onUpdate }: TorusPropertiesProps) {
     } else {
       entity.setSegments(entity.segmentConfig.radial, intValue);
     }
-    onUpdate();
   };
 
   const handleArcChange = (value: number) => {
     entity.setArc(value);
-    onUpdate();
   };
 
   const handleShadowChange = (field: 'cast' | 'receive', checked: boolean) => {
@@ -40,7 +39,6 @@ export function TorusProperties({ entity, onUpdate }: TorusPropertiesProps) {
     } else {
       entity.setShadowSettings(entity.getMesh().castShadow, checked);
     }
-    onUpdate();
   };
 
   return (
@@ -149,7 +147,7 @@ export function TorusProperties({ entity, onUpdate }: TorusPropertiesProps) {
             <Checkbox
               id="torus-cast-shadow"
               checked={entity.getMesh().castShadow}
-              onCheckedChange={(checked) => handleShadowChange('cast', checked)}
+              onCheckedChange={(checked) => handleShadowChange('cast', !!checked)}
             />
             <Label htmlFor="torus-cast-shadow" className="text-xs text-gray-400">Cast Shadow</Label>
           </div>
@@ -157,7 +155,7 @@ export function TorusProperties({ entity, onUpdate }: TorusPropertiesProps) {
             <Checkbox
               id="torus-receive-shadow"
               checked={entity.getMesh().receiveShadow}
-              onCheckedChange={(checked) => handleShadowChange('receive', checked)}
+              onCheckedChange={(checked) => handleShadowChange('receive', !!checked)}
             />
             <Label htmlFor="torus-receive-shadow" className="text-xs text-gray-400">Receive Shadow</Label>
           </div>

@@ -7,6 +7,7 @@ interface DragInputProps {
   step?: number
   precision?: number
   min?: number
+  id?: string
   max?: number
   className?: string
   label?: string
@@ -22,6 +23,7 @@ export function DragInput({
   precision = 1,
   min,
   max,
+  id,
   className,
   label,
   suffix,
@@ -189,6 +191,7 @@ export function DragInput({
       )}
       {isEditing ? (
         <input
+          id={id}
           ref={inputRef}
           type="text"
           value={inputValue}

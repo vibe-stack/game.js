@@ -26,49 +26,48 @@ import { CharacterControllerSection } from "./character-controller-section";
 
 interface EntityPropertiesRegistryProps {
   entity: Entity;
-  onUpdate: () => void;
 }
 
-export function EntityPropertiesRegistry({ entity, onUpdate }: EntityPropertiesRegistryProps) {
+export function EntityPropertiesRegistry({ entity }: EntityPropertiesRegistryProps) {
   const renderEntitySpecificProperties = () => {
     if (entity instanceof Box) {
-      return <BoxProperties entity={entity} onUpdate={onUpdate} />;
+      return <BoxProperties entity={entity} />;
     }
     
     if (entity instanceof Sphere) {
-      return <SphereProperties entity={entity} onUpdate={onUpdate} />;
+      return <SphereProperties entity={entity} />;
     }
 
     if (entity instanceof Cone) {
-      return <ConeProperties entity={entity} onUpdate={onUpdate} />;
+      return <ConeProperties entity={entity} />;
     }
 
     if (entity instanceof Cylinder) {
-      return <CylinderProperties entity={entity} onUpdate={onUpdate} />;
+      return <CylinderProperties entity={entity} />;
     }
 
     if (entity instanceof Plane) {
-      return <PlaneProperties entity={entity} onUpdate={onUpdate} />;
+      return <PlaneProperties entity={entity} />;
     }
 
     if (entity instanceof Capsule) {
-      return <CapsuleProperties entity={entity} onUpdate={onUpdate} />;
+      return <CapsuleProperties entity={entity} />;
     }
 
     if (entity instanceof Torus) {
-      return <TorusProperties entity={entity} onUpdate={onUpdate} />;
+      return <TorusProperties entity={entity} />;
     }
 
     if (entity instanceof Ring) {
-      return <RingProperties entity={entity} onUpdate={onUpdate} />;
+      return <RingProperties entity={entity} />;
     }
 
     if (entity instanceof Light) {
-      return <LightProperties entity={entity} onUpdate={onUpdate} />;
+      return <LightProperties entity={entity} />;
     }
 
     if (entity instanceof Heightfield) {
-      return <HeightfieldProperties entity={entity} onUpdate={onUpdate} />;
+      return <HeightfieldProperties entity={entity} />;
     }
 
     // For entities without specific property components, show a generic message
@@ -96,9 +95,9 @@ export function EntityPropertiesRegistry({ entity, onUpdate }: EntityPropertiesR
       {renderEntitySpecificProperties()}
       
       {/* Character Controller Section */}
-      <CharacterControllerSection entity={entity} onUpdate={onUpdate} />
+      <CharacterControllerSection entity={entity} />
       
-      <PhysicsProperties entity={entity} onUpdate={onUpdate} />
+      <PhysicsProperties entity={entity} />
       <MaterialsSection entity={entity} />
     </div>
   );

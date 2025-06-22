@@ -1,18 +1,18 @@
 import React from "react";
 import { DragInput } from "@/components/ui/drag-input";
 import { Sphere } from "@/models/primitives/sphere";
+import { useEntityState } from "@/hooks/use-entity-state";
 
 interface SpherePropertiesProps {
   entity: Sphere;
-  onUpdate: () => void;
 }
 
-export function SphereProperties({ entity, onUpdate }: SpherePropertiesProps) {
+export function SphereProperties({ entity }: SpherePropertiesProps) {
+  useEntityState(entity);
+
   const handleRadiusChange = (newRadius: number) => {
     const success = entity.setRadius(newRadius);
-    if (success) {
-      onUpdate();
-    } else {
+    if (!success) {
       console.warn("Could not update sphere radius:", newRadius);
     }
   };
@@ -27,9 +27,7 @@ export function SphereProperties({ entity, onUpdate }: SpherePropertiesProps) {
       success = entity.setHeightSegments(segmentValue);
     }
     
-    if (success) {
-      onUpdate();
-    } else {
+    if (!success) {
       console.warn(`Could not update sphere ${type} segments:`, segmentValue);
     }
   };

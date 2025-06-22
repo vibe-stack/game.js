@@ -1,22 +1,23 @@
 import React from "react";
 import { Cone } from "@/models/primitives/cone";
+import { useEntityState } from "@/hooks/use-entity-state";
 import { DragInput } from "@/components/ui/drag-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
 interface ConePropertiesProps {
   entity: Cone;
-  onUpdate: () => void;
 }
 
-export function ConeProperties({ entity, onUpdate }: ConePropertiesProps) {
+export function ConeProperties({ entity }: ConePropertiesProps) {
+  useEntityState(entity);
+
   const handleDimensionChange = (field: 'radius' | 'height', value: number) => {
     if (field === 'radius') {
       entity.setDimensions(value, entity.height);
     } else {
       entity.setDimensions(entity.radius, value);
     }
-    onUpdate();
   };
 
   const handleSegmentChange = (field: 'radial' | 'height', value: number) => {
@@ -26,7 +27,6 @@ export function ConeProperties({ entity, onUpdate }: ConePropertiesProps) {
     } else {
       entity.setSegments(entity.segmentConfig.radial, intValue);
     }
-    onUpdate();
   };
 
   const handleAngularChange = (field: 'thetaStart' | 'thetaLength', value: number) => {
@@ -35,12 +35,10 @@ export function ConeProperties({ entity, onUpdate }: ConePropertiesProps) {
     } else {
       entity.setAngularConfig(entity.segmentConfig.thetaStart, value);
     }
-    onUpdate();
   };
 
   const handleOpenEndedChange = (checked: boolean) => {
     entity.setOpenEnded(checked);
-    onUpdate();
   };
 
   const handleShadowChange = (field: 'cast' | 'receive', checked: string | boolean) => {
@@ -50,7 +48,6 @@ export function ConeProperties({ entity, onUpdate }: ConePropertiesProps) {
     } else {
       entity.setShadowSettings(entity.getMesh().castShadow, boolValue);
     }
-    onUpdate();
   };
 
   return (

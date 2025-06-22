@@ -355,4 +355,55 @@ export class PhysicsManager {
       return null;
     }
   }
+
+  // New methods for updating physics properties without recreating bodies
+  updateMass(id: string, mass: number): boolean {
+    const rigidBody = this.bodyMap.get(id);
+    if (!rigidBody || !rigidBody.isDynamic()) return false;
+
+    rigidBody.setAdditionalMass(mass, true);
+    return true;
+  }
+
+  updateRestitution(id: string, restitution: number): boolean {
+    const rigidBody = this.bodyMap.get(id);
+    if (!rigidBody) return false;
+
+    // Update all colliders attached to this rigid body
+    for (let i = 0; i < rigidBody.numColliders(); i++) {
+      const collider = rigidBody.collider(i);
+      collider.setRestitution(restitution);
+    }
+    return true;
+  }
+
+  updateFriction(id: string, friction: number): boolean {
+    const rigidBody = this.bodyMap.get(id);
+    if (!rigidBody) return false;
+
+    // Update all colliders attached to this rigid body
+    for (let i = 0; i < rigidBody.numColliders(); i++) {
+      const collider = rigidBody.collider(i);
+      collider.setFriction(friction);
+    }
+    return true;
+  }
+
+  updatePhysicsType(id: string, newType: "static" | "dynamic" | "kinematic"): boolean {
+    const rigidBody = this.bodyMap.get(id);
+    if (!rigidBody) return false;
+
+    switch (newType) {
+      case "static":
+        rigidBody.setBodyType(this.rapierModule!.RigidBodyType.Fixed, true);
+        break;
+      case "dynamic":
+        rigidBody.setBodyType(this.rapierModule!.RigidBodyType.Dynamic, true);
+        break;
+      case "kinematic":
+        rigidBody.setBodyType(this.rapierModule!.RigidBodyType.KinematicPositionBased, true);
+        break;
+    }
+    return true;
+  }
 } 

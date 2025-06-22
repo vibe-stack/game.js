@@ -1,15 +1,17 @@
 import React from "react";
 import { Cylinder } from "@/models/primitives/cylinder";
+import { useEntityState } from "@/hooks/use-entity-state";
 import { DragInput } from "@/components/ui/drag-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
 interface CylinderPropertiesProps {
   entity: Cylinder;
-  onUpdate: () => void;
 }
 
-export function CylinderProperties({ entity, onUpdate }: CylinderPropertiesProps) {
+export function CylinderProperties({ entity }: CylinderPropertiesProps) {
+  useEntityState(entity);
+
   const handleDimensionChange = (field: 'radiusTop' | 'radiusBottom' | 'height', value: number) => {
     if (field === 'radiusTop') {
       entity.setDimensions(value, entity.radiusBottom, entity.dimensions.height);
@@ -18,7 +20,6 @@ export function CylinderProperties({ entity, onUpdate }: CylinderPropertiesProps
     } else {
       entity.setDimensions(entity.radiusTop, entity.radiusBottom, value);
     }
-    onUpdate();
   };
 
   const handleSegmentChange = (field: 'radial' | 'height', value: number) => {
@@ -28,7 +29,6 @@ export function CylinderProperties({ entity, onUpdate }: CylinderPropertiesProps
     } else {
       entity.setSegments(entity.segmentConfig.radial, intValue);
     }
-    onUpdate();
   };
 
   const handleAngularChange = (field: 'thetaStart' | 'thetaLength', value: number) => {
@@ -37,12 +37,10 @@ export function CylinderProperties({ entity, onUpdate }: CylinderPropertiesProps
     } else {
       entity.setAngularConfig(entity.segmentConfig.thetaStart, value);
     }
-    onUpdate();
   };
 
   const handleOpenEndedChange = (checked: boolean) => {
     entity.setOpenEnded(checked);
-    onUpdate();
   };
 
   const handleShadowChange = (field: 'cast' | 'receive', checked: string | boolean) => {
@@ -52,7 +50,6 @@ export function CylinderProperties({ entity, onUpdate }: CylinderPropertiesProps
     } else {
       entity.setShadowSettings(entity.getMesh().castShadow, boolValue);
     }
-    onUpdate();
   };
 
   return (

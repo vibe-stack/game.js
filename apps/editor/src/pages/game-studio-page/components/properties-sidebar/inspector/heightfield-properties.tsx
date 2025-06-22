@@ -3,99 +3,127 @@ import { Heightfield } from "@/models/primitives/heightfield";
 import { DragInput } from "@/components/ui/drag-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { useEntityState } from "@/hooks/use-entity-state";
 
 interface HeightfieldPropertiesProps {
   entity: Heightfield;
-  onUpdate: () => void;
 }
 
-export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertiesProps) {
-  
-  const handleDimensionChange = (field: 'width' | 'depth' | 'rows' | 'columns', value: number) => {
-    const intValue = ['rows', 'columns'].includes(field) ? Math.max(3, Math.round(value)) : value;
-    
-    if (field === 'width') {
-      entity.setDimensions(intValue, entity.dimensions.depth, entity.dimensions.rows, entity.dimensions.columns);
-    } else if (field === 'depth') {
-      entity.setDimensions(entity.dimensions.width, intValue, entity.dimensions.rows, entity.dimensions.columns);
-    } else if (field === 'rows') {
-      entity.setDimensions(entity.dimensions.width, entity.dimensions.depth, intValue, entity.dimensions.columns);
-    } else if (field === 'columns') {
-      entity.setDimensions(entity.dimensions.width, entity.dimensions.depth, entity.dimensions.rows, intValue);
+export function HeightfieldProperties({ entity }: HeightfieldPropertiesProps) {
+  useEntityState(entity);
+
+  const handleDimensionChange = (
+    field: "width" | "depth" | "rows" | "columns",
+    value: number,
+  ) => {
+    const intValue = ["rows", "columns"].includes(field)
+      ? Math.max(3, Math.round(value))
+      : value;
+
+    if (field === "width") {
+      entity.setDimensions(
+        intValue,
+        entity.dimensions.depth,
+        entity.dimensions.rows,
+        entity.dimensions.columns,
+      );
+    } else if (field === "depth") {
+      entity.setDimensions(
+        entity.dimensions.width,
+        intValue,
+        entity.dimensions.rows,
+        entity.dimensions.columns,
+      );
+    } else if (field === "rows") {
+      entity.setDimensions(
+        entity.dimensions.width,
+        entity.dimensions.depth,
+        intValue,
+        entity.dimensions.columns,
+      );
+    } else if (field === "columns") {
+      entity.setDimensions(
+        entity.dimensions.width,
+        entity.dimensions.depth,
+        entity.dimensions.rows,
+        intValue,
+      );
     }
-    onUpdate();
   };
 
-  const handleElevationChange = (field: 'min' | 'max', value: number) => {
-    if (field === 'min') {
+  const handleElevationChange = (field: "min" | "max", value: number) => {
+    if (field === "min") {
       entity.setElevationRange(value, entity.elevationRange.max);
     } else {
       entity.setElevationRange(entity.elevationRange.min, value);
     }
-    onUpdate();
   };
 
   const handleAlgorithmChange = (algorithm: string) => {
     entity.setAlgorithm(algorithm as any);
-    onUpdate();
   };
 
   const handleSeedChange = (seed: number) => {
     entity.setSeed(Math.round(seed));
-    onUpdate();
   };
 
-  const handleNoiseSettingChange = (field: keyof typeof entity.noiseSettings, value: number) => {
+  const handleNoiseSettingChange = (
+    field: keyof typeof entity.noiseSettings,
+    value: number,
+  ) => {
     entity.setNoiseSettings({ [field]: value });
-    onUpdate();
   };
 
   const handleDisplacementScaleChange = (scale: number) => {
     entity.setDisplacementScale(scale);
-    onUpdate();
   };
 
-  const handleUVScaleChange = (axis: 'x' | 'y', value: number) => {
-    if (axis === 'x') {
+  const handleUVScaleChange = (axis: "x" | "y", value: number) => {
+    if (axis === "x") {
       entity.setUVScale(value, entity.uvScale.y);
     } else {
       entity.setUVScale(entity.uvScale.x, value);
     }
-    onUpdate();
   };
 
-  const handleShadowChange = (field: 'cast' | 'receive', checked: boolean) => {
-    if (field === 'cast') {
+  const handleShadowChange = (field: "cast" | "receive", checked: boolean) => {
+    if (field === "cast") {
       entity.setShadowSettings(checked, entity.getMesh().receiveShadow);
     } else {
       entity.setShadowSettings(entity.getMesh().castShadow, checked);
     }
-    onUpdate();
   };
 
   const handleRegenerate = () => {
     entity.regenerateHeightfield();
-    onUpdate();
   };
 
   const renderNoiseSettings = () => {
-    const needsFrequency = !['flat', 'random'].includes(entity.algorithm);
-    const needsOctaves = ['perlin', 'simplex', 'fbm'].includes(entity.algorithm);
-    const needsRidgeOffset = entity.algorithm === 'ridged';
-    const needsVoronoi = entity.algorithm === 'voronoi';
+    const needsFrequency = !["flat", "random"].includes(entity.algorithm);
+    const needsOctaves = ["perlin", "simplex", "fbm"].includes(
+      entity.algorithm,
+    );
+    const needsRidgeOffset = entity.algorithm === "ridged";
+    const needsVoronoi = entity.algorithm === "voronoi";
 
     return (
       <div className="space-y-3">
-        <h4 className="text-xs text-gray-300 font-medium">Noise Settings</h4>
-        
+        <h4 className="text-xs font-medium text-gray-300">Noise Settings</h4>
+
         {needsFrequency && (
           <div>
             <Label className="text-xs text-gray-400">Frequency</Label>
             <DragInput
               value={entity.noiseSettings.frequency}
-              onChange={(value) => handleNoiseSettingChange('frequency', value)}
+              onChange={(value) => handleNoiseSettingChange("frequency", value)}
               min={0.001}
               max={1}
               step={0.001}
@@ -108,7 +136,7 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
           <Label className="text-xs text-gray-400">Amplitude</Label>
           <DragInput
             value={entity.noiseSettings.amplitude}
-            onChange={(value) => handleNoiseSettingChange('amplitude', value)}
+            onChange={(value) => handleNoiseSettingChange("amplitude", value)}
             min={0.1}
             max={5}
             step={0.1}
@@ -122,7 +150,9 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
               <Label className="text-xs text-gray-400">Octaves</Label>
               <DragInput
                 value={entity.noiseSettings.octaves}
-                onChange={(value) => handleNoiseSettingChange('octaves', Math.round(value))}
+                onChange={(value) =>
+                  handleNoiseSettingChange("octaves", Math.round(value))
+                }
                 min={1}
                 max={8}
                 step={1}
@@ -133,7 +163,9 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
               <Label className="text-xs text-gray-400">Persistence</Label>
               <DragInput
                 value={entity.noiseSettings.persistence}
-                onChange={(value) => handleNoiseSettingChange('persistence', value)}
+                onChange={(value) =>
+                  handleNoiseSettingChange("persistence", value)
+                }
                 min={0.1}
                 max={1}
                 step={0.01}
@@ -144,7 +176,9 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
               <Label className="text-xs text-gray-400">Lacunarity</Label>
               <DragInput
                 value={entity.noiseSettings.lacunarity}
-                onChange={(value) => handleNoiseSettingChange('lacunarity', value)}
+                onChange={(value) =>
+                  handleNoiseSettingChange("lacunarity", value)
+                }
                 min={1}
                 max={4}
                 step={0.1}
@@ -159,7 +193,9 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
             <Label className="text-xs text-gray-400">Ridge Offset</Label>
             <DragInput
               value={entity.noiseSettings.ridgeOffset}
-              onChange={(value) => handleNoiseSettingChange('ridgeOffset', value)}
+              onChange={(value) =>
+                handleNoiseSettingChange("ridgeOffset", value)
+              }
               min={0}
               max={2}
               step={0.01}
@@ -175,7 +211,9 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
                 <Label className="text-xs text-gray-400">Voronoi Points</Label>
                 <DragInput
                   value={entity.noiseSettings.voronoiPoints}
-                  onChange={(value) => handleNoiseSettingChange('voronoiPoints', Math.round(value))}
+                  onChange={(value) =>
+                    handleNoiseSettingChange("voronoiPoints", Math.round(value))
+                  }
                   min={3}
                   max={50}
                   step={1}
@@ -185,10 +223,14 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
             )}
             {entity.noiseSettings.voronoiRandomness !== undefined && (
               <div>
-                <Label className="text-xs text-gray-400">Voronoi Randomness</Label>
+                <Label className="text-xs text-gray-400">
+                  Voronoi Randomness
+                </Label>
                 <DragInput
                   value={entity.noiseSettings.voronoiRandomness}
-                  onChange={(value) => handleNoiseSettingChange('voronoiRandomness', value)}
+                  onChange={(value) =>
+                    handleNoiseSettingChange("voronoiRandomness", value)
+                  }
                   min={0}
                   max={1}
                   step={0.01}
@@ -204,19 +246,19 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
 
   return (
     <div className="space-y-4">
-      <h3 className="text-green-300 text-sm font-medium border-b border-white/10 pb-1">
+      <h3 className="border-b border-white/10 pb-1 text-sm font-medium text-green-300">
         Heightfield Properties
       </h3>
-      
+
       {/* Dimensions */}
       <div className="space-y-3">
-        <h4 className="text-xs text-gray-300 font-medium">Dimensions</h4>
+        <h4 className="text-xs font-medium text-gray-300">Dimensions</h4>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <Label className="text-xs text-gray-400">Width</Label>
             <DragInput
               value={entity.dimensions.width}
-              onChange={(value) => handleDimensionChange('width', value)}
+              onChange={(value) => handleDimensionChange("width", value)}
               min={0.1}
               max={1000}
               step={0.1}
@@ -227,7 +269,7 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
             <Label className="text-xs text-gray-400">Depth</Label>
             <DragInput
               value={entity.dimensions.depth}
-              onChange={(value) => handleDimensionChange('depth', value)}
+              onChange={(value) => handleDimensionChange("depth", value)}
               min={0.1}
               max={1000}
               step={0.1}
@@ -240,7 +282,7 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
             <Label className="text-xs text-gray-400">Rows</Label>
             <DragInput
               value={entity.dimensions.rows}
-              onChange={(value) => handleDimensionChange('rows', value)}
+              onChange={(value) => handleDimensionChange("rows", value)}
               min={3}
               max={512}
               step={1}
@@ -251,7 +293,7 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
             <Label className="text-xs text-gray-400">Columns</Label>
             <DragInput
               value={entity.dimensions.columns}
-              onChange={(value) => handleDimensionChange('columns', value)}
+              onChange={(value) => handleDimensionChange("columns", value)}
               min={3}
               max={512}
               step={1}
@@ -263,13 +305,13 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
 
       {/* Elevation Range */}
       <div className="space-y-3">
-        <h4 className="text-xs text-gray-300 font-medium">Elevation Range</h4>
+        <h4 className="text-xs font-medium text-gray-300">Elevation Range</h4>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <Label className="text-xs text-gray-400">Min</Label>
             <DragInput
               value={entity.elevationRange.min}
-              onChange={(value) => handleElevationChange('min', value)}
+              onChange={(value) => handleElevationChange("min", value)}
               min={-100}
               max={entity.elevationRange.max - 0.1}
               step={0.1}
@@ -280,7 +322,7 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
             <Label className="text-xs text-gray-400">Max</Label>
             <DragInput
               value={entity.elevationRange.max}
-              onChange={(value) => handleElevationChange('max', value)}
+              onChange={(value) => handleElevationChange("max", value)}
               min={entity.elevationRange.min + 0.1}
               max={100}
               step={0.1}
@@ -341,13 +383,13 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
 
       {/* UV Scale */}
       <div className="space-y-3">
-        <h4 className="text-xs text-gray-300 font-medium">UV Scale</h4>
+        <h4 className="text-xs font-medium text-gray-300">UV Scale</h4>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <Label className="text-xs text-gray-400">X</Label>
             <DragInput
               value={entity.uvScale.x}
-              onChange={(value) => handleUVScaleChange('x', value)}
+              onChange={(value) => handleUVScaleChange("x", value)}
               min={0.1}
               max={10}
               step={0.1}
@@ -358,7 +400,7 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
             <Label className="text-xs text-gray-400">Y</Label>
             <DragInput
               value={entity.uvScale.y}
-              onChange={(value) => handleUVScaleChange('y', value)}
+              onChange={(value) => handleUVScaleChange("y", value)}
               min={0.1}
               max={10}
               step={0.1}
@@ -370,19 +412,23 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
 
       {/* Shadow Settings */}
       <div className="space-y-3">
-        <h4 className="text-xs text-gray-300 font-medium">Shadows</h4>
+        <h4 className="text-xs font-medium text-gray-300">Shadows</h4>
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
             <Checkbox
               checked={entity.getMesh().castShadow}
-              onCheckedChange={(checked) => handleShadowChange('cast', checked)}
+              onCheckedChange={(checked) =>
+                handleShadowChange("cast", checked as boolean)
+              }
             />
             <Label className="text-xs text-gray-400">Cast Shadow</Label>
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox
               checked={entity.getMesh().receiveShadow}
-              onCheckedChange={(checked) => handleShadowChange('receive', checked)}
+              onCheckedChange={(checked) =>
+                handleShadowChange("receive", checked as boolean)
+              }
             />
             <Label className="text-xs text-gray-400">Receive Shadow</Label>
           </div>
@@ -402,4 +448,4 @@ export function HeightfieldProperties({ entity, onUpdate }: HeightfieldPropertie
       </div>
     </div>
   );
-} 
+}

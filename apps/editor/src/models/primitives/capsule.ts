@@ -7,14 +7,14 @@ export interface CapsuleConfig extends EntityConfig {
   // Basic dimensions
   radius?: number;
   length?: number;
-  
+
   // Segment configuration
   capSegments?: number;
   radialSegments?: number;
-  
+
   // Material
   material?: THREE.Material;
-  
+
   // Shadow settings
   castShadow?: boolean;
   receiveShadow?: boolean;
@@ -28,43 +28,48 @@ export class Capsule extends Entity {
 
   constructor(config: CapsuleConfig = {}) {
     super(config);
-    
+
     this.dimensions = {
       radius: config.radius ?? 1,
-      length: config.length ?? 1
+      length: config.length ?? 1,
     };
-    
+
     this.segments = {
       cap: config.capSegments ?? 4,
-      radial: config.radialSegments ?? 8
+      radial: config.radialSegments ?? 8,
     };
-    
-    const material = config.material ?? new THREE.MeshStandardMaterial({ color: 0xff0088 });
-    
+
+    const material =
+      config.material ?? new THREE.MeshStandardMaterial({ color: 0xff0088 });
+
     this.geometry = new THREE.CapsuleGeometry(
       this.dimensions.radius,
       this.dimensions.length,
       this.segments.cap,
-      this.segments.radial
+      this.segments.radial,
     );
-    
+
     this.mesh = new THREE.Mesh(this.geometry, material);
     this.mesh.castShadow = config.castShadow ?? true;
     this.mesh.receiveShadow = config.receiveShadow ?? true;
     this.add(this.mesh);
-    
+
     this.metadata.type = "primitive";
     this.addTag("capsule");
   }
 
   protected createCollider(): void {
     if (!this.physicsManager || !this.rigidBodyId) return;
-    
+
     this.physicsManager.createCollider(
       this.colliderId!,
       this.rigidBodyId,
       "capsule",
-      new THREE.Vector3(this.dimensions.radius, this.dimensions.length, this.dimensions.radius)
+      new THREE.Vector3(
+        this.dimensions.radius,
+        this.dimensions.length,
+        this.dimensions.radius,
+      ),
     );
   }
 
@@ -74,11 +79,11 @@ export class Capsule extends Entity {
       radius,
       length,
       this.segments.cap,
-      this.segments.radial
+      this.segments.radial,
     );
     this.mesh.geometry = this.geometry;
-    (this.dimensions as any).radius = radius;
-    (this.dimensions as any).length = length;
+    this.dimensions.radius = radius;
+    this.dimensions.length = length;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
@@ -89,11 +94,11 @@ export class Capsule extends Entity {
       this.dimensions.radius,
       this.dimensions.length,
       capSegments,
-      radialSegments
+      radialSegments,
     );
     this.mesh.geometry = this.geometry;
-    (this.segments as any).cap = capSegments;
-    (this.segments as any).radial = radialSegments;
+    this.segments.cap = capSegments;
+    this.segments.radial = radialSegments;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
@@ -132,16 +137,22 @@ export class Capsule extends Entity {
   }
 
   // Convenience getters
-  get radius(): number { return this.dimensions.radius; }
-  get length(): number { return this.dimensions.length; }
-  get totalHeight(): number { return this.dimensions.length + this.dimensions.radius * 2; }
+  get radius(): number {
+    return this.dimensions.radius;
+  }
+  get length(): number {
+    return this.dimensions.length;
+  }
+  get totalHeight(): number {
+    return this.dimensions.length + this.dimensions.radius * 2;
+  }
 
   // Create common capsule variations
   static createPill(config: CapsuleConfig = {}): Capsule {
     return new Capsule({
       radius: 0.3,
       length: 1.5,
-      ...config
+      ...config,
     });
   }
 
@@ -149,22 +160,44 @@ export class Capsule extends Entity {
     return new Capsule({
       radius: 0.2,
       length: 0.8,
-      ...config
+      ...config,
     });
   }
 
   serialize(): EntityData {
     return {
-      id: this.entityId, name: this.entityName, type: "capsule",
+      id: this.entityId,
+      name: this.entityName,
+      type: "capsule",
       transform: {
-        position: { x: this.position.x, y: this.position.y, z: this.position.z },
-        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
+        position: {
+          x: this.position.x,
+          y: this.position.y,
+          z: this.position.z,
+        },
+        rotation: {
+          x: this.rotation.x,
+          y: this.rotation.y,
+          z: this.rotation.z,
+        },
         scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
       },
-      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
-      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      visible: this.visible,
+      castShadow: this.mesh.castShadow,
+      receiveShadow: this.mesh.receiveShadow,
+      userData: { ...this.userData },
+      tags: [...this.metadata.tags],
+      layer: this.metadata.layer,
       physics: this.serializePhysics(),
-      geometry: { type: "CapsuleGeometry", parameters: { radius: this.radius, length: this.length, capSegments: this.segments.cap, radialSegments: this.segments.radial } }
+      geometry: {
+        type: "CapsuleGeometry",
+        parameters: {
+          radius: this.radius,
+          length: this.length,
+          capSegments: this.segments.cap,
+          radialSegments: this.segments.radial,
+        },
+      },
     };
   }
-} 
+}

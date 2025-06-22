@@ -3,20 +3,20 @@ import { Plane } from "@/models/primitives/plane";
 import { DragInput } from "@/components/ui/drag-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useEntityState } from "@/hooks/use-entity-state";
 
 interface PlanePropertiesProps {
   entity: Plane;
-  onUpdate: () => void;
 }
 
-export function PlaneProperties({ entity, onUpdate }: PlanePropertiesProps) {
+export function PlaneProperties({ entity }: PlanePropertiesProps) {
+  useEntityState(entity);
   const handleDimensionChange = (field: 'width' | 'height', value: number) => {
     if (field === 'width') {
       entity.setDimensions(value, entity.height);
     } else {
       entity.setDimensions(entity.width, value);
     }
-    onUpdate();
   };
 
   const handleSegmentChange = (field: 'width' | 'height', value: number) => {
@@ -26,7 +26,6 @@ export function PlaneProperties({ entity, onUpdate }: PlanePropertiesProps) {
     } else {
       entity.setSegments(entity.segments.width, intValue);
     }
-    onUpdate();
   };
 
   const handleShadowChange = (field: 'cast' | 'receive', checked: string | boolean) => {
@@ -36,7 +35,6 @@ export function PlaneProperties({ entity, onUpdate }: PlanePropertiesProps) {
     } else {
       entity.setShadowSettings(entity.getMesh().castShadow, boolValue);
     }
-    onUpdate();
   };
 
   return (
@@ -109,7 +107,7 @@ export function PlaneProperties({ entity, onUpdate }: PlanePropertiesProps) {
             <Checkbox
               id="plane-cast-shadow"
               checked={entity.getMesh().castShadow}
-              onCheckedChange={(checked) => handleShadowChange('cast', checked)}
+              onCheckedChange={(checked) => handleShadowChange('cast', checked as boolean)}
             />
             <Label htmlFor="plane-cast-shadow" className="text-xs text-gray-400">Cast Shadow</Label>
           </div>
@@ -117,7 +115,7 @@ export function PlaneProperties({ entity, onUpdate }: PlanePropertiesProps) {
             <Checkbox
               id="plane-receive-shadow"
               checked={entity.getMesh().receiveShadow}
-              onCheckedChange={(checked) => handleShadowChange('receive', checked)}
+              onCheckedChange={(checked) => handleShadowChange('receive', checked as boolean)}
             />
             <Label htmlFor="plane-receive-shadow" className="text-xs text-gray-400">Receive Shadow</Label>
           </div>

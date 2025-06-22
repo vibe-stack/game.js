@@ -1,150 +1,68 @@
 import React from "react";
 import { Entity } from "@/models";
+import { useEntityState } from "@/hooks/use-entity-state";
 import { DragInput } from "@/components/ui/drag-input";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useEntityState } from "@/hooks/use-entity-state";
 
 interface PhysicsPropertiesProps {
   entity: Entity;
-  onUpdate: () => void;
 }
 
-export function PhysicsProperties({ entity, onUpdate }: PhysicsPropertiesProps) {
-  // Subscribe to entity changes to ensure component re-renders when physics properties change
+export function PhysicsProperties({ entity }: PhysicsPropertiesProps) {
   useEntityState(entity);
-  
-  return <PhysicsPropertiesContent entity={entity} onUpdate={onUpdate} />;
-} 
 
-function PhysicsPropertiesContent({ entity, onUpdate }: PhysicsPropertiesProps) {
-  const physicsConfig = entity.getPhysicsConfig();
-  const hasPhysics = entity.hasPhysics();
+  // Read values directly from entity properties
+  const hasPhysics = entity.physicsConfig !== null && entity.getRigidBodyId() !== null;
   
-  const handlePhysicsToggle = (enabled: string | boolean) => {
-    const isEnabled = typeof enabled === 'boolean' ? enabled : enabled === 'true';
-    
-    if (isEnabled && !hasPhysics) {
+  const handlePhysicsToggle = (enabled: boolean) => {
+    if (enabled && !hasPhysics) {
       // Enable physics with default settings
       entity.enableDynamicPhysics();
-    } else if (!isEnabled && hasPhysics) {
+    } else if (!enabled && hasPhysics) {
       // Disable physics
       entity.disablePhysics();
     }
-    onUpdate();
   };
 
   const handlePhysicsTypeChange = (type: string) => {
     if (!hasPhysics) return;
     
-    const currentConfig = entity.getPhysicsConfig();
-    if (!currentConfig) return;
-
-    // Disable and re-enable with new type
-    entity.disablePhysics();
-    
-    if (type === 'dynamic') {
-      entity.enableDynamicPhysics(
-        currentConfig.mass || 1,
-        currentConfig.restitution || 0.5,
-        currentConfig.friction || 0.7
-      );
-    } else if (type === 'static') {
-      entity.enableStaticPhysics(
-        currentConfig.restitution || 0.5,
-        currentConfig.friction || 0.7
-      );
-    } else if (type === 'kinematic') {
-      entity.enableKinematicPhysics();
-    }
-    
-    onUpdate();
+    entity.updatePhysicsType(type as "static" | "dynamic" | "kinematic");
   };
 
   const handleMassChange = (mass: number) => {
-    if (!hasPhysics || !physicsConfig) return;
-    
-    // Re-enable physics with new mass
-    entity.disablePhysics();
-    entity.enableDynamicPhysics(
-      mass,
-      physicsConfig.restitution || 0.5,
-      physicsConfig.friction || 0.7
-    );
-    onUpdate();
+    entity.updateMass(mass);
   };
 
   const handleRestitutionChange = (restitution: number) => {
-    if (!hasPhysics || !physicsConfig) return;
-    
-    const currentType = physicsConfig.type || 'dynamic';
-    entity.disablePhysics();
-    
-    if (currentType === 'dynamic') {
-      entity.enableDynamicPhysics(
-        physicsConfig.mass || 1,
-        restitution,
-        physicsConfig.friction || 0.7
-      );
-    } else if (currentType === 'static') {
-      entity.enableStaticPhysics(
-        restitution,
-        physicsConfig.friction || 0.7
-      );
-    } else if (currentType === 'kinematic') {
-      entity.enableKinematicPhysics();
-    }
-    
-    onUpdate();
+    entity.updateRestitution(restitution);
   };
 
   const handleFrictionChange = (friction: number) => {
-    if (!hasPhysics || !physicsConfig) return;
-    
-    const currentType = physicsConfig.type || 'dynamic';
-    entity.disablePhysics();
-    
-    if (currentType === 'dynamic') {
-      entity.enableDynamicPhysics(
-        physicsConfig.mass || 1,
-        physicsConfig.restitution || 0.5,
-        friction
-      );
-    } else if (currentType === 'static') {
-      entity.enableStaticPhysics(
-        physicsConfig.restitution || 0.5,
-        friction
-      );
-    } else if (currentType === 'kinematic') {
-      entity.enableKinematicPhysics();
-    }
-    
-    onUpdate();
+    entity.updateFriction(friction);
   };
 
   return (
     <div className="space-y-4">
-      <h3 className="text-orange-300 text-sm font-medium border-b border-white/10 pb-1">
-        Physics Settings
-      </h3>
-      
-      {/* Physics Toggle */}
-      <div className="flex items-center space-x-2">
-        <Checkbox
-          id="physics-enabled"
+      <div className="flex items-center justify-between">
+        <h3 className="text-orange-300 text-sm font-medium">
+          Physics Settings
+        </h3>
+        <Switch
           checked={hasPhysics}
           onCheckedChange={handlePhysicsToggle}
+          className="data-[state=checked]:bg-orange-500"
         />
-        <Label htmlFor="physics-enabled" className="text-xs text-gray-400">Enable Physics</Label>
       </div>
-
-      {hasPhysics && physicsConfig && (
+      
+      {hasPhysics && entity.physicsConfig && (
         <>
           {/* Physics Type */}
           <div className="space-y-2">
             <Label className="text-xs text-gray-400">Physics Type</Label>
-            <Select value={physicsConfig.type || 'dynamic'} onValueChange={handlePhysicsTypeChange}>
+            <Select value={entity.physicsType || 'dynamic'} onValueChange={handlePhysicsTypeChange}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -157,11 +75,11 @@ function PhysicsPropertiesContent({ entity, onUpdate }: PhysicsPropertiesProps) 
           </div>
 
           {/* Mass (only for dynamic bodies) */}
-          {physicsConfig.type === 'dynamic' && (
+          {entity.physicsType === 'dynamic' && (
             <div className="space-y-2">
               <Label className="text-xs text-gray-400">Mass</Label>
               <DragInput
-                value={physicsConfig.mass || 1}
+                value={entity.physicsMass!}
                 onChange={handleMassChange}
                 min={0.01}
                 max={1000}
@@ -175,7 +93,7 @@ function PhysicsPropertiesContent({ entity, onUpdate }: PhysicsPropertiesProps) 
           <div className="space-y-2">
             <Label className="text-xs text-gray-400">Restitution (Bounciness)</Label>
             <DragInput
-              value={physicsConfig.restitution || 0.5}
+              value={entity.physicsRestitution!}
               onChange={handleRestitutionChange}
               min={0}
               max={1}
@@ -188,7 +106,7 @@ function PhysicsPropertiesContent({ entity, onUpdate }: PhysicsPropertiesProps) 
           <div className="space-y-2">
             <Label className="text-xs text-gray-400">Friction</Label>
             <DragInput
-              value={physicsConfig.friction || 0.7}
+              value={entity.physicsFriction!}
               onChange={handleFrictionChange}
               min={0}
               max={2}

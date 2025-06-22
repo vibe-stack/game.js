@@ -6,24 +6,26 @@ import { Plus, X } from "lucide-react";
 import { Entity } from "@/models";
 import { CharacterControllerProperties } from "./character-controller-properties";
 import { FPS_CHARACTER_CONFIG } from "@/models/character-controller";
+import { useEntityState } from "@/hooks/use-entity-state";
 
 interface CharacterControllerSectionProps {
   entity: Entity;
-  onUpdate: () => void;
 }
 
-export function CharacterControllerSection({ entity, onUpdate }: CharacterControllerSectionProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const hasController = entity.hasCharacterControllerEnabled();
+export function CharacterControllerSection({ entity }: CharacterControllerSectionProps) {
+  useEntityState(entity);
+  const hasController = entity.hasCharacterController;
+  const [isExpanded, setIsExpanded] = useState(hasController);
 
   const handleToggleController = () => {
     if (hasController) {
       entity.disableCharacterController();
+      setIsExpanded(false);
     } else {
       // Add character controller with default FPS config
       entity.enableCharacterController(FPS_CHARACTER_CONFIG);
+      setIsExpanded(true);
     }
-    onUpdate();
   };
 
   return (
@@ -66,9 +68,6 @@ export function CharacterControllerSection({ entity, onUpdate }: CharacterContro
             <Separator className="bg-gray-600 my-3" />
             <CharacterControllerProperties
               entity={entity}
-              config={entity.getCharacterControllerConfig()!}
-              onConfigChange={(newConfig) => entity.updateCharacterControllerConfig(newConfig)}
-              onUpdate={onUpdate}
             />
           </>
         )}
