@@ -104,6 +104,9 @@ export class SelectionManager {
   private createSelectionHelper(entity: Entity): void {
     if (!entity || !this.gameWorld) return;
 
+    // Clear any existing selection helper first
+    this.clearSelectionHelper();
+
     // Find the mesh in the entity to create AABB helper
     const mesh = this.findMeshInEntity(entity);
     if (!mesh) return;
@@ -185,10 +188,44 @@ export class SelectionManager {
 
   private clearSelectionHelper(): void {
     if (this.selectionHelper && this.gameWorld) {
-      this.gameWorld.getScene().remove(this.selectionHelper);
-      this.selectionHelper.dispose();
-      this.selectionHelper = null;
+      try {
+        this.gameWorld.getScene().remove(this.selectionHelper);
+        if (typeof this.selectionHelper.dispose === 'function') {
+          this.selectionHelper.dispose();
+        }
+      } catch (error) {
+        console.warn("Error disposing selection helper:", error);
+      } finally {
+        this.selectionHelper = null;
+      }
     }
+    
+    // Also clean up any orphaned selection helpers in the scene
+    this.cleanupOrphanedSelectionHelpers();
+  }
+
+  private cleanupOrphanedSelectionHelpers(): void {
+    if (!this.gameWorld) return;
+    
+    const scene = this.gameWorld.getScene();
+    const orphanedHelpers: THREE.Object3D[] = [];
+    
+    scene.traverse((child) => {
+      if (child.name === "selection-helper" && child !== this.selectionHelper) {
+        orphanedHelpers.push(child);
+      }
+    });
+    
+    orphanedHelpers.forEach((helper) => {
+      try {
+        scene.remove(helper);
+        if (typeof (helper as any).dispose === 'function') {
+          (helper as any).dispose();
+        }
+      } catch (error) {
+        console.warn("Error disposing orphaned selection helper:", error);
+      }
+    });
   }
 
   // Method to be called when entities are added/removed from the scene
@@ -202,9 +239,12 @@ export class SelectionManager {
   onEntityAdded(entity: Entity): void {
     if (this.isInitialized) {
       this.setupEntityClickHandler(entity);
-      this.createSelectionHelper(entity);
-      this.setupEntityChangeListener(entity);
-      this.refreshInteractions();
+      // Only create selection helper if this entity is currently selected
+      const { selectedEntity } = useGameStudioStore.getState();
+      if (selectedEntity === entity.entityId) {
+        this.createSelectionHelper(entity);
+        this.setupEntityChangeListener(entity);
+      }
     }
   }
 

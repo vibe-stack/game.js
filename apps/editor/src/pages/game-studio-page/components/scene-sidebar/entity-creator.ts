@@ -31,15 +31,8 @@ export class EntityCreator {
       throw new Error("Game world not initialized");
     }
 
-    const scene = gameWorld.getScene();
-    const entitiesRegistry = gameWorld.getRegistryManager().getRegistry<Entity>("entities");
-    
-    if (!entitiesRegistry) {
-      throw new Error("Entities registry not found");
-    }
-
     let entity: Entity | null = null;
-    const spawnPosition = new THREE.Vector3(0, 2, 0); // Spawn slightly above ground
+    const spawnPosition = new THREE.Vector3(0, 2, 0);
 
     switch (entityType) {
       // Basic Shapes
@@ -221,20 +214,157 @@ export class EntityCreator {
     }
 
     if (entity) {
-      // Add entity to the scene
-      scene.add(entity);
-      
-      // Register entity in the registry
-      entitiesRegistry.add(entity.entityId, entity.entityName, entity, {
-        tags: entity.metadata.tags,
-        type: entity.metadata.type,
-      });
+      // Use GameWorld.createEntity to ensure proper setup (physics, script manager, interaction manager, etc.)
+      gameWorld.createEntity(entity);
       
       // Notify selection manager about the new entity
       const selectionManager = gameWorldService.getSelectionManager();
       selectionManager.onEntityAdded(entity);
       
       return entity;
+    }
+
+    return null;
+  }
+
+  static async duplicateEntity(sourceEntity: Entity, gameWorldService: GameWorldService): Promise<Entity | null> {
+    const gameWorld = gameWorldService.getGameWorld();
+    if (!gameWorld) {
+      throw new Error("Game world not initialized");
+    }
+
+    try {
+      // Serialize the source entity to get all its properties
+      const serializedData = sourceEntity.serialize();
+      if (!serializedData) {
+        throw new Error("Entity serialization failed");
+      }
+
+      // Create new entity with duplicated data but new IDs
+      const duplicatedConfig: any = {
+        name: `${sourceEntity.entityName} Copy`,
+        position: new THREE.Vector3().copy(sourceEntity.position).add(new THREE.Vector3(1, 0, 1)), // Offset slightly
+        rotation: new THREE.Euler().copy(sourceEntity.rotation),
+        scale: new THREE.Vector3().copy(sourceEntity.scale),
+        castShadow: serializedData.castShadow,
+        receiveShadow: serializedData.receiveShadow,
+        // Copy physics config if present
+        physics: sourceEntity.physicsConfig ? { ...sourceEntity.physicsConfig } : undefined,
+        // Copy properties from serialized data
+        ...serializedData.properties,
+        // Copy geometry parameters if present
+        ...(serializedData.geometry?.parameters || {})
+      };
+
+      let newEntity: Entity | null = null;
+
+      // Create the appropriate entity type based on the serialized data type
+      const entityType = serializedData.type;
+      switch (entityType) {
+        case "sphere":
+          newEntity = new Sphere(duplicatedConfig);
+          break;
+        case "box":
+          newEntity = new Box(duplicatedConfig);
+          break;
+        case "plane":
+          newEntity = new Plane(duplicatedConfig);
+          break;
+        case "cylinder":
+          newEntity = new Cylinder(duplicatedConfig);
+          break;
+        case "cone":
+          newEntity = new Cone(duplicatedConfig);
+          break;
+        case "torus":
+          newEntity = new Torus(duplicatedConfig);
+          break;
+        case "capsule":
+          newEntity = new Capsule(duplicatedConfig);
+          break;
+        case "ring":
+          newEntity = new Ring(duplicatedConfig);
+          break;
+        case "tetrahedron":
+          newEntity = new Tetrahedron(duplicatedConfig);
+          break;
+        case "octahedron":
+          newEntity = new Octahedron(duplicatedConfig);
+          break;
+        case "dodecahedron":
+          newEntity = new Dodecahedron(duplicatedConfig);
+          break;
+        case "icosahedron":
+          newEntity = new Icosahedron(duplicatedConfig);
+          break;
+        case "heightfield":
+          newEntity = new Heightfield(duplicatedConfig);
+          break;
+        case "custom-heightfield":
+          newEntity = new CustomHeightfield(duplicatedConfig);
+          break;
+        case "ambient-light":
+          newEntity = new AmbientLight(duplicatedConfig);
+          break;
+        case "directional-light":
+          newEntity = new DirectionalLight(duplicatedConfig);
+          break;
+        case "point-light":
+          newEntity = new PointLight(duplicatedConfig);
+          break;
+        case "spot-light":
+          newEntity = new SpotLight(duplicatedConfig);
+          break;
+        default:
+          throw new Error(`Unsupported entity type for duplication: ${entityType}`);
+      }
+
+      if (newEntity) {
+        // Copy material if the source entity has one
+        if ('getMaterial' in sourceEntity && typeof sourceEntity.getMaterial === 'function') {
+          const sourceMaterial = sourceEntity.getMaterial();
+          if (sourceMaterial && 'setMaterial' in newEntity && typeof newEntity.setMaterial === 'function') {
+            // Clone the material to avoid sharing the same instance
+            const clonedMaterial = sourceMaterial.clone();
+            newEntity.setMaterial(clonedMaterial);
+          }
+        }
+
+        // Copy tags
+        newEntity.metadata.tags = [...sourceEntity.metadata.tags];
+
+        // Copy character controller config if present
+        if (sourceEntity.characterControllerConfig) {
+          newEntity.characterControllerConfig = { ...sourceEntity.characterControllerConfig };
+          newEntity.hasCharacterController = sourceEntity.hasCharacterController;
+        }
+
+        // Use GameWorld.createEntity to ensure proper setup
+        gameWorld.createEntity(newEntity);
+
+        // If the source entity has a parent (and it's not the scene), add the new entity to the same parent
+        if (sourceEntity.parent && sourceEntity.parent !== gameWorld.getScene()) {
+          sourceEntity.parent.add(newEntity);
+        }
+
+        // Duplicate children recursively
+        const sourceChildren = sourceEntity.children.filter(child => child instanceof Entity) as Entity[];
+        for (const childEntity of sourceChildren) {
+          const duplicatedChild = await this.duplicateEntity(childEntity, gameWorldService);
+          if (duplicatedChild) {
+            newEntity.add(duplicatedChild);
+          }
+        }
+
+        // Notify selection manager about the new entity
+        const selectionManager = gameWorldService.getSelectionManager();
+        selectionManager.onEntityAdded(newEntity);
+
+        return newEntity;
+      }
+    } catch (error) {
+      console.error("Failed to duplicate entity:", error);
+      throw error;
     }
 
     return null;

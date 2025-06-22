@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Entity } from "@/models";
 import { GameWorldService } from "../../services/game-world-service";
@@ -8,6 +9,7 @@ import useGameStudioStore from "@/stores/game-studio-store";
 import SceneTree from "./scene-tree";
 import AddEntityMenu from "./add-entity-menu";
 import { motion } from "motion/react";
+import { EntityCreator } from "./entity-creator";
 
 interface SceneSidebarProps {
   gameWorldService: React.RefObject<GameWorldService | null>;
@@ -18,6 +20,7 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [sceneEntities, setSceneEntities] = useState<Entity[]>([]);
+  const [copiedEntity, setCopiedEntity] = useState<Entity | null>(null);
   const { selectedEntity, setSelectedEntity, gameState } = useGameStudioStore();
 
   // Poll for scene entities periodically and when entities are added
@@ -46,6 +49,61 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
     return () => clearInterval(interval);
   }, [updateEntities]);
 
+  // Keyboard shortcuts for copy/paste
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle shortcuts if no input field is focused
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey)) {
+        switch (event.key.toLowerCase()) {
+          case 'c':
+            // Copy selected entity
+            if (selectedEntity) {
+              event.preventDefault();
+              const gameWorld = gameWorldService.current?.getGameWorld();
+              if (gameWorld) {
+                const entitiesRegistry = gameWorld.getRegistryManager().getRegistry<Entity>("entities");
+                if (entitiesRegistry) {
+                  const entity = entitiesRegistry.get(selectedEntity);
+                  if (entity) {
+                    setCopiedEntity(entity);
+                  }
+                }
+              }
+            }
+            break;
+          case 'v':
+            // Paste copied entity
+            if (copiedEntity && gameWorldService.current) {
+              event.preventDefault();
+              handlePasteEntity();
+            }
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedEntity, copiedEntity, gameWorldService]);
+
+  const handlePasteEntity = async () => {
+    if (!copiedEntity || !gameWorldService.current) return;
+    
+    try {
+      const duplicatedEntity = await EntityCreator.duplicateEntity(copiedEntity, gameWorldService.current);
+      if (duplicatedEntity) {
+        // Select the newly pasted entity
+        setSelectedEntity(duplicatedEntity.entityId);
+      }
+    } catch (error) {
+      console.error("Failed to paste entity:", error);
+    }
+  };
+
   const toggleExpanded = (entityId: string) => {
     setExpandedNodes((prev) => {
       const newSet = new Set(prev);
@@ -56,6 +114,10 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
       }
       return newSet;
     });
+  };
+
+  const handleEntityAdded = () => {
+    updateEntities();
   };
 
   return (
@@ -110,9 +172,15 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
             </div>
             <AddEntityMenu
               gameWorldService={gameWorldService}
-              onEntityAdded={updateEntities}
+              onEntityAdded={handleEntityAdded}
             />
           </div>
+
+          {copiedEntity && (
+            <div className="mt-2 text-xs text-gray-400">
+              Copied: {copiedEntity.entityName} (Cmd+V to paste)
+            </div>
+          )}
 
           <SceneTree
             sceneEntities={sceneEntities}

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/context-menu";
 import { Entity } from "@/models";
 import { GameWorldService } from "../../services/game-world-service";
+import { EntityCreator } from "./entity-creator";
 
 interface SceneTreeNode {
   entity: Entity;
@@ -61,6 +62,16 @@ export default function EntityItem({
           entitiesRegistry.remove(node.entity.entityId);
         }
       }
+    }
+  };
+
+  const handleDuplicateEntity = async () => {
+    if (!gameWorldService.current) return;
+    
+    try {
+      await EntityCreator.duplicateEntity(node.entity, gameWorldService.current);
+    } catch (error) {
+      console.error("Failed to duplicate entity:", error);
     }
   };
 
@@ -181,6 +192,12 @@ export default function EntityItem({
             className="text-gray-200 hover:bg-gray-800"
           >
             Rename
+          </ContextMenuItem>
+          <ContextMenuItem 
+            onClick={handleDuplicateEntity}
+            className="text-gray-200 hover:bg-gray-800"
+          >
+            Duplicate
           </ContextMenuItem>
           <ContextMenuItem 
             onClick={handleSendToRoot}
