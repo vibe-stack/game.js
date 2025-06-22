@@ -81,7 +81,7 @@ export class Cylinder extends Entity {
     this.addTag("cylinder");
   }
 
-  protected createCollider(): void {
+  protected createCollider(config: any): void {
     if (!this.physicsManager || !this.rigidBodyId) return;
     
     // Use capsule for cylinder if radii are equal, otherwise use convex hull
@@ -90,7 +90,8 @@ export class Cylinder extends Entity {
         this.colliderId!,
         this.rigidBodyId,
         "capsule",
-        new THREE.Vector3(this.dimensions.radiusTop, this.dimensions.height, this.dimensions.radiusTop)
+        new THREE.Vector3(this.dimensions.radiusTop, this.dimensions.height, this.dimensions.radiusTop),
+        config
       );
     } else {
       // For truncated cones, we'd need a more complex collider
@@ -99,7 +100,8 @@ export class Cylinder extends Entity {
         this.colliderId!,
         this.rigidBodyId,
         "capsule",
-        new THREE.Vector3(radius, this.dimensions.height, radius)
+        new THREE.Vector3(radius, this.dimensions.height, radius),
+        config
       );
     }
   }

@@ -157,7 +157,7 @@ export default function GameCanvas({ gameWorldService }: GameCanvasProps) {
 
   return (
     <div className="absolute inset-0 pt-12">
-      <div className="absolute inset-0 ml-[336px] mr-[336px]"> {/* Account for left and right sidebars with margins */}
+      <div className="absolute inset-0"> {/* Account for left and right sidebars with margins */}
         <canvas
           ref={canvasRef}
           className="w-full h-full block"

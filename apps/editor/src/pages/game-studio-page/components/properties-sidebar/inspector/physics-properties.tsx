@@ -4,6 +4,7 @@ import { DragInput } from "@/components/ui/drag-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useEntityState } from "@/hooks/use-entity-state";
 
 interface PhysicsPropertiesProps {
   entity: Entity;
@@ -11,9 +12,16 @@ interface PhysicsPropertiesProps {
 }
 
 export function PhysicsProperties({ entity, onUpdate }: PhysicsPropertiesProps) {
+  // Subscribe to entity changes to ensure component re-renders when physics properties change
+  useEntityState(entity);
+  
+  return <PhysicsPropertiesContent entity={entity} onUpdate={onUpdate} />;
+} 
+
+function PhysicsPropertiesContent({ entity, onUpdate }: PhysicsPropertiesProps) {
   const physicsConfig = entity.getPhysicsConfig();
   const hasPhysics = entity.hasPhysics();
-
+  
   const handlePhysicsToggle = (enabled: string | boolean) => {
     const isEnabled = typeof enabled === 'boolean' ? enabled : enabled === 'true';
     
@@ -198,4 +206,4 @@ export function PhysicsProperties({ entity, onUpdate }: PhysicsPropertiesProps) 
       )}
     </div>
   );
-} 
+}

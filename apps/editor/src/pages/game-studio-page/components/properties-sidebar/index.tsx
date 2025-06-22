@@ -5,39 +5,67 @@ import { Settings, MessageSquare } from "lucide-react";
 import { Inspector } from "./inspector";
 import { Chat } from "./chat";
 import { GameWorldService } from "../../services/game-world-service";
+import { motion } from "motion/react";
+import useGameStudioStore from "@/stores/game-studio-store";
 
 interface PropertiesSidebarProps {
   gameWorldService: React.RefObject<GameWorldService | null>;
 }
 
-export default function PropertiesSidebar({ gameWorldService }: PropertiesSidebarProps) {
+export default function PropertiesSidebar({
+  gameWorldService,
+}: PropertiesSidebarProps) {
   const [activeTab, setActiveTab] = useState("inspector");
+  const { gameState } = useGameStudioStore();
 
   return (
-    <div className="fixed right-4 top-32 bottom-32 w-80 bg-black/20 backdrop-blur-md border border-white/10 rounded-lg overflow-hidden z-40">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-        <TabsList className="grid w-full grid-cols-2 bg-white/5 m-2 mb-0">
-          <TabsTrigger value="inspector" className="flex items-center gap-2 text-white data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-300">
-            <Settings className="w-4 h-4" />
+    <motion.div
+      initial={{ x: 100, opacity: 1 }}
+      animate={{
+        x: gameState === "playing" ? 300 : 0,
+        opacity: gameState === "playing" ? 0 : 1,
+      }}
+      transition={{ duration: 0.5 }}
+      className="fixed top-32 right-4 bottom-32 z-40 w-80 overflow-hidden rounded-lg border border-white/10 bg-black/20 backdrop-blur-md"
+    >
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="flex h-full flex-col"
+      >
+        <TabsList className="m-2 mb-0 grid w-full grid-cols-2 bg-white/5">
+          <TabsTrigger
+            value="inspector"
+            className="flex items-center gap-2 text-white data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-300"
+          >
+            <Settings className="h-4 w-4" />
             Inspector
           </TabsTrigger>
-          <TabsTrigger value="chat" className="flex items-center gap-2 text-white data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-300">
-            <MessageSquare className="w-4 h-4" />
+          <TabsTrigger
+            value="chat"
+            className="flex items-center gap-2 text-white data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-300"
+          >
+            <MessageSquare className="h-4 w-4" />
             Chat
           </TabsTrigger>
         </TabsList>
-        
-        <div className="flex-1 flex flex-col min-h-0">
-          <TabsContent value="inspector" className="flex-1 flex flex-col min-h-0 m-2 overflow-y-auto">
 
-              <Inspector gameWorldService={gameWorldService} />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <TabsContent
+            value="inspector"
+            className="m-2 flex min-h-0 flex-1 flex-col overflow-y-auto"
+          >
+            <Inspector gameWorldService={gameWorldService} />
           </TabsContent>
-          
-          <TabsContent value="chat" className="flex-1 flex flex-col min-h-0 m-2">
+
+          <TabsContent
+            value="chat"
+            className="m-2 flex min-h-0 flex-1 flex-col"
+          >
             <Chat />
           </TabsContent>
         </div>
       </Tabs>
-    </div>
+    </motion.div>
   );
-} 
+}

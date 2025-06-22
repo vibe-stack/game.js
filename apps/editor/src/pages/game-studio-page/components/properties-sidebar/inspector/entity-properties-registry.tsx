@@ -8,6 +8,8 @@ import { Plane } from "@/models/primitives/plane";
 import { Capsule } from "@/models/primitives/capsule";
 import { Torus } from "@/models/primitives/torus";
 import { Ring } from "@/models/primitives/ring";
+import { Light } from "@/models/primitives/light";
+import { Heightfield } from "@/models/primitives/heightfield";
 import { BoxProperties } from "./box-properties";
 import { SphereProperties } from "./sphere-properties";
 import { ConeProperties } from "./cone-properties";
@@ -16,6 +18,8 @@ import { PlaneProperties } from "./plane-properties";
 import { CapsuleProperties } from "./capsule-properties";
 import { TorusProperties } from "./torus-properties";
 import { RingProperties } from "./ring-properties";
+import { LightProperties } from "./light-properties";
+import { HeightfieldProperties } from "./heightfield-properties";
 import { PhysicsProperties } from "./physics-properties";
 import { MaterialsSection } from "./materials-section";
 
@@ -56,6 +60,14 @@ export function EntityPropertiesRegistry({ entity, onUpdate }: EntityPropertiesR
 
     if (entity instanceof Ring) {
       return <RingProperties entity={entity} onUpdate={onUpdate} />;
+    }
+
+    if (entity instanceof Light) {
+      return <LightProperties entity={entity} onUpdate={onUpdate} />;
+    }
+
+    if (entity instanceof Heightfield) {
+      return <HeightfieldProperties entity={entity} onUpdate={onUpdate} />;
     }
 
     // For entities without specific property components, show a generic message

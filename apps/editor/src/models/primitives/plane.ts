@@ -60,7 +60,7 @@ export class Plane extends Entity {
     this.addTag("plane");
   }
 
-  protected createCollider(): void {
+  protected createCollider(config: any): void {
     if (!this.physicsManager || !this.rigidBodyId) return;
     
     // Create a thin box collider for the plane
@@ -68,7 +68,8 @@ export class Plane extends Entity {
       this.colliderId!,
       this.rigidBodyId,
       "cuboid",
-      new THREE.Vector3(this.dimensions.width, 0.01, this.dimensions.height)
+      new THREE.Vector3(this.dimensions.width, 0.01, this.dimensions.height),
+      config
     );
   }
 

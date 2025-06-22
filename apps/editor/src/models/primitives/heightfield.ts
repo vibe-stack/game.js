@@ -290,17 +290,20 @@ export class Heightfield extends Entity {
     });
 
     this.geometry.attributes.uv.needsUpdate = true;
+    this.emitChange();
     return this;
   }
 
   setMaterial(material: THREE.Material): this {
     this.mesh.material = material;
+    this.emitChange();
     return this;
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
+    this.emitChange();
     return this;
   }
 
@@ -311,6 +314,7 @@ export class Heightfield extends Entity {
     if (this._needsPhysicsUpdate) {
       this.updatePhysics();
     }
+    this.emitChange();
     return this;
   }
 
@@ -470,6 +474,7 @@ export class Heightfield extends Entity {
         rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
         scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
       },
+      physics: this.serializePhysics(),
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
       geometry: { type: "HeightfieldGeometry", parameters: { width: this.dimensions.width, depth: this.dimensions.depth, rows: this.dimensions.rows, columns: this.dimensions.columns, minElevation: this.elevationRange.min, maxElevation: this.elevationRange.max, customHeights: this.getHeights(), algorithm: this.algorithm, seed: this.seed, frequency: this.noiseSettings.frequency, amplitude: this.noiseSettings.amplitude, octaves: this.noiseSettings.octaves, persistence: this.noiseSettings.persistence, lacunarity: this.noiseSettings.lacunarity, displacementScale: this.displacementScale, smoothing: this.smoothing, uvScale: this.uvScale, enableVertexManipulation: this.enableVertexManipulation, heightConstraints: this.heightConstraints, smoothRadius: this.smoothRadius, smoothFalloff: this.smoothFalloff } }

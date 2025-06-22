@@ -108,9 +108,9 @@ export class Sphere extends Entity {
     };
   }
 
-  protected createCollider(): void {
+  protected createCollider(config: any): void {
     if (this.physicsManager && this.rigidBodyId) {
-      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "ball", this.radius);
+      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "ball", this.radius, config);
     }
   }
   

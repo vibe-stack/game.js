@@ -79,47 +79,38 @@ export class Torus extends Entity {
     );
   }
 
-  setDimensions(radius: number, tube: number): this {
+  protected rebuildGeometry(): void {
     this.geometry.dispose();
     this.geometry = new THREE.TorusGeometry(
-      radius,
-      tube,
+      this.dimensions.radius,
+      this.dimensions.tube,
       this.segmentConfig.radial,
       this.segmentConfig.tubular,
       this.segmentConfig.arc
     );
     this.mesh.geometry = this.geometry;
+  }
+
+  setDimensions(radius: number, tube: number): this {
     (this.dimensions as any).radius = radius;
     (this.dimensions as any).tube = tube;
+    this.rebuildGeometry();
+    this.emitChange();
     return this;
   }
 
-  setSegments(radialSegments: number, tubularSegments: number): this {
-    this.geometry.dispose();
-    this.geometry = new THREE.TorusGeometry(
-      this.dimensions.radius,
-      this.dimensions.tube,
-      radialSegments,
-      tubularSegments,
-      this.segmentConfig.arc
-    );
-    this.mesh.geometry = this.geometry;
-    (this.segmentConfig as any).radial = radialSegments;
-    (this.segmentConfig as any).tubular = tubularSegments;
+  setSegments(radial: number, tubular: number): this {
+    this.segmentConfig.radial = Math.max(3, Math.round(radial));
+    this.segmentConfig.tubular = Math.max(3, Math.round(tubular));
+    this.rebuildGeometry();
+    this.emitChange();
     return this;
   }
 
   setArc(arc: number): this {
-    this.geometry.dispose();
-    this.geometry = new THREE.TorusGeometry(
-      this.dimensions.radius,
-      this.dimensions.tube,
-      this.segmentConfig.radial,
-      this.segmentConfig.tubular,
-      arc
-    );
-    this.mesh.geometry = this.geometry;
-    (this.segmentConfig as any).arc = arc;
+    this.segmentConfig.arc = Math.max(0.1, Math.min(Math.PI * 2, arc));
+    this.rebuildGeometry();
+    this.emitChange();
     return this;
   }
 
@@ -136,7 +127,7 @@ export class Torus extends Entity {
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
-    this.emitChange(); // Trigger change event for UI updates
+    this.emitChange();
     return this;
   }
 

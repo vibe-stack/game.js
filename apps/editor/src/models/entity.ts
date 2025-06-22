@@ -162,6 +162,7 @@ export abstract class Entity extends THREE.Object3D {
     const config = { type: "dynamic" as const, mass, restitution, friction };
     this.physicsConfig = config;
     this.setupPhysics(config);
+    this.emitChange();
     return this;
   }
 
@@ -169,6 +170,7 @@ export abstract class Entity extends THREE.Object3D {
     const config = { type: "static" as const, restitution, friction };
     this.physicsConfig = config;
     this.setupPhysics(config);
+    this.emitChange();
     return this;
   }
 
@@ -176,6 +178,7 @@ export abstract class Entity extends THREE.Object3D {
     const config = { type: "kinematic" as const };
     this.physicsConfig = config;
     this.setupPhysics(config);
+    this.emitChange();
     return this;
   }
 
@@ -191,6 +194,7 @@ export abstract class Entity extends THREE.Object3D {
       }
     }
     this.physicsConfig = null;
+    this.emitChange();
     return this;
   }
 

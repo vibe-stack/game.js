@@ -37,6 +37,10 @@ export abstract class Light extends Entity {
     }
   }
 
+  // Abstract methods that subclasses must implement
+  abstract setColor(color: THREE.ColorRepresentation): this;
+  abstract setIntensity(intensity: number): this;
+
   protected abstract createLight(config: LightConfig): THREE.Light;
   
   protected configureShadows(config: LightConfig) {
@@ -92,12 +96,16 @@ export class AmbientLight extends Light {
     // No-op for ambient lights
   }
   
-  setColor(color: THREE.ColorRepresentation) {
+  setColor(color: THREE.ColorRepresentation): this {
     this.light.color.set(color);
+    this.emitChange();
+    return this;
   }
   
-  setIntensity(intensity: number) {
+  setIntensity(intensity: number): this {
     this.light.intensity = intensity;
+    this.emitChange();
+    return this;
   }
 }
 
@@ -145,12 +153,16 @@ export class DirectionalLight extends Light {
     return this._target.position.clone();
   }
   
-  setColor(color: THREE.ColorRepresentation) {
+  setColor(color: THREE.ColorRepresentation): this {
     this.directionalLight.color.set(color);
+    this.emitChange();
+    return this;
   }
   
-  setIntensity(intensity: number) {
+  setIntensity(intensity: number): this {
     this.directionalLight.intensity = intensity;
+    this.emitChange();
+    return this;
   }
   
   setShadowCameraSize(size: number) {
@@ -194,12 +206,16 @@ export class PointLight extends Light {
     shadowCamera.far = this.pointLight.distance || 100;
   }
   
-  setColor(color: THREE.ColorRepresentation) {
+  setColor(color: THREE.ColorRepresentation): this {
     this.pointLight.color.set(color);
+    this.emitChange();
+    return this;
   }
   
-  setIntensity(intensity: number) {
+  setIntensity(intensity: number): this {
     this.pointLight.intensity = intensity;
+    this.emitChange();
+    return this;
   }
   
   setDistance(distance: number) {
@@ -274,12 +290,16 @@ export class SpotLight extends Light {
     return this._target.position.clone();
   }
   
-  setColor(color: THREE.ColorRepresentation) {
+  setColor(color: THREE.ColorRepresentation): this {
     this.spotLight.color.set(color);
+    this.emitChange();
+    return this;
   }
   
-  setIntensity(intensity: number) {
+  setIntensity(intensity: number): this {
     this.spotLight.intensity = intensity;
+    this.emitChange();
+    return this;
   }
   
   setDistance(distance: number) {

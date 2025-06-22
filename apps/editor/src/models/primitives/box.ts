@@ -141,9 +141,9 @@ export class Box extends Entity {
     };
   }
 
-  protected createCollider(): void {
+  protected createCollider(config: any): void {
     if (this.physicsManager && this.rigidBodyId) {
-      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "cuboid", this.dimensions);
+      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "cuboid", this.dimensions, config);
     }
   }
 
