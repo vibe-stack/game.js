@@ -39,6 +39,8 @@ export {
   type ScriptConfig,
   type CompiledScript,
   type EntityScriptBinding,
+  type ScriptParameter,
+  type EntityScriptParameters,
 } from "./script-manager";
 
 // Example Scripts

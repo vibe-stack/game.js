@@ -421,7 +421,91 @@ export function update(context, deltaTime) {
 `,
     enabled: true,
     priority: 0
+  },
+
+  // Oscillated movement with configurable parameters
+  oscillatedMove: {
+    id: 'oscillated-move',
+    name: 'Oscillated Move',
+    code: `
+let time = 0;
+let initialPosition = null;
+
+export function init(context) {
+  // Store the initial position
+  initialPosition = context.entity.position.clone();
+  time = 0;
+  
+  console.log('Oscillated Move script initialized for:', context.entity.entityName);
+}
+
+export function update(context, deltaTime) {
+  if (!initialPosition) return;
+  
+  // Get parameters from entity script parameters (will be set by UI)
+  const scriptManager = context.gameWorld.getScriptManager();
+  const params = scriptManager.getScriptParametersWithDefaults(context.entity.entityId, 'oscillated-move');
+  
+  const axis = params.axis || 'x';
+  const maxDistance = params.maxDistance || 2.0;
+  const speed = params.speed || 1.0;
+  
+  time += deltaTime * speed;
+  
+  // Calculate oscillation value
+  const oscillationValue = Math.sin(time) * maxDistance;
+  
+  // Apply oscillation on the specified axis
+  const newPosition = initialPosition.clone();
+  switch (axis) {
+    case 'x':
+      newPosition.x += oscillationValue;
+      break;
+    case 'y':
+      newPosition.y += oscillationValue;
+      break;
+    case 'z':
+      newPosition.z += oscillationValue;
+      break;
   }
+  
+  context.entity.position.copy(newPosition);
+}
+
+export function destroy(context) {
+  console.log('Oscillated Move script destroyed for:', context.entity.entityName);
+}
+`,
+    enabled: true,
+    priority: 0,
+    parameters: [
+      {
+        name: 'axis',
+        type: 'select' as const,
+        defaultValue: 'x',
+        options: ['x', 'y', 'z'],
+        description: 'The axis along which to oscillate'
+      },
+      {
+        name: 'maxDistance',
+        type: 'number' as const,
+        defaultValue: 2.0,
+        min: 0.1,
+        max: 10.0,
+        step: 0.1,
+        description: 'Maximum distance from center position'
+      },
+      {
+        name: 'speed',
+        type: 'number' as const,
+        defaultValue: 1.0,
+        min: 0.1,
+        max: 5.0,
+        step: 0.1,
+        description: 'Speed of oscillation'
+      }
+    ]
+  },
 };
 
 /**

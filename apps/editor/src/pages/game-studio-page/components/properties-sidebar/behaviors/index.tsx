@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { GameWorldService } from "../../../services/game-world-service";
 import useGameStudioStore from "@/stores/game-studio-store";
 import { useEntityProperties } from "@/hooks/use-entity-state";
+import { useScriptManagerState } from "@/hooks/use-script-manager-state";
 import { Entity, EXAMPLE_SCRIPTS, getExampleScriptIds } from "@/models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +54,9 @@ export function Behaviors({ gameWorldService }: BehaviorsProps) {
     const gameWorld = gameWorldService.current.getGameWorld();
     return gameWorld?.getScriptManager() || null;
   }, [gameWorldService]);
+
+  // Use the script manager state hook for React synchronization
+  useScriptManagerState(scriptManager);
 
   // Get attached scripts
   const attachedScripts = useMemo(() => {
@@ -181,6 +185,7 @@ export function Behaviors({ gameWorldService }: BehaviorsProps) {
             onToggleScript={handleToggleScript}
             onSelectScript={setSelectedScript}
             selectedScript={selectedScript}
+            entityId={selectedEntityId!}
           />
         )}
         

@@ -51,12 +51,28 @@ export interface ScriptContext {
   frameCount: number;
 }
 
+export interface ScriptParameter {
+  name: string;
+  type: 'number' | 'string' | 'boolean' | 'vector3' | 'select';
+  defaultValue: any;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: string[]; // For select type
+  description?: string;
+}
+
 export interface ScriptConfig {
   id: string;
   name: string;
   code: string;
   enabled: boolean;
   priority: number; // Lower numbers run first
+  parameters?: ScriptParameter[];
+}
+
+export interface EntityScriptParameters {
+  [parameterName: string]: any;
 }
 
 export interface CompiledScript {
@@ -66,12 +82,14 @@ export interface CompiledScript {
   isInitialized: boolean;
   hasErrors: boolean;
   lastError?: string;
+  parameters?: ScriptParameter[];
 }
 
 export interface EntityScriptBinding {
   entityId: string;
   scriptId: string;
   enabled: boolean;
+  parameters?: EntityScriptParameters;
 }
 
 export class ScriptManager {
@@ -84,6 +102,12 @@ export class ScriptManager {
   private compiledScripts = new Map<string, CompiledScript>();
   private entityScripts = new Map<string, Set<string>>(); // entityId -> scriptIds
   private scriptEntities = new Map<string, Set<string>>(); // scriptId -> entityIds
+  
+  // Parameter storage
+  private entityScriptParameters = new Map<string, Map<string, EntityScriptParameters>>(); // entityId -> scriptId -> parameters
+  
+  // Change listeners for React synchronization
+  private changeListeners: Set<() => void> = new Set();
   
   // Execution tracking
   private frameCount = 0;
@@ -102,6 +126,19 @@ export class ScriptManager {
 
   constructor(gameWorld: GameWorld) {
     this.gameWorld = gameWorld;
+  }
+
+  // Change listener methods for React synchronization
+  public addChangeListener(listener: () => void): void {
+    this.changeListeners.add(listener);
+  }
+
+  public removeChangeListener(listener: () => void): void {
+    this.changeListeners.delete(listener);
+  }
+
+  protected emitChange(): void {
+    this.changeListeners.forEach(listener => listener());
   }
 
   public setSceneManager(sceneManager: SceneManager): void {
@@ -165,9 +202,11 @@ export class ScriptManager {
         lifecycle,
         isInitialized: false,
         hasErrors: false,
+        parameters: config.parameters || [],
       };
 
       this.compiledScripts.set(config.id, compiledScript);
+      this.emitChange();
       return compiledScript;
 
     } catch (error) {
@@ -178,10 +217,12 @@ export class ScriptManager {
         isInitialized: false,
         hasErrors: true,
         lastError: error instanceof Error ? error.message : String(error),
+        parameters: config.parameters || [],
       };
 
       this.compiledScripts.set(config.id, compiledScript);
       console.error(`Failed to compile script ${config.id}:`, error);
+      this.emitChange();
       return compiledScript;
     }
   }
@@ -212,6 +253,7 @@ export class ScriptManager {
       this.initializeScriptForEntity(scriptId, entityId);
     }
 
+    this.emitChange();
     return true;
   }
 
@@ -246,6 +288,7 @@ export class ScriptManager {
       this.scriptEntities.delete(scriptId);
     }
 
+    this.emitChange();
     return true;
   }
 
@@ -505,6 +548,7 @@ export class ScriptManager {
     const script = this.compiledScripts.get(scriptId);
     if (script) {
       script.config.enabled = enabled;
+      this.emitChange();
     }
   }
 
@@ -583,5 +627,44 @@ export class ScriptManager {
     this.entityScripts.clear();
     this.scriptEntities.clear();
     this.scriptPerformance.clear();
+  }
+
+  // Parameter management methods
+  public setScriptParameters(entityId: string, scriptId: string, parameters: EntityScriptParameters): void {
+    if (!this.entityScriptParameters.has(entityId)) {
+      this.entityScriptParameters.set(entityId, new Map());
+    }
+    this.entityScriptParameters.get(entityId)!.set(scriptId, parameters);
+    this.emitChange();
+  }
+
+  public getScriptParameters(entityId: string, scriptId: string): EntityScriptParameters {
+    const entityParams = this.entityScriptParameters.get(entityId);
+    if (!entityParams) return {};
+    return entityParams.get(scriptId) || {};
+  }
+
+  public getScriptParametersWithDefaults(entityId: string, scriptId: string): EntityScriptParameters {
+    const script = this.compiledScripts.get(scriptId);
+    const currentParams = this.getScriptParameters(entityId, scriptId);
+    const result: EntityScriptParameters = {};
+
+    // Apply defaults from script definition
+    if (script?.parameters) {
+      for (const param of script.parameters) {
+        result[param.name] = currentParams[param.name] !== undefined 
+          ? currentParams[param.name] 
+          : param.defaultValue;
+      }
+    }
+
+    // Include any additional parameters
+    for (const [key, value] of Object.entries(currentParams)) {
+      if (!(key in result)) {
+        result[key] = value;
+      }
+    }
+
+    return result;
   }
 } 

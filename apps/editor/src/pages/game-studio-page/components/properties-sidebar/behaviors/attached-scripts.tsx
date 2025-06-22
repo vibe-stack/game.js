@@ -13,6 +13,7 @@ import {
   Info
 } from "lucide-react";
 import { ScriptManager, CompiledScript } from "@/models";
+import { ScriptParameters } from "./script-parameters";
 
 interface AttachedScriptsProps {
   attachedScripts: string[];
@@ -21,6 +22,7 @@ interface AttachedScriptsProps {
   onToggleScript: (scriptId: string, enabled: boolean) => void;
   onSelectScript: (scriptId: string | null) => void;
   selectedScript: string | null;
+  entityId: string;
 }
 
 export function AttachedScripts({
@@ -29,7 +31,8 @@ export function AttachedScripts({
   onDetachScript,
   onToggleScript,
   onSelectScript,
-  selectedScript
+  selectedScript,
+  entityId
 }: AttachedScriptsProps) {
   
   if (attachedScripts.length === 0) {
@@ -57,6 +60,7 @@ export function AttachedScripts({
             onSelect={() => onSelectScript(selectedScript === scriptId ? null : scriptId)}
             onDetach={() => onDetachScript(scriptId)}
             onToggle={(enabled) => onToggleScript(scriptId, enabled)}
+            entityId={entityId}
           />
         );
       })}
@@ -71,6 +75,7 @@ interface ScriptCardProps {
   onSelect: () => void;
   onDetach: () => void;
   onToggle: (enabled: boolean) => void;
+  entityId: string;
 }
 
 function ScriptCard({ 
@@ -79,7 +84,8 @@ function ScriptCard({
   isSelected, 
   onSelect, 
   onDetach, 
-  onToggle 
+  onToggle,
+  entityId
 }: ScriptCardProps) {
   const metrics = scriptManager.getScriptPerformance(script.id);
   
@@ -194,7 +200,7 @@ function ScriptCard({
         
         {/* Script details when selected */}
         {isSelected && (
-          <div className="mt-3 pt-3 border-t border-white/10">
+          <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
             <div className="space-y-2 text-xs">
               <div>
                 <span className="text-gray-400">Script ID:</span>
@@ -221,6 +227,16 @@ function ScriptCard({
                 </span>
               </div>
             </div>
+            
+            {/* Script Parameters */}
+            {script.parameters && script.parameters.length > 0 && (
+              <ScriptParameters
+                entityId={entityId}
+                scriptId={script.id}
+                parameters={script.parameters}
+                scriptManager={scriptManager}
+              />
+            )}
           </div>
         )}
       </CardContent>
