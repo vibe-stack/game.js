@@ -22,6 +22,7 @@ import { LightProperties } from "./light-properties";
 import { HeightfieldProperties } from "./heightfield-properties";
 import { PhysicsProperties } from "./physics-properties";
 import { MaterialsSection } from "./materials-section";
+import { CharacterControllerSection } from "./character-controller-section";
 
 interface EntityPropertiesRegistryProps {
   entity: Entity;
@@ -93,6 +94,10 @@ export function EntityPropertiesRegistry({ entity, onUpdate }: EntityPropertiesR
   return (
     <div className="space-y-6">
       {renderEntitySpecificProperties()}
+      
+      {/* Character Controller Section */}
+      <CharacterControllerSection entity={entity} onUpdate={onUpdate} />
+      
       <PhysicsProperties entity={entity} onUpdate={onUpdate} />
       <MaterialsSection entity={entity} />
     </div>

@@ -6,6 +6,7 @@ import { InteractionManager } from "./interaction-manager";
 import { CameraManager } from "./camera-manager";
 import { CameraControlManager } from "./camera-control-manager";
 import { DebugRenderer } from "./debug-renderer";
+import { InputManager } from "./input-manager";
 import { Entity } from "./entity";
 import { GameConfig } from "./types";
 import { SceneData } from "../types/project";
@@ -24,6 +25,7 @@ export class GameWorld {
   private cameraManager: CameraManager;
   private cameraControlManager: CameraControlManager;
   private debugRenderer: DebugRenderer;
+  private inputManager: InputManager;
   
   private entities: Registry<Entity>;
   private cameras: Registry<THREE.Camera>;
@@ -71,6 +73,7 @@ export class GameWorld {
     
     this.interactionManager = new InteractionManager(this.renderer as any, this.cameraManager, config.canvas);
     this.debugRenderer = new DebugRenderer(this.scene, this.physicsManager);
+    this.inputManager = new InputManager(config.canvas);
     
     if (config.enablePhysics !== false) {
       this.initializePhysics(config.gravity);
@@ -235,6 +238,7 @@ export class GameWorld {
   getRegistryManager(): RegistryManager { return this.registryManager; }
   getCameraManager(): CameraManager { return this.cameraManager; }
   getCameraControlManager(): CameraControlManager { return this.cameraControlManager; }
+  getInputManager(): InputManager { return this.inputManager; }
   getEntitiesByTag(tag: string): Entity[] { return this.entities.getByTag(tag); }
   isPhysicsDebugRenderEnabled(): boolean { return this.debugRenderer.isEnabled(); }
   togglePhysicsDebugRender(): void { this.debugRenderer.toggle(); }
@@ -254,6 +258,7 @@ export class GameWorld {
     this.cameraControlManager.dispose();
     this.cameraManager.dispose();
     this.physicsManager.dispose();
+    this.inputManager.dispose();
     this.renderer.dispose();
     this.scene.clear();
   }

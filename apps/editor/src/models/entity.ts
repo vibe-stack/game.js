@@ -2,6 +2,7 @@ import * as THREE from "three/webgpu";
 import { PhysicsManager } from "./physics-manager";
 import { EntityConfig, TweenConfig, InteractionCallbacks, EntityMetadata, EntityType, PhysicsConfig } from "./types";
 import { EntityData } from "./scene-loader";
+import { CharacterControllerConfig } from "./character-controller";
 
 export abstract class Entity extends THREE.Object3D {
   public readonly entityId: string;
@@ -16,6 +17,10 @@ export abstract class Entity extends THREE.Object3D {
   private interactionCallbacks: InteractionCallbacks = {};
   private destroyed = false;
   private debugRenderEnabled = false;
+  
+  // Character controller support
+  private characterControllerConfig: CharacterControllerConfig | null = null;
+  private hasCharacterController = false;
   
   // Event system for React synchronization
   private changeListeners: Set<() => void> = new Set();
@@ -323,4 +328,71 @@ export abstract class Entity extends THREE.Object3D {
   isDebugRenderEnabled(): boolean { return this.debugRenderEnabled; }
   getRigidBodyId(): string | null { return this.rigidBodyId; }
   getColliderId(): string | null { return this.colliderId; }
+
+  // Character controller methods
+  enableCharacterController(config: Partial<CharacterControllerConfig> = {}): this {
+    // Default character controller config
+    const defaultConfig: CharacterControllerConfig = {
+      capsuleHalfHeight: 0.9,
+      capsuleRadius: 0.4,
+      maxSpeed: 8.0,
+      acceleration: 50.0,
+      jumpForce: 12.0,
+      sprintMultiplier: 1.8,
+      offset: 0.01,
+      maxSlopeClimbAngle: Math.PI / 4,
+      minSlopeSlideAngle: Math.PI / 6,
+      autoStepMaxHeight: 0.5,
+      autoStepMinWidth: 0.2,
+      autoStepIncludeDynamic: true,
+      snapToGroundDistance: 0.3,
+      gravityScale: 20.0,
+      maxFallSpeed: -25.0,
+      cameraMode: "first-person",
+      cameraDistance: -5.0,
+      cameraHeight: 1.7,
+      cameraMinDistance: -1.0,
+      cameraMaxDistance: -10.0,
+      cameraUpLimit: Math.PI / 3,
+      cameraDownLimit: -Math.PI / 3,
+      cameraSensitivity: 0.002,
+    };
+
+    this.characterControllerConfig = { ...defaultConfig, ...config };
+    this.hasCharacterController = true;
+    
+    // Automatically enable kinematic physics for character controller
+    this.enableKinematicPhysics();
+    
+    this.emitChange();
+    return this;
+  }
+
+  disableCharacterController(): this {
+    this.characterControllerConfig = null;
+    this.hasCharacterController = false;
+    this.emitChange();
+    return this;
+  }
+
+  getCharacterControllerConfig(): CharacterControllerConfig | null {
+    return this.characterControllerConfig ? { ...this.characterControllerConfig } : null;
+  }
+
+  updateCharacterControllerConfig(newConfig: Partial<CharacterControllerConfig>): this {
+    if (this.characterControllerConfig) {
+      this.characterControllerConfig = { ...this.characterControllerConfig, ...newConfig };
+      this.emitChange();
+    }
+    return this;
+  }
+
+  hasCharacterControllerEnabled(): boolean {
+    return this.hasCharacterController;
+  }
+
+  protected serializeCharacterController() {
+    if (!this.characterControllerConfig) return undefined;
+    return { ...this.characterControllerConfig };
+  }
 }
