@@ -221,6 +221,7 @@ export class Cone extends Entity {
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
       physics: this.serializePhysics(),
+      characterController: this.serializeCharacterController(),
       geometry: { type: "ConeGeometry", parameters: { radius: this.radius, height: this.height, radialSegments: this.segmentConfig.radial, heightSegments: this.segmentConfig.height, openEnded: this.segmentConfig.openEnded, thetaStart: this.segmentConfig.thetaStart, thetaLength: this.segmentConfig.thetaLength } }
     };
   }

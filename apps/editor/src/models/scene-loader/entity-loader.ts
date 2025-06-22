@@ -61,6 +61,12 @@ export class EntityLoader {
       if (data.physics?.enabled) {
         this.applyPhysicsToEntity(entity, data);
       }
+      
+      // Apply character controller if present in data
+      if (data.characterController) {
+        entity.enableCharacterController(data.characterController);
+      }
+      
       if (data.children && data.children.length > 0) {
         for (const childData of data.children) {
           const childEntity = await this.createEntity(context, childData, entityMap);

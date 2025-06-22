@@ -11,6 +11,7 @@ export class GameWorldService {
   private editorCameraService: EditorCameraService;
   private selectionManager: SelectionManager;
   private characterControllers: Map<string, CharacterController> = new Map();
+  private prePlaActiveCamera: string | null = null; // Store active camera before gameplay
 
   constructor() {
     this.sceneLoader = new SceneLoader();
@@ -164,6 +165,10 @@ export class GameWorldService {
 
   play(): void {
     if (this.gameWorld) {
+      // Store the currently active camera before gameplay starts
+      const { activeCamera } = useGameStudioStore.getState();
+      this.prePlaActiveCamera = activeCamera;
+      
       this.gameWorld.start();
       useGameStudioStore.getState().setGameState('playing');
       this.selectionManager.onGameStateChanged('playing');
@@ -195,8 +200,24 @@ export class GameWorldService {
       useGameStudioStore.getState().setGameState('initial');
       this.selectionManager.onGameStateChanged('initial');
       
-      // Disable character controllers
+      // Disable character controllers first (this removes their cameras)
       this.disableCharacterControllers();
+      
+      // Restore the previously active camera if we have it, otherwise use editor camera
+      if (this.prePlaActiveCamera) {
+        const success = this.switchToCamera(this.prePlaActiveCamera);
+        if (!success) {
+          // If switching back to previous camera failed, fallback to editor camera
+          this.editorCameraService.switchToEditorCamera();
+        }
+        this.prePlaActiveCamera = null; // Clear the stored camera
+      } else {
+        // No previous camera stored, default to editor camera
+        this.editorCameraService.switchToEditorCamera();
+      }
+      
+      // Update available cameras to remove any runtime cameras
+      this.updateAvailableCameras();
     }
   }
   

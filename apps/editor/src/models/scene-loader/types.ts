@@ -37,6 +37,31 @@ export interface EntityData {
     colliderShape?: string;
     colliderSize?: [number, number, number];
   };
+  characterController?: {
+    capsuleHalfHeight: number;
+    capsuleRadius: number;
+    maxSpeed: number;
+    acceleration: number;
+    jumpForce: number;
+    sprintMultiplier: number;
+    offset: number;
+    maxSlopeClimbAngle: number;
+    minSlopeSlideAngle: number;
+    autoStepMaxHeight: number;
+    autoStepMinWidth: number;
+    autoStepIncludeDynamic: boolean;
+    snapToGroundDistance: number;
+    gravityScale: number;
+    maxFallSpeed: number;
+    cameraMode: "first-person" | "third-person";
+    cameraDistance: number;
+    cameraHeight: number;
+    cameraMinDistance: number;
+    cameraMaxDistance: number;
+    cameraUpLimit: number;
+    cameraDownLimit: number;
+    cameraSensitivity: number;
+  };
   geometry?: {
     type: string;
     parameters: Record<string, any>;

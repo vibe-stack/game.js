@@ -201,6 +201,7 @@ export class Ring extends Entity {
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
       physics: this.serializePhysics(),
+      characterController: this.serializeCharacterController(),
       geometry: { type: "RingGeometry", parameters: { innerRadius: this.dimensions.innerRadius, outerRadius: this.dimensions.outerRadius, thetaSegments: this.segmentConfig.theta, phiSegments: this.segmentConfig.phi, thetaStart: this.segmentConfig.thetaStart, thetaLength: this.segmentConfig.thetaLength } }
     };
   }

@@ -520,6 +520,7 @@ export class Mesh3D extends Entity {
         scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
       },
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
+      characterController: this.serializeCharacterController(),
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
       geometry: { type: "Mesh3D", parameters: { modelId: this.modelId, geometry: this.loadedGeometry, material: this.loadedMaterials } }  
     };
