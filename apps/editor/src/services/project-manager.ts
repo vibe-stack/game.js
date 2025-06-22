@@ -61,8 +61,8 @@ export class ProjectManager {
       name: projectName,
       path: projectPath,
       lastModified: now,
-      scenes: ["main-scene"],
-      currentScene: "main-scene",
+      scenes: ["main-scene.scene"],
+      currentScene: "main-scene.scene",
       packageJson: ProjectManager.createPackageJson(projectName),
       metadata: {
         created: now,

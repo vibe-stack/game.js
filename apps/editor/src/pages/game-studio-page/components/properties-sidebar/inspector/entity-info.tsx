@@ -35,11 +35,7 @@ export function EntityInfo({
         
         <div className="space-y-1">
           <Label className="text-gray-300 text-xs">Type</Label>
-          <Input 
-            value={entityType} 
-            readOnly 
-            className="bg-white/5 border-white/20 text-white text-sm h-8" 
-          />
+          <span className="text-muted-foreground text-xs">{entityType}</span>
         </div>
         
         <div className="flex items-center space-x-2">

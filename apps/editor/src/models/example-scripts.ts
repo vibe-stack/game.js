@@ -18,6 +18,10 @@ export function update(context, deltaTime) {
   // Rotate the entity continuously
   const speed = context.entity.userData.rotationSpeed || 1.0;
   context.entity.rotation.y += speed * deltaTime;
+  
+  // Note: Physics body transform will be automatically synced
+  // after this script executes, so both visual and physics
+  // representations will stay in sync
 }
 `,
     enabled: true,
@@ -385,6 +389,38 @@ export function update(context, deltaTime) {
 `,
     enabled: true,
     priority: -1 // Run early so other scripts can use the time data
+  },
+
+  // Transform manipulation script showing both approaches
+  transformManipulation: {
+    id: 'transform-manipulation',
+    name: 'Transform Manipulation',
+    code: `
+export function init(context) {
+  context.entity.userData.oscillationTime = 0;
+}
+
+export function update(context, deltaTime) {
+  context.entity.userData.oscillationTime += deltaTime;
+  const time = context.entity.userData.oscillationTime;
+  
+  // Method 1: Direct property modification
+  // Physics sync happens automatically after script execution
+  context.entity.position.y = Math.sin(time * 2) * 2;
+  context.entity.rotation.x = Math.sin(time) * 0.3;
+  
+  // Method 2: Using entity setter methods (also works)
+  // These immediately sync physics transforms
+  // context.entity.setPosition(
+  //   context.entity.position.x,
+  //   Math.sin(time * 2) * 2,
+  //   context.entity.position.z
+  // );
+  // context.entity.setRotation(Math.sin(time) * 0.3, 0, 0);
+}
+`,
+    enabled: true,
+    priority: 0
   }
 };
 

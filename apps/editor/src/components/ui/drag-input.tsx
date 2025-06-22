@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { cn } from '@/utils/tailwind'
 
 interface DragInputProps {
-  value: number
+  value?: number
   onChange: (value: number) => void
   step?: number
   precision?: number
@@ -33,7 +33,7 @@ export function DragInput({
   const [isDragging, setIsDragging] = useState(false)
   const [hasDragged, setHasDragged] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
-  const [inputValue, setInputValue] = useState(value.toFixed(precision))
+  const [inputValue, setInputValue] = useState(value?.toFixed(precision) ?? '')
   const [dragStartX, setDragStartX] = useState(0)
   const [dragStartValue, setDragStartValue] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -42,7 +42,7 @@ export function DragInput({
   useEffect(() => {
     // Don't update input value while actively dragging
     // This prevents external value changes from breaking the drag state
-    if (!isEditing && !isDragging) {
+    if (!isEditing && !isDragging && value !== undefined) {
       setInputValue(value.toFixed(precision))
     }
   }, [value, precision, isEditing, isDragging])
@@ -73,7 +73,7 @@ export function DragInput({
     setIsDragging(true)
     setHasDragged(false)
     setDragStartX(e.clientX)
-    setDragStartValue(value)
+    setDragStartValue(value ?? 0)
     
     e.preventDefault()
   }, [isEditing, disabled, value])
@@ -179,7 +179,7 @@ export function DragInput({
       e.preventDefault()
       handleInputBlur()
     } else if (e.key === 'Escape') {
-      setInputValue(value.toFixed(precision))
+      setInputValue(value?.toFixed(precision) ?? '')
       setIsEditing(false)
     }
   }
@@ -220,7 +220,7 @@ export function DragInput({
           onClick={handleClick}
           onKeyDown={handleKeyDown}
         >
-          <span className="truncate">{value.toFixed(precision)}</span>
+          <span className="truncate">{value?.toFixed(precision) ?? ''}</span>
           {suffix && <span className="text-zinc-500 flex-shrink-0 ml-1">{suffix}</span>}
         </div>
       )}

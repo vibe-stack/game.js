@@ -1,6 +1,6 @@
 import React from "react";
 import { Entity } from "@/models";
-import { useEntityState } from "@/hooks/use-entity-state";
+import { useEntityProperties, useEntityState } from "@/hooks/use-entity-state";
 import { DragInput } from "@/components/ui/drag-input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,7 @@ interface PhysicsPropertiesProps {
 }
 
 export function PhysicsProperties({ entity }: PhysicsPropertiesProps) {
-  useEntityState(entity);
+  const { physicsType, physicsMass, physicsRestitution, physicsFriction } = useEntityProperties(entity);
 
   // Read values directly from entity properties
   const hasPhysics = entity.physicsConfig !== null && entity.getRigidBodyId() !== null;
@@ -62,7 +62,7 @@ export function PhysicsProperties({ entity }: PhysicsPropertiesProps) {
           {/* Physics Type */}
           <div className="space-y-2">
             <Label className="text-xs text-gray-400">Physics Type</Label>
-            <Select value={entity.physicsType || 'dynamic'} onValueChange={handlePhysicsTypeChange}>
+            <Select value={physicsType || ''} onValueChange={handlePhysicsTypeChange}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -75,11 +75,11 @@ export function PhysicsProperties({ entity }: PhysicsPropertiesProps) {
           </div>
 
           {/* Mass (only for dynamic bodies) */}
-          {entity.physicsType === 'dynamic' && (
+          {physicsType === 'dynamic' && (
             <div className="space-y-2">
               <Label className="text-xs text-gray-400">Mass</Label>
-              <DragInput
-                value={entity.physicsMass!}
+              <DragInput 
+                value={physicsMass}
                 onChange={handleMassChange}
                 min={0.01}
                 max={1000}
@@ -93,7 +93,7 @@ export function PhysicsProperties({ entity }: PhysicsPropertiesProps) {
           <div className="space-y-2">
             <Label className="text-xs text-gray-400">Restitution (Bounciness)</Label>
             <DragInput
-              value={entity.physicsRestitution!}
+              value={physicsRestitution}
               onChange={handleRestitutionChange}
               min={0}
               max={1}
@@ -106,7 +106,7 @@ export function PhysicsProperties({ entity }: PhysicsPropertiesProps) {
           <div className="space-y-2">
             <Label className="text-xs text-gray-400">Friction</Label>
             <DragInput
-              value={entity.physicsFriction!}
+              value={physicsFriction}
               onChange={handleFrictionChange}
               min={0}
               max={2}

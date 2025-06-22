@@ -61,5 +61,9 @@ export function useEntityProperties(entity: Entity | null) {
     visible: entity.visible,
     entityName: entity.entityName,
     metadata: entity.metadata,
+    physicsType: entity.physicsType,
+    physicsMass: entity.physicsMass,
+    physicsRestitution: entity.physicsRestitution,
+    physicsFriction: entity.physicsFriction,
   };
 } 

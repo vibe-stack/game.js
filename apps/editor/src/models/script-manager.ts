@@ -117,17 +117,36 @@ export class ScriptManager {
   }
 
   /**
+   * Transform ES6 export syntax to function declarations
+   */
+  private transformScriptCode(code: string): string {
+    // Transform export function statements to regular function declarations
+    return code
+      // Transform export function name(...) { ... } to name = function(...) { ... }
+      .replace(/export\s+function\s+(\w+)\s*\(/g, '$1 = function(')
+      // Remove any standalone export statements like export { ... }
+      .replace(/^\s*export\s*{\s*[^}]*\s*}\s*;?\s*$/gm, '')
+      // Remove any export default statements
+      .replace(/export\s+default\s+/g, '')
+      // Remove export keyword from variable declarations
+      .replace(/export\s+(const|let|var)\s+/g, '$1 ');
+  }
+
+  /**
    * Compile a script from string code
    */
   public compileScript(config: ScriptConfig): CompiledScript {
     try {
+      // Transform ES6 export syntax to function declarations
+      const transformedCode = this.transformScriptCode(config.code);
+      
       // Create a sandboxed function that returns the script lifecycle
-      const scriptFunction = new Function(`
+      const scriptFunction = new Function('THREE', `
         // Lifecycle functions
         let init, update, fixedUpdate, destroy;
         
         // Execute the script code
-        ${config.code}
+        ${transformedCode}
         
         // Return the lifecycle object
         return {
@@ -138,7 +157,7 @@ export class ScriptManager {
         };
       `);
 
-      const lifecycle = scriptFunction() as ScriptLifecycle;
+      const lifecycle = scriptFunction(THREE) as ScriptLifecycle;
 
       const compiledScript: CompiledScript = {
         id: config.id,
@@ -338,6 +357,11 @@ export class ScriptManager {
 
     try {
       lifecycleFunction(context, deltaTime);
+      
+      // Sync physics transform after script execution
+      // This ensures that if scripts modify position/rotation directly,
+      // the physics body stays in sync with the visual mesh
+      context.entity.syncPhysicsFromTransform();
       
       // Update performance metrics
       const executionTime = performance.now() - startTime;

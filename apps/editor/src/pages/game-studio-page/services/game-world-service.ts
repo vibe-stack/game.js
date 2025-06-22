@@ -37,9 +37,6 @@ export class GameWorldService {
       });
 
       await this.gameWorld.initialize();
-      this.gameWorld.enablePhysicsDebugRender();
-      this.gameWorld.enablePhysicsDebugRender();
-      this.gameWorld.enablePhysicsDebugRender();
       // Initialize editor camera service
       this.editorCameraService.initialize(this.gameWorld, canvas);
       
@@ -213,13 +210,18 @@ export class GameWorldService {
   dispose(): void {
     // Disable character controllers first
     this.disableCharacterControllers();
-    
-    if (this.gameWorld) {
+
+    try {
+      if (this.gameWorld) {
       this.gameWorld.dispose();
       this.gameWorld = null;
     }
     this.editorCameraService.dispose();
     this.selectionManager.dispose();
+
+    } catch (error) {
+      console.error("Failed to dispose game world:", error);
+    }
   }
 
   getGameWorld(): GameWorld | null {

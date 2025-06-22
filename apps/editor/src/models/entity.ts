@@ -257,6 +257,7 @@ export abstract class Entity extends THREE.Object3D {
     
     // Always emit change to update UI
     this.emitChange();
+
     return this;
   }
 
@@ -358,6 +359,21 @@ export abstract class Entity extends THREE.Object3D {
     const rigidBody = this.physicsManager.getRigidBody(this.rigidBodyId);
     if (rigidBody?.isDynamic()) {
       this.physicsManager.syncTransform(this.rigidBodyId, this);
+      this.emitChange();
+    }
+  }
+
+  /**
+   * Sync the physics body transform to match the visual mesh transform
+   * This is useful when scripts modify entity position/rotation directly
+   */
+  syncPhysicsFromTransform(): void {
+    if (!this.physicsManager || !this.rigidBodyId) return;
+    const rigidBody = this.physicsManager.getRigidBody(this.rigidBodyId);
+    if (rigidBody && !rigidBody.isDynamic()) {
+      // For static and kinematic bodies, update physics to match visual transform
+      rigidBody.setTranslation(this.position, true);
+      rigidBody.setRotation(this.quaternion, true);
       this.emitChange();
     }
   }

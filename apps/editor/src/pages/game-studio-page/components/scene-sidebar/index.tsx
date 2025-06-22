@@ -66,7 +66,7 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
         opacity: gameState === "playing" ? 0 : 1,
       }}
       transition={{ duration: 0.5 }}
-      className="fixed top-32 bottom-32 left-4 z-40 w-80 overflow-hidden rounded-lg border border-white/10 bg-black/20 backdrop-blur-md"
+      className="fixed top-32 bottom-32 left-4 z-40 w-80 overflow-hidden rounded-lg border border-white/10 bg-black/60 backdrop-blur-md"
     >
       <Tabs
         value={activeTab}

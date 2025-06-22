@@ -95,7 +95,6 @@ export function Inspector({ gameWorldService }: InspectorProps) {
 
       <EntityPropertiesRegistry
         entity={selectedEntity}
-        onUpdate={handleEntityUpdate}
       />
 
       <TagsSection

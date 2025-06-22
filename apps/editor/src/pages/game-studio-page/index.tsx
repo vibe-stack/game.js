@@ -16,7 +16,7 @@ export default function GameStudioPage() {
   const gameWorldServiceRef = useRef<GameWorldService | null>(null);
   
   const { currentProject } = useGameStudioStore();
-  const { setSaving, error, playGame, pauseGame, resetGame, resumeGame } = useGameStudioStore.getState();
+  const { setSaving, error, playGame, pauseGame, resetGame, resumeGame, gameState  } = useGameStudioStore.getState();
 
   useEffect(() => {
     if (!currentProject) {
@@ -46,7 +46,7 @@ export default function GameStudioPage() {
     setSaving(true);
     try {
       await gameWorldServiceRef.current.saveScene();
-      toast.success(`Scene "${currentScene?.name || 'Untitled'}" saved successfully`);
+      // toast.success(`Scene "${currentScene?.name || 'Untitled'}" saved successfully`);
     } catch (error) {
       console.error("Failed to save scene:", error);
       toast.error(`Failed to save scene: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -76,8 +76,8 @@ export default function GameStudioPage() {
   return (
     <div className="relative h-screen overflow-hidden bg-gray-900">
       <LoadingOverlay />
-      <SceneSidebar gameWorldService={gameWorldServiceRef} />
-      <PropertiesSidebar gameWorldService={gameWorldServiceRef} />
+      { gameState === "playing" ? null : <SceneSidebar gameWorldService={gameWorldServiceRef} />}
+      { gameState === "playing" ? null : <PropertiesSidebar gameWorldService={gameWorldServiceRef} />}
       <FloatingToolbar
         onHome={handleGoHome}
         onSave={handleSave}
@@ -88,7 +88,7 @@ export default function GameStudioPage() {
         onResume={handleResume}
       />
       <GameCanvas gameWorldService={gameWorldServiceRef} />
-      <MaterialEditor />
+      { gameState === "playing" ? null : <MaterialEditor />}
     </div>
   );
 }

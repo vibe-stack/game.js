@@ -69,7 +69,7 @@ export default function ProjectInfoToolbar({
 
     try {
       const defaultSceneData = SceneLoader.getDefaultSceneData();
-      const sceneName = "main-scene";
+      const sceneName = "main-scene.scene";
 
       await window.projectAPI.createScene(currentProject.path, sceneName, defaultSceneData);
       setAvailableScenes([sceneName]);
