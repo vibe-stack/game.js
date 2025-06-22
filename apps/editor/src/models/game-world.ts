@@ -12,6 +12,7 @@ import { GameConfig } from "./types";
 import { SceneData } from "../types/project";
 import { SceneLoader } from "./scene-loader";
 import { SceneSerializer } from "./scene-loader/scene-serializer";
+import { ScriptManager } from "./script-manager";
 
 export class GameWorld {
   public readonly scene: THREE.Scene;
@@ -26,6 +27,7 @@ export class GameWorld {
   private cameraControlManager: CameraControlManager;
   private debugRenderer: DebugRenderer;
   private inputManager: InputManager;
+  private scriptManager: ScriptManager;
   
   private entities: Registry<Entity>;
   private cameras: Registry<THREE.Camera>;
@@ -74,6 +76,7 @@ export class GameWorld {
     this.interactionManager = new InteractionManager(this.renderer as any, this.cameraManager, config.canvas);
     this.debugRenderer = new DebugRenderer(this.scene, this.physicsManager);
     this.inputManager = new InputManager(config.canvas);
+    this.scriptManager = new ScriptManager(this);
     
     if (config.enablePhysics !== false) {
       this.initializePhysics(config.gravity);
@@ -99,6 +102,7 @@ export class GameWorld {
 
   public createEntity(entity: Entity): Entity {
     entity.setPhysicsManager(this.physicsManager);
+    entity.setScriptManager(this.scriptManager);
     const metadata = { type: entity.metadata.type, tags: entity.metadata.tags, created: entity.metadata.created };
     this.entities.add(entity.entityId, entity.entityName, entity, metadata);
     this.scene.add(entity);
@@ -227,6 +231,9 @@ export class GameWorld {
         entity.updateTweens(delta);
       }
     });
+
+    // Update scripts
+    this.scriptManager.update(delta);
   };
 
   // ... (getters and other methods)
@@ -239,6 +246,7 @@ export class GameWorld {
   getCameraManager(): CameraManager { return this.cameraManager; }
   getCameraControlManager(): CameraControlManager { return this.cameraControlManager; }
   getInputManager(): InputManager { return this.inputManager; }
+  getScriptManager(): ScriptManager { return this.scriptManager; }
   getEntitiesByTag(tag: string): Entity[] { return this.entities.getByTag(tag); }
   isPhysicsDebugRenderEnabled(): boolean { return this.debugRenderer.isEnabled(); }
   togglePhysicsDebugRender(): void { this.debugRenderer.toggle(); }
@@ -259,6 +267,7 @@ export class GameWorld {
     this.cameraManager.dispose();
     this.physicsManager.dispose();
     this.inputManager.dispose();
+    this.scriptManager.dispose();
     this.renderer.dispose();
     this.scene.clear();
   }

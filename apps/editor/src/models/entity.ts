@@ -3,6 +3,7 @@ import { PhysicsManager } from "./physics-manager";
 import { EntityConfig, TweenConfig, InteractionCallbacks, EntityMetadata, EntityType, PhysicsConfig } from "./types";
 import { EntityData } from "./scene-loader";
 import { CharacterControllerConfig } from "./character-controller";
+import type { ScriptManager } from "./script-manager";
 
 export abstract class Entity extends THREE.Object3D {
   public readonly entityId: string;
@@ -17,6 +18,10 @@ export abstract class Entity extends THREE.Object3D {
   private interactionCallbacks: InteractionCallbacks = {};
   private destroyed = false;
   private debugRenderEnabled = false;
+  
+  // Script system
+  private scriptManager: ScriptManager | null = null;
+  private attachedScripts: string[] = [];
   
   // Character controller support
   public characterControllerConfig: CharacterControllerConfig | null = null;
@@ -160,6 +165,11 @@ export abstract class Entity extends THREE.Object3D {
 
   setPhysicsManager(physicsManager: PhysicsManager): this {
     this.physicsManager = physicsManager;
+    return this;
+  }
+
+  setScriptManager(scriptManager: ScriptManager): this {
+    this.scriptManager = scriptManager;
     return this;
   }
 
@@ -411,7 +421,24 @@ export abstract class Entity extends THREE.Object3D {
   removeTag(tag: string): this { const index = this.metadata.tags.indexOf(tag); if (index > -1) { this.metadata.tags.splice(index, 1); this.metadata.updated = Date.now(); } return this; }
   hasTag(tag: string): boolean { return this.metadata.tags.includes(tag); }
   setLayer(layer: number): this { this.metadata.layer = layer; this.metadata.updated = Date.now(); return this; }
-  destroy(): void { if (this.destroyed) return; if (this.physicsManager) { if (this.rigidBodyId) this.physicsManager.removeRigidBody(this.rigidBodyId); if (this.colliderId) this.physicsManager.removeCollider(this.colliderId); } this.removeFromParent(); this.clear(); this.destroyed = true; }
+  destroy(): void { 
+    if (this.destroyed) return; 
+    
+    // Clean up scripts first
+    if (this.scriptManager) {
+      this.scriptManager.onEntityDestroyed(this.entityId);
+    }
+    
+    // Clean up physics
+    if (this.physicsManager) { 
+      if (this.rigidBodyId) this.physicsManager.removeRigidBody(this.rigidBodyId); 
+      if (this.colliderId) this.physicsManager.removeCollider(this.colliderId); 
+    } 
+    
+    this.removeFromParent(); 
+    this.clear(); 
+    this.destroyed = true; 
+  }
   isDestroyed(): boolean { return this.destroyed; }
   enableDebugRender(): this { this.debugRenderEnabled = true; return this; }
   disableDebugRender(): this { this.debugRenderEnabled = false; return this; }
@@ -504,5 +531,50 @@ export abstract class Entity extends THREE.Object3D {
   protected serializeCharacterController() {
     if (!this.characterControllerConfig) return undefined;
     return { ...this.characterControllerConfig };
+  }
+
+  // Script system methods
+  attachScript(scriptId: string): this {
+    if (!this.scriptManager) {
+      console.warn(`Cannot attach script ${scriptId}: ScriptManager not set on entity ${this.entityId}`);
+      return this;
+    }
+
+    if (this.scriptManager.attachScript(this.entityId, scriptId)) {
+      if (!this.attachedScripts.includes(scriptId)) {
+        this.attachedScripts.push(scriptId);
+      }
+      this.emitChange();
+    }
+    return this;
+  }
+
+  detachScript(scriptId: string): this {
+    if (!this.scriptManager) return this;
+
+    if (this.scriptManager.detachScript(this.entityId, scriptId)) {
+      const index = this.attachedScripts.indexOf(scriptId);
+      if (index > -1) {
+        this.attachedScripts.splice(index, 1);
+      }
+      this.emitChange();
+    }
+    return this;
+  }
+
+  getAttachedScripts(): string[] {
+    return [...this.attachedScripts];
+  }
+
+  hasScript(scriptId: string): boolean {
+    return this.attachedScripts.includes(scriptId);
+  }
+
+  detachAllScripts(): this {
+    const scriptsToDetach = [...this.attachedScripts];
+    for (const scriptId of scriptsToDetach) {
+      this.detachScript(scriptId);
+    }
+    return this;
   }
 }

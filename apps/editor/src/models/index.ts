@@ -31,6 +31,24 @@ export {
   SceneSerializer,
 } from "./scene-loader";
 
+// Script System
+export {
+  ScriptManager,
+  type ScriptLifecycle,
+  type ScriptContext,
+  type ScriptConfig,
+  type CompiledScript,
+  type EntityScriptBinding,
+} from "./script-manager";
+
+// Example Scripts
+export {
+  EXAMPLE_SCRIPTS,
+  getExampleScript,
+  getExampleScriptIds,
+  loadExampleScripts,
+} from "./example-scripts";
+
 // Character controller
 export { 
   CharacterController,

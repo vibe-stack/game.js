@@ -60,7 +60,7 @@ export class CustomHeightfield extends Heightfield {
     this.enableVertexManipulation = config.enableVertexManipulation ?? true;
     this.heightConstraints = {
       min: config.minHeight ?? this.elevationRange.min - 10,
-      max: config.maxHeight ?? this.elevationRange.max + 10
+      max: config.maxHeight ?? this.elevationRange.max + 10,
     };
     this.smoothRadius = config.smoothRadius ?? 2;
     this.smoothFalloff = config.smoothFalloff ?? "quadratic";
@@ -86,11 +86,16 @@ export class CustomHeightfield extends Heightfield {
 
   // Custom height data management
   setCustomHeights(heights: number[][]): this {
-    if (heights.length !== this.dimensions.rows || heights[0]?.length !== this.dimensions.columns) {
-      throw new Error(`Height data dimensions (${heights.length}x${heights[0]?.length}) don't match heightfield dimensions (${this.dimensions.rows}x${this.dimensions.columns})`);
+    if (
+      heights.length !== this.dimensions.rows ||
+      heights[0]?.length !== this.dimensions.columns
+    ) {
+      throw new Error(
+        `Height data dimensions (${heights.length}x${heights[0]?.length}) don't match heightfield dimensions (${this.dimensions.rows}x${this.dimensions.columns})`,
+      );
     }
 
-    (this as any).heights = heights.map(row => [...row]);
+    (this as any).heights = heights.map((row) => [...row]);
     this.applyDisplacement();
 
     if (this.needsPhysicsUpdate) {
@@ -101,7 +106,12 @@ export class CustomHeightfield extends Heightfield {
   }
 
   // Single vertex editing
-  setHeightAt(row: number, column: number, height: number, smooth = false): this {
+  setHeightAt(
+    row: number,
+    column: number,
+    height: number,
+    smooth = false,
+  ): this {
     if (!this.enableVertexManipulation) {
       console.warn("Vertex manipulation is disabled for this heightfield");
       return this;
@@ -112,13 +122,16 @@ export class CustomHeightfield extends Heightfield {
       return this;
     }
 
-    const clampedHeight = Math.max(this.heightConstraints.min, Math.min(this.heightConstraints.max, height));
+    const clampedHeight = Math.max(
+      this.heightConstraints.min,
+      Math.min(this.heightConstraints.max, height),
+    );
 
     const edit: HeightfieldEdit = {
       row,
       column,
       height: clampedHeight,
-      strength: 1.0
+      strength: 1.0,
     };
 
     if (smooth) {
@@ -138,7 +151,10 @@ export class CustomHeightfield extends Heightfield {
   }
 
   // Batch vertex editing
-  setHeightsInRegion(region: HeightfieldRegion, height: number | ((row: number, col: number) => number)): this {
+  setHeightsInRegion(
+    region: HeightfieldRegion,
+    height: number | ((row: number, col: number) => number),
+  ): this {
     if (!this.enableVertexManipulation) {
       console.warn("Vertex manipulation is disabled for this heightfield");
       return this;
@@ -146,10 +162,22 @@ export class CustomHeightfield extends Heightfield {
 
     const { startRow, endRow, startColumn, endColumn } = region;
 
-    for (let row = Math.max(0, startRow); row <= Math.min(this.dimensions.rows - 1, endRow); row++) {
-      for (let col = Math.max(0, startColumn); col <= Math.min(this.dimensions.columns - 1, endColumn); col++) {
-        const newHeight = typeof height === 'function' ? height(row, col) : height;
-        const clampedHeight = Math.max(this.heightConstraints.min, Math.min(this.heightConstraints.max, newHeight));
+    for (
+      let row = Math.max(0, startRow);
+      row <= Math.min(this.dimensions.rows - 1, endRow);
+      row++
+    ) {
+      for (
+        let col = Math.max(0, startColumn);
+        col <= Math.min(this.dimensions.columns - 1, endColumn);
+        col++
+      ) {
+        const newHeight =
+          typeof height === "function" ? height(row, col) : height;
+        const clampedHeight = Math.max(
+          this.heightConstraints.min,
+          Math.min(this.heightConstraints.max, newHeight),
+        );
         (this as any).heights[row][col] = clampedHeight;
       }
     }
@@ -191,7 +219,8 @@ export class CustomHeightfield extends Heightfield {
             falloffStrength = 1 - normalizedDistance * normalizedDistance;
             break;
           case "cubic":
-            falloffStrength = 1 - normalizedDistance * normalizedDistance * normalizedDistance;
+            falloffStrength =
+              1 - normalizedDistance * normalizedDistance * normalizedDistance;
             break;
           default:
             falloffStrength = 1 - normalizedDistance * normalizedDistance;
@@ -201,7 +230,10 @@ export class CustomHeightfield extends Heightfield {
         const heightDifference = targetHeight - currentHeight;
         const adjustedStrength = falloffStrength * strength;
         const newHeight = currentHeight + heightDifference * adjustedStrength;
-        const clampedHeight = Math.max(this.heightConstraints.min, Math.min(this.heightConstraints.max, newHeight));
+        const clampedHeight = Math.max(
+          this.heightConstraints.min,
+          Math.min(this.heightConstraints.max, newHeight),
+        );
 
         (this as any).heights[row][column] = clampedHeight;
       }
@@ -211,33 +243,82 @@ export class CustomHeightfield extends Heightfield {
   }
 
   // Raise/lower terrain in circular area
-  raiseCircularArea(centerRow: number, centerColumn: number, radius: number, amount: number): this {
-    return this.modifyCircularArea(centerRow, centerColumn, radius, (currentHeight) => currentHeight + amount);
+  raiseCircularArea(
+    centerRow: number,
+    centerColumn: number,
+    radius: number,
+    amount: number,
+  ): this {
+    return this.modifyCircularArea(
+      centerRow,
+      centerColumn,
+      radius,
+      (currentHeight) => currentHeight + amount,
+    );
   }
 
-  lowerCircularArea(centerRow: number, centerColumn: number, radius: number, amount: number): this {
-    return this.modifyCircularArea(centerRow, centerColumn, radius, (currentHeight) => currentHeight - amount);
+  lowerCircularArea(
+    centerRow: number,
+    centerColumn: number,
+    radius: number,
+    amount: number,
+  ): this {
+    return this.modifyCircularArea(
+      centerRow,
+      centerColumn,
+      radius,
+      (currentHeight) => currentHeight - amount,
+    );
   }
 
-  flattenCircularArea(centerRow: number, centerColumn: number, radius: number, targetHeight?: number): this {
-    const height = targetHeight ?? (this as any).heights[centerRow][centerColumn];
-    return this.modifyCircularArea(centerRow, centerColumn, radius, () => height);
+  flattenCircularArea(
+    centerRow: number,
+    centerColumn: number,
+    radius: number,
+    targetHeight?: number,
+  ): this {
+    const height =
+      targetHeight ?? (this as any).heights[centerRow][centerColumn];
+    return this.modifyCircularArea(
+      centerRow,
+      centerColumn,
+      radius,
+      () => height,
+    );
   }
 
-  private modifyCircularArea(centerRow: number, centerColumn: number, radius: number, heightModifier: (currentHeight: number) => number): this {
+  private modifyCircularArea(
+    centerRow: number,
+    centerColumn: number,
+    radius: number,
+    heightModifier: (currentHeight: number) => number,
+  ): this {
     if (!this.enableVertexManipulation) {
       console.warn("Vertex manipulation is disabled for this heightfield");
       return this;
     }
 
-    for (let row = Math.max(0, centerRow - radius); row <= Math.min(this.dimensions.rows - 1, centerRow + radius); row++) {
-      for (let col = Math.max(0, centerColumn - radius); col <= Math.min(this.dimensions.columns - 1, centerColumn + radius); col++) {
-        const distance = Math.sqrt((row - centerRow) ** 2 + (col - centerColumn) ** 2);
+    for (
+      let row = Math.max(0, centerRow - radius);
+      row <= Math.min(this.dimensions.rows - 1, centerRow + radius);
+      row++
+    ) {
+      for (
+        let col = Math.max(0, centerColumn - radius);
+        col <= Math.min(this.dimensions.columns - 1, centerColumn + radius);
+        col++
+      ) {
+        const distance = Math.sqrt(
+          (row - centerRow) ** 2 + (col - centerColumn) ** 2,
+        );
 
         if (distance <= radius) {
           const currentHeight = (this as any).heights[row][col];
           const newHeight = heightModifier(currentHeight);
-          const clampedHeight = Math.max(this.heightConstraints.min, Math.min(this.heightConstraints.max, newHeight));
+          const clampedHeight = Math.max(
+            this.heightConstraints.min,
+            Math.min(this.heightConstraints.max, newHeight),
+          );
           (this as any).heights[row][col] = clampedHeight;
         }
       }
@@ -253,7 +334,12 @@ export class CustomHeightfield extends Heightfield {
   }
 
   // Noise application to custom areas
-  addNoiseToRegion(region: HeightfieldRegion, amplitude: number, frequency: number, seed?: number): this {
+  addNoiseToRegion(
+    region: HeightfieldRegion,
+    amplitude: number,
+    frequency: number,
+    seed?: number,
+  ): this {
     if (!this.enableVertexManipulation) {
       console.warn("Vertex manipulation is disabled for this heightfield");
       return this;
@@ -262,13 +348,28 @@ export class CustomHeightfield extends Heightfield {
     const actualSeed = seed ?? Math.random() * 1000000;
     const { startRow, endRow, startColumn, endColumn } = region;
 
-    for (let row = Math.max(0, startRow); row <= Math.min(this.dimensions.rows - 1, endRow); row++) {
-      for (let col = Math.max(0, startColumn); col <= Math.min(this.dimensions.columns - 1, endColumn); col++) {
+    for (
+      let row = Math.max(0, startRow);
+      row <= Math.min(this.dimensions.rows - 1, endRow);
+      row++
+    ) {
+      for (
+        let col = Math.max(0, startColumn);
+        col <= Math.min(this.dimensions.columns - 1, endColumn);
+        col++
+      ) {
         // Simple noise - could be expanded to use the noise generator
-        const noise = (Math.sin(row * frequency + actualSeed) + Math.cos(col * frequency + actualSeed)) * amplitude * 0.5;
+        const noise =
+          (Math.sin(row * frequency + actualSeed) +
+            Math.cos(col * frequency + actualSeed)) *
+          amplitude *
+          0.5;
         const currentHeight = (this as any).heights[row][col];
         const newHeight = currentHeight + noise;
-        const clampedHeight = Math.max(this.heightConstraints.min, Math.min(this.heightConstraints.max, newHeight));
+        const clampedHeight = Math.max(
+          this.heightConstraints.min,
+          Math.min(this.heightConstraints.max, newHeight),
+        );
         (this as any).heights[row][col] = clampedHeight;
       }
     }
@@ -292,17 +393,26 @@ export class CustomHeightfield extends Heightfield {
     for (let iter = 0; iter < iterations; iter++) {
       const newHeights = this.getHeights();
 
-      for (let row = Math.max(1, region.startRow); row <= Math.min(this.dimensions.rows - 2, region.endRow); row++) {
-        for (let col = Math.max(1, region.startColumn); col <= Math.min(this.dimensions.columns - 2, region.endColumn); col++) {
+      for (
+        let row = Math.max(1, region.startRow);
+        row <= Math.min(this.dimensions.rows - 2, region.endRow);
+        row++
+      ) {
+        for (
+          let col = Math.max(1, region.startColumn);
+          col <= Math.min(this.dimensions.columns - 2, region.endColumn);
+          col++
+        ) {
           // Average with neighbors
           const neighbors = [
             (this as any).heights[row - 1][col],
             (this as any).heights[row + 1][col],
             (this as any).heights[row][col - 1],
-            (this as any).heights[row][col + 1]
+            (this as any).heights[row][col + 1],
           ];
 
-          const average = neighbors.reduce((sum, h) => sum + h, 0) / neighbors.length;
+          const average =
+            neighbors.reduce((sum, h) => sum + h, 0) / neighbors.length;
           newHeights[row][col] = average;
         }
       }
@@ -329,7 +439,7 @@ export class CustomHeightfield extends Heightfield {
   }
 
   getEditHistory(): HeightfieldEdit[] {
-    return this.editHistory.map(edit => ({ ...edit }));
+    return this.editHistory.map((edit) => ({ ...edit }));
   }
 
   clearHistory(): this {
@@ -357,8 +467,16 @@ export class CustomHeightfield extends Heightfield {
 
     const { startRow, endRow, startColumn, endColumn } = region;
 
-    for (let row = Math.max(0, startRow); row <= Math.min(this.dimensions.rows - 1, endRow); row++) {
-      for (let col = Math.max(0, startColumn); col <= Math.min(this.dimensions.columns - 1, endColumn); col++) {
+    for (
+      let row = Math.max(0, startRow);
+      row <= Math.min(this.dimensions.rows - 1, endRow);
+      row++
+    ) {
+      for (
+        let col = Math.max(0, startColumn);
+        col <= Math.min(this.dimensions.columns - 1, endColumn);
+        col++
+      ) {
         (this as any).heights[row][col] = this.originalHeights[row][col];
       }
     }
@@ -374,7 +492,12 @@ export class CustomHeightfield extends Heightfield {
 
   // Utility methods
   private isValidCoordinate(row: number, column: number): boolean {
-    return row >= 0 && row < this.dimensions.rows && column >= 0 && column < this.dimensions.columns;
+    return (
+      row >= 0 &&
+      row < this.dimensions.rows &&
+      column >= 0 &&
+      column < this.dimensions.columns
+    );
   }
 
   getHeightAtCoordinate(row: number, column: number): number | null {
@@ -387,15 +510,54 @@ export class CustomHeightfield extends Heightfield {
   // Serialization support
   serialize(): EntityData {
     return {
-      id: this.entityId, name: this.entityName, type: "custom-heightfield",
+      id: this.entityId,
+      name: this.entityName,
+      type: "custom-heightfield",
       transform: {
-        position: { x: this.position.x, y: this.position.y, z: this.position.z },
-        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
+        position: {
+          x: this.position.x,
+          y: this.position.y,
+          z: this.position.z,
+        },
+        rotation: {
+          x: this.rotation.x,
+          y: this.rotation.y,
+          z: this.rotation.z,
+        },
         scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
       },
-      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
-      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
-      geometry: { type: "CustomHeightfield", parameters: { width: this.dimensions.width, depth: this.dimensions.depth, rows: this.dimensions.rows, columns: this.dimensions.columns, minElevation: this.elevationRange.min, maxElevation: this.elevationRange.max, customHeights: this.getHeights(), algorithm: this.algorithm, seed: this.seed, frequency: this.noiseSettings.frequency, amplitude: this.noiseSettings.amplitude, octaves: this.noiseSettings.octaves, persistence: this.noiseSettings.persistence, lacunarity: this.noiseSettings.lacunarity, displacementScale: this.displacementScale, smoothing: this.smoothing, uvScale: this.uvScale, enableVertexManipulation: this.enableVertexManipulation, heightConstraints: this.heightConstraints, smoothRadius: this.smoothRadius, smoothFalloff: this.smoothFalloff } }
+      visible: this.visible,
+      castShadow: this.castShadow,
+      receiveShadow: this.receiveShadow,
+      userData: { ...this.userData },
+      tags: [...this.metadata.tags],
+      layer: this.metadata.layer,
+      geometry: {
+        type: "CustomHeightfield",
+        parameters: {
+          width: this.dimensions.width,
+          depth: this.dimensions.depth,
+          rows: this.dimensions.rows,
+          columns: this.dimensions.columns,
+          minElevation: this.elevationRange.min,
+          maxElevation: this.elevationRange.max,
+          customHeights: this.getHeights(),
+          algorithm: this.algorithm,
+          seed: this.seed,
+          frequency: this.noiseSettings.frequency,
+          amplitude: this.noiseSettings.amplitude,
+          octaves: this.noiseSettings.octaves,
+          persistence: this.noiseSettings.persistence,
+          lacunarity: this.noiseSettings.lacunarity,
+          displacementScale: this.displacementScale,
+          smoothing: this.smoothing,
+          uvScale: this.uvScale,
+          enableVertexManipulation: this.enableVertexManipulation,
+          heightConstraints: this.heightConstraints,
+          smoothRadius: this.smoothRadius,
+          smoothFalloff: this.smoothFalloff,
+        },
+      },
     };
   }
 
@@ -425,25 +587,34 @@ export class CustomHeightfield extends Heightfield {
       smoothFalloff: data.smoothFalloff,
       position: new THREE.Vector3().fromArray(data.position),
       rotation: new THREE.Euler().fromArray(data.rotation),
-      scale: new THREE.Vector3().fromArray(data.scale)
+      scale: new THREE.Vector3().fromArray(data.scale),
     };
 
     return new CustomHeightfield(config);
   }
 
   // Static factory methods for specialized terrain types
-  static createVoronoiTerrain(config: Omit<CustomHeightfieldConfig, 'algorithm' | 'voronoiPoints' | 'voronoiRandomness'> = {}): CustomHeightfield {
+  static createVoronoiTerrain(
+    config: Omit<
+      CustomHeightfieldConfig,
+      "algorithm" | "voronoiPoints" | "voronoiRandomness"
+    > = {},
+  ): CustomHeightfield {
     return new CustomHeightfield({
       ...config,
       algorithm: "voronoi",
       voronoiPoints: 16,
       voronoiRandomness: 0.8,
       amplitude: 4,
-      enableVertexManipulation: true
+      enableVertexManipulation: true,
     });
   }
 
-  static createEditableTerrain(width = 20, depth = 20, resolution = 64): CustomHeightfield {
+  static createEditableTerrain(
+    width = 20,
+    depth = 20,
+    resolution = 64,
+  ): CustomHeightfield {
     return new CustomHeightfield({
       width,
       depth,
@@ -453,11 +624,14 @@ export class CustomHeightfield extends Heightfield {
       enableVertexManipulation: true,
       minHeight: -10,
       maxHeight: 20,
-      smoothRadius: 3
+      smoothRadius: 3,
     });
   }
 
-  static fromHeightMap(imageData: ImageData, config: Partial<CustomHeightfieldConfig> = {}): CustomHeightfield {
+  static fromHeightMap(
+    imageData: ImageData,
+    config: Partial<CustomHeightfieldConfig> = {},
+  ): CustomHeightfield {
     const { width, height, data } = imageData;
     const heights: number[][] = [];
 
@@ -482,7 +656,7 @@ export class CustomHeightfield extends Heightfield {
       customHeights: heights,
       rows: height,
       columns: width,
-      enableVertexManipulation: true
+      enableVertexManipulation: true,
     });
   }
 }

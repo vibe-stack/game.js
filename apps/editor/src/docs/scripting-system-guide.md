@@ -1,4 +1,4 @@
-# Script System Guide
+# Scripting System Guide
 
 The script system allows you to attach JavaScript code to entities that runs during the game lifecycle. Scripts can access and modify all aspects of the game world, including spawning entities, playing sounds, switching scenes, and more.
 
@@ -212,89 +212,6 @@ export function destroy(context) {
 `;
 ```
 
-### Interactive Object Script
-
-```javascript
-const interactiveObjectScript = `
-let isHighlighted = false;
-
-export function init(context) {
-  const entity = context.entity;
-  
-  // Set up interaction callbacks
-  entity.onPointerEnter(() => {
-    isHighlighted = true;
-    // Change material to highlight
-    if (entity.material) {
-      entity.material.emissive.setHex(0x444444);
-    }
-  });
-  
-  entity.onPointerLeave(() => {
-    isHighlighted = false;
-    // Reset material
-    if (entity.material) {
-      entity.material.emissive.setHex(0x000000);
-    }
-  });
-  
-  entity.onClick(async () => {
-    // Play interaction sound
-    if (context.playSound) {
-      await context.playSound('item-pickup');
-    }
-    
-    // Add item to inventory (example)
-    const state = context.stateManager;
-    const inventory = state.get('inventory') || [];
-    inventory.push({
-      id: 'health-potion',
-      name: 'Health Potion',
-      value: 50
-    });
-    state.set('inventory', inventory);
-    
-    // Destroy the object
-    context.destroyEntity(entity.entityId);
-  });
-}
-
-export function update(context, deltaTime) {
-  if (isHighlighted) {
-    // Add floating animation
-    const time = context.currentTime;
-    const originalY = context.entity.userData.originalY || context.entity.position.y;
-    context.entity.position.y = originalY + Math.sin(time * 2) * 0.1;
-    
-    if (!context.entity.userData.originalY) {
-      context.entity.userData.originalY = originalY;
-    }
-  }
-}
-`;
-```
-
-### Scene Transition Script
-
-```javascript
-const sceneTransitionScript = `
-export function init(context) {
-  // This could be attached to a door or portal
-  const entity = context.entity;
-  
-  entity.onClick(async () => {
-    if (context.switchScene && context.playSound) {
-      // Play transition sound
-      await context.playSound('door-open');
-      
-      // Switch to the next scene
-      await context.switchScene('next-level');
-    }
-  });
-}
-`;
-```
-
 ## Script Management
 
 ### Enable/Disable Scripts
@@ -330,19 +247,6 @@ console.log('Call count:', metrics.callCount);
 const allMetrics = scriptManager.getAllPerformanceMetrics();
 ```
 
-### Error Handling
-
-```javascript
-// Check if a script has errors
-const script = scriptManager.getScript('movement-script');
-if (script.hasErrors) {
-  console.error('Script error:', script.lastError);
-}
-
-// Clear errors (useful after fixing script code)
-scriptManager.clearScriptErrors('movement-script');
-```
-
 ## Best Practices
 
 1. **Keep scripts small and focused** - Each script should handle one specific behavior
@@ -351,43 +255,4 @@ scriptManager.clearScriptErrors('movement-script');
 4. **Cache references** - Store commonly used objects in script-local variables
 5. **Use fixed update for physics** - Physics-related code should go in `fixedUpdate`
 6. **Handle edge cases** - Always check if managers exist before using them
-7. **Performance monitoring** - Use the performance metrics to identify slow scripts
-
-## Integration with External Systems
-
-Scripts can easily integrate with external APIs, databases, or services:
-
-```javascript
-const networkScript = `
-export async function init(context) {
-  // Fetch initial data from server
-  try {
-    const response = await fetch('/api/player-data');
-    const playerData = await response.json();
-    
-    // Store in state manager
-    context.stateManager.set('playerData', playerData);
-  } catch (error) {
-    console.error('Failed to load player data:', error);
-  }
-}
-
-export function update(context, deltaTime) {
-  // Send position updates to server periodically
-  const lastUpdate = context.entity.userData.lastNetworkUpdate || 0;
-  if (context.currentTime - lastUpdate > 1.0) { // Every second
-    fetch('/api/player-position', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        position: context.entity.position,
-        timestamp: context.currentTime
-      })
-    });
-    context.entity.userData.lastNetworkUpdate = context.currentTime;
-  }
-}
-`;
-```
-
-The script system provides a powerful and flexible way to add behavior to your game entities while maintaining clean separation of concerns and easy debugging capabilities. 
+7. **Performance monitoring** - Use the performance metrics to identify slow scripts 

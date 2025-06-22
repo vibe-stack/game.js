@@ -16,7 +16,15 @@ export interface HeightfieldConfig extends EntityConfig {
   maxElevation?: number;
 
   // Generation algorithm
-  algorithm?: "perlin" | "simplex" | "ridged" | "fbm" | "voronoi" | "diamond-square" | "random" | "flat";
+  algorithm?:
+    | "perlin"
+    | "simplex"
+    | "ridged"
+    | "fbm"
+    | "voronoi"
+    | "diamond-square"
+    | "random"
+    | "flat";
   seed?: number;
 
   // Noise settings
@@ -46,7 +54,12 @@ export interface HeightfieldConfig extends EntityConfig {
 }
 
 export class Heightfield extends Entity {
-  public readonly dimensions: { width: number; depth: number; rows: number; columns: number };
+  public readonly dimensions: {
+    width: number;
+    depth: number;
+    rows: number;
+    columns: number;
+  };
   public readonly elevationRange: { min: number; max: number };
   public readonly algorithm: string;
   public readonly noiseSettings: {
@@ -81,13 +94,13 @@ export class Heightfield extends Entity {
       width: config.width ?? 10,
       depth: config.depth ?? 10,
       rows: config.rows ?? 32,
-      columns: config.columns ?? 32
+      columns: config.columns ?? 32,
     };
 
     // Set elevation range
     this.elevationRange = {
       min: config.minElevation ?? 0,
-      max: config.maxElevation ?? 5
+      max: config.maxElevation ?? 5,
     };
 
     // Set generation algorithm
@@ -103,7 +116,7 @@ export class Heightfield extends Entity {
       lacunarity: config.lacunarity ?? 2.0,
       ridgeOffset: config.ridgeOffset,
       voronoiPoints: config.voronoiPoints,
-      voronoiRandomness: config.voronoiRandomness
+      voronoiRandomness: config.voronoiRandomness,
     };
 
     // Visual properties
@@ -111,10 +124,12 @@ export class Heightfield extends Entity {
     this.smoothing = config.smoothing ?? false;
     this.uvScale = config.uvScale ?? { x: 1, y: 1 };
 
-    const material = config.material ?? new THREE.MeshStandardMaterial({
-      color: 0x6b7c54,
-      wireframe: config.wireframe ?? false
-    });
+    const material =
+      config.material ??
+      new THREE.MeshStandardMaterial({
+        color: 0x6b7c54,
+        wireframe: config.wireframe ?? false,
+      });
 
     // Generate initial heightfield data
     this.generateHeightfield();
@@ -124,7 +139,7 @@ export class Heightfield extends Entity {
       this.dimensions.width,
       this.dimensions.depth,
       this.dimensions.columns - 1,
-      this.dimensions.rows - 1
+      this.dimensions.rows - 1,
     );
 
     this.geometry.rotateX(-Math.PI / 2); // Rotate to lie flat
@@ -165,7 +180,7 @@ export class Heightfield extends Entity {
       customHeights: undefined,
       uvScale: this.uvScale,
       smoothing: this.smoothing,
-      wireframe: false
+      wireframe: false,
     };
 
     const result = generateHeightfieldData(heightfieldProperties);
@@ -218,21 +233,26 @@ export class Heightfield extends Entity {
     // Scale represents the total dimensions of the heightfield in world units
     // After rotation: geometry width -> physics Z, geometry depth -> physics X
     const scale = new THREE.Vector3(
-      this.dimensions.depth,     // X scale: depth becomes X after rotation
-      this.displacementScale,    // Y scale: height multiplier  
-      this.dimensions.width      // Z scale: width becomes Z after rotation
+      this.dimensions.depth, // X scale: depth becomes X after rotation
+      this.displacementScale, // Y scale: height multiplier
+      this.dimensions.width, // Z scale: width becomes Z after rotation
     );
 
     this.physicsManager.createCollider(
       this.colliderId!,
       this.rigidBodyId,
       "heightfield",
-      { heights: transposedHeights, scale }
+      { heights: transposedHeights, scale },
     );
   }
 
   // Configuration methods
-  setDimensions(width: number, depth: number, rows?: number, columns?: number): this {
+  setDimensions(
+    width: number,
+    depth: number,
+    rows?: number,
+    columns?: number,
+  ): this {
     (this.dimensions as any).width = width;
     (this.dimensions as any).depth = depth;
     if (rows !== undefined) (this.dimensions as any).rows = rows;
@@ -283,9 +303,11 @@ export class Heightfield extends Entity {
 
     this.geometry.attributes.uv.array.forEach((_, i) => {
       if (i % 2 === 0) {
-        this.geometry.attributes.uv.array[i] = (this.geometry.attributes.uv.array[i] / this.uvScale.x) * x;
+        this.geometry.attributes.uv.array[i] =
+          (this.geometry.attributes.uv.array[i] / this.uvScale.x) * x;
       } else {
-        this.geometry.attributes.uv.array[i] = (this.geometry.attributes.uv.array[i] / this.uvScale.y) * y;
+        this.geometry.attributes.uv.array[i] =
+          (this.geometry.attributes.uv.array[i] / this.uvScale.y) * y;
       }
     });
 
@@ -324,7 +346,7 @@ export class Heightfield extends Entity {
       this.dimensions.width,
       this.dimensions.depth,
       this.dimensions.columns - 1,
-      this.dimensions.rows - 1
+      this.dimensions.rows - 1,
     );
 
     this.geometry.rotateX(-Math.PI / 2);
@@ -356,14 +378,20 @@ export class Heightfield extends Entity {
   }
 
   getHeights(): number[][] {
-    return this.heights.map(row => [...row]); // Return copy
+    return this.heights.map((row) => [...row]); // Return copy
   }
 
   getHeightAt(x: number, z: number): number {
     // Convert world coordinates to heightfield coordinates
     // Account for the -90° rotation around X axis
-    const col = Math.floor(((x + this.dimensions.width / 2) / this.dimensions.width) * (this.dimensions.columns - 1));
-    const row = Math.floor(((z + this.dimensions.depth / 2) / this.dimensions.depth) * (this.dimensions.rows - 1));
+    const col = Math.floor(
+      ((x + this.dimensions.width / 2) / this.dimensions.width) *
+        (this.dimensions.columns - 1),
+    );
+    const row = Math.floor(
+      ((z + this.dimensions.depth / 2) / this.dimensions.depth) *
+        (this.dimensions.rows - 1),
+    );
 
     const clampedCol = Math.max(0, Math.min(this.dimensions.columns - 1, col));
     const clampedRow = Math.max(0, Math.min(this.dimensions.rows - 1, row));
@@ -372,7 +400,12 @@ export class Heightfield extends Entity {
   }
 
   // Static factory methods for common presets
-  static createMountainTerrain(config: Omit<HeightfieldConfig, 'algorithm' | 'frequency' | 'amplitude' | 'octaves'> = {}): Heightfield {
+  static createMountainTerrain(
+    config: Omit<
+      HeightfieldConfig,
+      "algorithm" | "frequency" | "amplitude" | "octaves"
+    > = {},
+  ): Heightfield {
     return new Heightfield({
       ...config,
       algorithm: "fbm",
@@ -380,11 +413,16 @@ export class Heightfield extends Entity {
       amplitude: 8,
       octaves: 6,
       persistence: 0.6,
-      lacunarity: 2.0
+      lacunarity: 2.0,
     });
   }
 
-  static createHillsTerrain(config: Omit<HeightfieldConfig, 'algorithm' | 'frequency' | 'amplitude' | 'octaves'> = {}): Heightfield {
+  static createHillsTerrain(
+    config: Omit<
+      HeightfieldConfig,
+      "algorithm" | "frequency" | "amplitude" | "octaves"
+    > = {},
+  ): Heightfield {
     return new Heightfield({
       ...config,
       algorithm: "perlin",
@@ -392,57 +430,71 @@ export class Heightfield extends Entity {
       amplitude: 3,
       octaves: 4,
       persistence: 0.5,
-      lacunarity: 2.0
+      lacunarity: 2.0,
     });
   }
 
-  static createCanyonTerrain(config: Omit<HeightfieldConfig, 'algorithm' | 'frequency' | 'amplitude' | 'ridgeOffset'> = {}): Heightfield {
+  static createCanyonTerrain(
+    config: Omit<
+      HeightfieldConfig,
+      "algorithm" | "frequency" | "amplitude" | "ridgeOffset"
+    > = {},
+  ): Heightfield {
     return new Heightfield({
       ...config,
       algorithm: "ridged",
       frequency: 0.08,
       amplitude: 6,
       octaves: 5,
-      ridgeOffset: 1.0
+      ridgeOffset: 1.0,
     });
   }
 
-  static createVoronoiTerrain(config: Omit<HeightfieldConfig, 'algorithm' | 'voronoiPoints' | 'voronoiRandomness'> = {}): Heightfield {
+  static createVoronoiTerrain(
+    config: Omit<
+      HeightfieldConfig,
+      "algorithm" | "voronoiPoints" | "voronoiRandomness"
+    > = {},
+  ): Heightfield {
     return new Heightfield({
       ...config,
       algorithm: "voronoi",
       voronoiPoints: 16,
       voronoiRandomness: 0.8,
-      amplitude: 4
+      amplitude: 4,
     });
   }
 
-  static createFlatTerrain(config: Omit<HeightfieldConfig, 'algorithm'> = {}): Heightfield {
+  static createFlatTerrain(
+    config: Omit<HeightfieldConfig, "algorithm"> = {},
+  ): Heightfield {
     return new Heightfield({
       ...config,
-      algorithm: "flat"
+      algorithm: "flat",
     });
   }
 
   // Debug method for testing physics
-  static createDebugTerrain(config: Partial<HeightfieldConfig> = {}): Heightfield {
+  static createDebugTerrain(
+    config: Partial<HeightfieldConfig> = {},
+  ): Heightfield {
     console.log("Creating debug heightfield terrain for physics testing...");
 
     const terrain = new Heightfield({
       width: 20,
       depth: 20,
-      rows: 10,  // Lower resolution for easier debugging
+      rows: 10, // Lower resolution for easier debugging
       columns: 10,
       minElevation: 0,
       maxElevation: 5,
-      algorithm: "flat",  // Start with flat terrain
+      algorithm: "flat", // Start with flat terrain
       displacementScale: 1.0,
       material: new THREE.MeshStandardMaterial({
-        color: 0x00ff00,  // Bright green for visibility
-        wireframe: false
+        color: 0x00ff00, // Bright green for visibility
+        wireframe: false,
       }),
       name: "Debug Heightfield",
-      ...config
+      ...config,
     });
 
     // Add some manual height variations for testing
@@ -452,9 +504,12 @@ export class Heightfield extends Entity {
         // Create a simple pyramid in the center
         const centerI = Math.floor(heights.length / 2);
         const centerJ = Math.floor(heights[i].length / 2);
-        const distFromCenter = Math.max(Math.abs(i - centerI), Math.abs(j - centerJ));
+        const distFromCenter = Math.max(
+          Math.abs(i - centerI),
+          Math.abs(j - centerJ),
+        );
         const maxDist = Math.max(centerI, centerJ);
-        heights[i][j] = Math.max(0, (maxDist - distFromCenter) / maxDist * 3);
+        heights[i][j] = Math.max(0, ((maxDist - distFromCenter) / maxDist) * 3);
       }
     }
 
@@ -468,16 +523,51 @@ export class Heightfield extends Entity {
 
   serialize(): EntityData {
     return {
-      id: this.entityId, name: this.entityName, type: "heightfield",
+      id: this.entityId,
+      name: this.entityName,
+      type: "heightfield",
       transform: {
-        position: { x: this.position.x, y: this.position.y, z: this.position.z },
-        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
+        position: {
+          x: this.position.x,
+          y: this.position.y,
+          z: this.position.z,
+        },
+        rotation: {
+          x: this.rotation.x,
+          y: this.rotation.y,
+          z: this.rotation.z,
+        },
         scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
       },
       physics: this.serializePhysics(),
-      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
-      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
-      geometry: { type: "HeightfieldGeometry", parameters: { width: this.dimensions.width, depth: this.dimensions.depth, rows: this.dimensions.rows, columns: this.dimensions.columns, minElevation: this.elevationRange.min, maxElevation: this.elevationRange.max, customHeights: this.getHeights(), algorithm: this.algorithm, seed: this.seed, frequency: this.noiseSettings.frequency, amplitude: this.noiseSettings.amplitude, octaves: this.noiseSettings.octaves, persistence: this.noiseSettings.persistence, lacunarity: this.noiseSettings.lacunarity, displacementScale: this.displacementScale, smoothing: this.smoothing, uvScale: this.uvScale, enableVertexManipulation: this.enableVertexManipulation, heightConstraints: this.heightConstraints, smoothRadius: this.smoothRadius, smoothFalloff: this.smoothFalloff } }
+      visible: this.visible,
+      castShadow: this.castShadow,
+      receiveShadow: this.receiveShadow,
+      userData: { ...this.userData },
+      tags: [...this.metadata.tags],
+      layer: this.metadata.layer,
+      geometry: {
+        type: "HeightfieldGeometry",
+        parameters: {
+          width: this.dimensions.width,
+          depth: this.dimensions.depth,
+          rows: this.dimensions.rows,
+          columns: this.dimensions.columns,
+          minElevation: this.elevationRange.min,
+          maxElevation: this.elevationRange.max,
+          customHeights: this.getHeights(),
+          algorithm: this.algorithm,
+          seed: this.seed,
+          frequency: this.noiseSettings.frequency,
+          amplitude: this.noiseSettings.amplitude,
+          octaves: this.noiseSettings.octaves,
+          persistence: this.noiseSettings.persistence,
+          lacunarity: this.noiseSettings.lacunarity,
+          displacementScale: this.displacementScale,
+          smoothing: this.smoothing,
+          uvScale: this.uvScale,
+        },
+      },
     };
   }
 }
