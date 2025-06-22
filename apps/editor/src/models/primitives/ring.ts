@@ -138,12 +138,18 @@ export class Ring extends Entity {
 
   setMaterial(material: THREE.Material): this {
     this.mesh.material = material;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
+  }
+
+  getMaterial(): THREE.Material {
+    return this.mesh.material as THREE.Material;
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
@@ -194,6 +200,7 @@ export class Ring extends Entity {
       },
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      physics: this.serializePhysics(),
       geometry: { type: "RingGeometry", parameters: { innerRadius: this.dimensions.innerRadius, outerRadius: this.dimensions.outerRadius, thetaSegments: this.segmentConfig.theta, phiSegments: this.segmentConfig.phi, thetaStart: this.segmentConfig.thetaStart, thetaLength: this.segmentConfig.thetaLength } }
     };
   }

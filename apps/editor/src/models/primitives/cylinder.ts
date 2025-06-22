@@ -120,6 +120,7 @@ export class Cylinder extends Entity {
     (this.dimensions as any).radiusTop = radiusTop;
     (this.dimensions as any).radiusBottom = radiusBottom;
     (this.dimensions as any).height = height;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
@@ -138,6 +139,7 @@ export class Cylinder extends Entity {
     this.mesh.geometry = this.geometry;
     (this.segmentConfig as any).radial = radialSegments;
     (this.segmentConfig as any).height = heightSegments;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
@@ -156,6 +158,7 @@ export class Cylinder extends Entity {
     this.mesh.geometry = this.geometry;
     (this.segmentConfig as any).thetaStart = thetaStart;
     (this.segmentConfig as any).thetaLength = thetaLength;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
@@ -173,17 +176,24 @@ export class Cylinder extends Entity {
     );
     this.mesh.geometry = this.geometry;
     (this.segmentConfig as any).openEnded = openEnded;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
   setMaterial(material: THREE.Material): this {
     this.mesh.material = material;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
+  }
+
+  getMaterial(): THREE.Material {
+    return this.mesh.material as THREE.Material;
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
@@ -234,6 +244,7 @@ export class Cylinder extends Entity {
       },
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      physics: this.serializePhysics(),
       geometry: { type: "CylinderGeometry", parameters: { radiusTop: this.dimensions.radiusTop, radiusBottom: this.dimensions.radiusBottom, height: this.dimensions.height, radialSegments: this.segmentConfig.radial, heightSegments: this.segmentConfig.height, openEnded: this.segmentConfig.openEnded, thetaStart: this.segmentConfig.thetaStart, thetaLength: this.segmentConfig.thetaLength } }
     };
   }

@@ -75,7 +75,7 @@ export class ProjectService {
 
   static async saveScene(projectPath: string, sceneName: string, sceneData: SceneData): Promise<void> {
     const scenesDir = path.join(projectPath, "scenes");
-    const scenePath = path.join(scenesDir, `${sceneName}.scene.json`);
+    const scenePath = path.join(scenesDir, `${sceneName}.json`);
     
     try {
       // Ensure scenes directory exists

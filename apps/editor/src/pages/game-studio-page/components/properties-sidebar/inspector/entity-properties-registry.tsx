@@ -2,8 +2,21 @@ import React from "react";
 import { Entity } from "@/models";
 import { Box } from "@/models/primitives/box";
 import { Sphere } from "@/models/primitives/sphere";
+import { Cone } from "@/models/primitives/cone";
+import { Cylinder } from "@/models/primitives/cylinder";
+import { Plane } from "@/models/primitives/plane";
+import { Capsule } from "@/models/primitives/capsule";
+import { Torus } from "@/models/primitives/torus";
+import { Ring } from "@/models/primitives/ring";
 import { BoxProperties } from "./box-properties";
 import { SphereProperties } from "./sphere-properties";
+import { ConeProperties } from "./cone-properties";
+import { CylinderProperties } from "./cylinder-properties";
+import { PlaneProperties } from "./plane-properties";
+import { CapsuleProperties } from "./capsule-properties";
+import { TorusProperties } from "./torus-properties";
+import { RingProperties } from "./ring-properties";
+import { PhysicsProperties } from "./physics-properties";
 import { MaterialsSection } from "./materials-section";
 
 interface EntityPropertiesRegistryProps {
@@ -19,6 +32,30 @@ export function EntityPropertiesRegistry({ entity, onUpdate }: EntityPropertiesR
     
     if (entity instanceof Sphere) {
       return <SphereProperties entity={entity} onUpdate={onUpdate} />;
+    }
+
+    if (entity instanceof Cone) {
+      return <ConeProperties entity={entity} onUpdate={onUpdate} />;
+    }
+
+    if (entity instanceof Cylinder) {
+      return <CylinderProperties entity={entity} onUpdate={onUpdate} />;
+    }
+
+    if (entity instanceof Plane) {
+      return <PlaneProperties entity={entity} onUpdate={onUpdate} />;
+    }
+
+    if (entity instanceof Capsule) {
+      return <CapsuleProperties entity={entity} onUpdate={onUpdate} />;
+    }
+
+    if (entity instanceof Torus) {
+      return <TorusProperties entity={entity} onUpdate={onUpdate} />;
+    }
+
+    if (entity instanceof Ring) {
+      return <RingProperties entity={entity} onUpdate={onUpdate} />;
     }
 
     // For entities without specific property components, show a generic message
@@ -44,8 +81,8 @@ export function EntityPropertiesRegistry({ entity, onUpdate }: EntityPropertiesR
   return (
     <div className="space-y-6">
       {renderEntitySpecificProperties()}
+      <PhysicsProperties entity={entity} onUpdate={onUpdate} />
       <MaterialsSection entity={entity} />
     </div>
   );
-
 } 

@@ -125,12 +125,18 @@ export class Torus extends Entity {
 
   setMaterial(material: THREE.Material): this {
     this.mesh.material = material;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
+  }
+
+  getMaterial(): THREE.Material {
+    return this.mesh.material as THREE.Material;
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
@@ -182,6 +188,7 @@ export class Torus extends Entity {
       },
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      physics: this.serializePhysics(),
       geometry: { type: "TorusGeometry", parameters: { radius: this.dimensions.radius, tube: this.dimensions.tube, radialSegments: this.segmentConfig.radial, tubularSegments: this.segmentConfig.tubular, arc: this.segmentConfig.arc } }
     };
   }

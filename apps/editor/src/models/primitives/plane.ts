@@ -102,12 +102,18 @@ export class Plane extends Entity {
 
   setMaterial(material: THREE.Material): this {
     this.mesh.material = material;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
+  }
+
+  getMaterial(): THREE.Material {
+    return this.mesh.material as THREE.Material;
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
@@ -162,6 +168,7 @@ export class Plane extends Entity {
       },
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      physics: this.serializePhysics(),
       geometry: { type: "PlaneGeometry", parameters: { width: this.dimensions.width, height: this.dimensions.height, widthSegments: this.segments.width, heightSegments: this.segments.height } }
     };
   }

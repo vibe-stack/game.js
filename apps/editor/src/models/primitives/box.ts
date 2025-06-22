@@ -136,6 +136,7 @@ export class Box extends Entity {
       },
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      physics: this.serializePhysics(),
       geometry: { type: "BoxGeometry", parameters: { width: this.width, height: this.height, depth: this.depth } }
     };
   }
@@ -154,6 +155,7 @@ export class Box extends Entity {
   getMaterial(): THREE.Material { return this.material; }
   setMaterial(material: THREE.Material): void { 
     this.material = material; 
-    this.mesh.material = material; 
+    this.mesh.material = material;
+    this.emitChange(); // Trigger change event for UI updates
   }
 }

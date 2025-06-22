@@ -309,3 +309,30 @@
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
 }
+
+/* Apply to elements with scrollbars, or globally */
+html, body, .scrollable-container {
+  /* Use thin scrollbars */
+  scrollbar-width: thin;
+  /* Customize thumb and track colors */
+  scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+}
+
+/* WebKit-specific styles for finer control */
+::-webkit-scrollbar {
+  width: 8px; /* Thin scrollbar */
+  height: 8px; /* For horizontal scrollbars */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent; /* Transparent track */
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3); /* Semi-transparent dark thumb */
+  border-radius: 4px; /* Rounded edges for modern look */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(50, 50, 50, 0.5); /* Darker on hover */
+}

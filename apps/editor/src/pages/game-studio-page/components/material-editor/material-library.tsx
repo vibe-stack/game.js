@@ -91,7 +91,7 @@ export function MaterialLibrary({ selectedMaterial, onMaterialSelect }: Material
       </div>
 
       {/* Material List */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 max-h-[500px] overflow-y-auto">
         <div className="space-y-1 p-2">
           {filteredMaterials.map((material) => (
             <div

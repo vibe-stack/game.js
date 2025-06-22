@@ -103,6 +103,7 @@ export class Sphere extends Entity {
       },
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      physics: this.serializePhysics(),
       geometry: { type: "SphereGeometry", parameters: { radius: this.radius } }
     };
   }
@@ -117,6 +118,7 @@ export class Sphere extends Entity {
   getMaterial(): THREE.Material { return this.material; }
   setMaterial(material: THREE.Material): void { 
     this.material = material; 
-    this.mesh.material = material; 
+    this.mesh.material = material;
+    this.emitChange(); // Trigger change event for UI updates
   }
 }

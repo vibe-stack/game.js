@@ -202,6 +202,9 @@ export class SelectionManager {
   onEntityAdded(entity: Entity): void {
     if (this.isInitialized) {
       this.setupEntityClickHandler(entity);
+      this.createSelectionHelper(entity);
+      this.setupEntityChangeListener(entity);
+      this.refreshInteractions();
     }
   }
 

@@ -1,6 +1,6 @@
 import * as THREE from "three/webgpu";
 import { PhysicsManager } from "./physics-manager";
-import { EntityConfig, TweenConfig, InteractionCallbacks, EntityMetadata, EntityType } from "./types";
+import { EntityConfig, TweenConfig, InteractionCallbacks, EntityMetadata, EntityType, PhysicsConfig } from "./types";
 import { EntityData } from "./scene-loader";
 
 export abstract class Entity extends THREE.Object3D {
@@ -11,6 +11,7 @@ export abstract class Entity extends THREE.Object3D {
   protected physicsManager: PhysicsManager | null = null;
   protected rigidBodyId: string | null = null;
   protected colliderId: string | null = null;
+  protected physicsConfig: PhysicsConfig | null = null;
   private tweens: TweenConfig[] = [];
   private interactionCallbacks: InteractionCallbacks = {};
   private destroyed = false;
@@ -36,6 +37,11 @@ export abstract class Entity extends THREE.Object3D {
     if (config.position) this.position.copy(config.position);
     if (config.rotation) this.rotation.copy(config.rotation);
     if (config.scale) this.scale.copy(config.scale);
+    
+    // Store initial physics config if provided
+    if (config.physics) {
+      this.physicsConfig = { ...config.physics };
+    }
   }
 
   /**
@@ -127,6 +133,21 @@ export abstract class Entity extends THREE.Object3D {
 
   abstract serialize(): EntityData;
 
+  /**
+   * Helper method to serialize physics properties that all entities can use
+   */
+  protected serializePhysics() {
+    if (!this.physicsConfig) return undefined;
+    
+    return {
+      enabled: true,
+      type: this.physicsConfig.type || "static",
+      mass: this.physicsConfig.mass,
+      restitution: this.physicsConfig.restitution,
+      friction: this.physicsConfig.friction
+    };
+  }
+
   dispatchEvent(event: any): void {
     if (event && event.type) this.handleInteraction(event.type, event);
     super.dispatchEvent(event);
@@ -138,21 +159,50 @@ export abstract class Entity extends THREE.Object3D {
   }
 
   enableDynamicPhysics(mass = 1, restitution = 0.5, friction = 0.7): this {
-    this.setupPhysics({ type: "dynamic", mass, restitution, friction });
+    const config = { type: "dynamic" as const, mass, restitution, friction };
+    this.physicsConfig = config;
+    this.setupPhysics(config);
     return this;
   }
 
   enableStaticPhysics(restitution = 0.5, friction = 0.7): this {
-    this.setupPhysics({ type: "static", restitution, friction });
+    const config = { type: "static" as const, restitution, friction };
+    this.physicsConfig = config;
+    this.setupPhysics(config);
     return this;
   }
 
   enableKinematicPhysics(): this {
-    this.setupPhysics({ type: "kinematic" });
+    const config = { type: "kinematic" as const };
+    this.physicsConfig = config;
+    this.setupPhysics(config);
     return this;
   }
 
-  private setupPhysics(config: any): void {
+  disablePhysics(): this {
+    if (this.physicsManager) {
+      if (this.rigidBodyId) {
+        this.physicsManager.removeRigidBody(this.rigidBodyId);
+        this.rigidBodyId = null;
+      }
+      if (this.colliderId) {
+        this.physicsManager.removeCollider(this.colliderId);
+        this.colliderId = null;
+      }
+    }
+    this.physicsConfig = null;
+    return this;
+  }
+
+  getPhysicsConfig(): PhysicsConfig | null {
+    return this.physicsConfig ? { ...this.physicsConfig } : null;
+  }
+
+  hasPhysics(): boolean {
+    return this.physicsConfig !== null && this.rigidBodyId !== null;
+  }
+
+  private setupPhysics(config: PhysicsConfig): void {
     if (!this.physicsManager) return;
     this.rigidBodyId = `${this.entityId}_body`;
     const rigidBody = this.physicsManager.createRigidBody(this.rigidBodyId, config, this.position, this.quaternion);
@@ -203,7 +253,7 @@ export abstract class Entity extends THREE.Object3D {
   }
 
   // Event system methods for React synchronization
-  private emitChange(): void {
+  protected emitChange(): void {
     this.changeListeners.forEach(listener => listener());
   }
 

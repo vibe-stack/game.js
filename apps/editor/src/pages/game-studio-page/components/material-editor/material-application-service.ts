@@ -27,6 +27,13 @@ export class MaterialApplicationService {
       // Apply to entity
       (entity as any).setMaterial(threeMaterial);
       
+      // CRITICAL: Trigger entity change event for UI updates
+      // This ensures the material section and other UI components refresh
+      if ('emitChange' in entity && typeof (entity as any).emitChange === 'function') {
+        (entity as any).emitChange();
+      }
+      
+      console.log('Material applied successfully to entity:', entity.entityId);
       return true;
     } catch (error) {
       console.error('Failed to apply material to entity:', error);

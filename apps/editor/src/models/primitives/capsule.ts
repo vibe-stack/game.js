@@ -79,6 +79,7 @@ export class Capsule extends Entity {
     this.mesh.geometry = this.geometry;
     (this.dimensions as any).radius = radius;
     (this.dimensions as any).length = length;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
@@ -93,6 +94,7 @@ export class Capsule extends Entity {
     this.mesh.geometry = this.geometry;
     (this.segments as any).cap = capSegments;
     (this.segments as any).radial = radialSegments;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
@@ -106,12 +108,18 @@ export class Capsule extends Entity {
 
   setMaterial(material: THREE.Material): this {
     this.mesh.material = material;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
+  }
+
+  getMaterial(): THREE.Material {
+    return this.mesh.material as THREE.Material;
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
+    this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
@@ -155,6 +163,7 @@ export class Capsule extends Entity {
       },
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      physics: this.serializePhysics(),
       geometry: { type: "CapsuleGeometry", parameters: { radius: this.radius, length: this.length, capSegments: this.segments.cap, radialSegments: this.segments.radial } }
     };
   }
