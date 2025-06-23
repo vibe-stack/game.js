@@ -103,6 +103,10 @@ export class EditorCameraService {
     return EditorCameraService.EDITOR_CAMERA_ID;
   }
 
+  getOrbitControls(): OrbitControls | null {
+    return this.orbitControls;
+  }
+
   dispose(): void {
     if (this.orbitControls) {
       this.orbitControls.dispose();

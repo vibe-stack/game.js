@@ -2,6 +2,7 @@ import { GameWorld, SceneLoader, SceneSerializer, CharacterController, Entity } 
 import useGameStudioStore from "@/stores/game-studio-store";
 import { EditorCameraService } from "./editor-camera-service";
 import { SelectionManager } from "./selection-manager";
+import { TransformControlsManager } from "./transform-controls-manager";
 
 export class GameWorldService {
   private gameWorld: GameWorld | null = null;
@@ -10,6 +11,7 @@ export class GameWorldService {
   private currentSceneData: any = null;
   private editorCameraService: EditorCameraService;
   private selectionManager: SelectionManager;
+  private transformControlsManager: TransformControlsManager;
   private characterControllers: Map<string, CharacterController> = new Map();
   private prePlaActiveCamera: string | null = null; // Store active camera before gameplay
 
@@ -18,6 +20,7 @@ export class GameWorldService {
     this.sceneSerializer = new SceneSerializer();
     this.editorCameraService = new EditorCameraService();
     this.selectionManager = new SelectionManager();
+    this.transformControlsManager = new TransformControlsManager();
   }
 
   async initialize(canvas: HTMLCanvasElement): Promise<void> {
@@ -41,11 +44,26 @@ export class GameWorldService {
       // Initialize editor camera service
       this.editorCameraService.initialize(this.gameWorld, canvas);
       
-      // Set editor camera as default active camera for viewport
-      this.editorCameraService.switchToEditorCamera();
+              // Set editor camera as default active camera for viewport
+        this.editorCameraService.switchToEditorCamera();
 
-      // Initialize selection manager
-      this.selectionManager.initialize(this.gameWorld);
+        // Initialize selection manager
+        this.selectionManager.initialize(this.gameWorld);
+        
+        // Initialize transform controls manager
+        this.transformControlsManager.initialize(this.gameWorld, canvas);
+        
+        // Connect orbit controls to transform controls manager
+        const orbitControls = this.editorCameraService.getOrbitControls();
+        if (orbitControls) {
+          this.transformControlsManager.setOrbitControls(orbitControls);
+        }
+        
+        // Update transform controls camera
+        const activeCamera = this.gameWorld.getCameraManager().getActiveCamera();
+        if (activeCamera) {
+          this.transformControlsManager.updateCamera(activeCamera);
+        }
       
       // The gameWorld instance itself is not stored in zustand to avoid serialization issues.
       // We manage its lifecycle here and interact with it.
@@ -89,11 +107,26 @@ export class GameWorldService {
         // Reinitialize selection manager after scene reload
         this.selectionManager.initialize(this.gameWorld);
         
+        // Reinitialize transform controls manager after scene reload
+        this.transformControlsManager.initialize(this.gameWorld, canvas);
+        
+        // Connect orbit controls to transform controls manager
+        const orbitControls = this.editorCameraService.getOrbitControls();
+        if (orbitControls) {
+          this.transformControlsManager.setOrbitControls(orbitControls);
+        }
+        
         // Discover and update available cameras in the store
         this.updateAvailableCameras();
         
         // Set editor camera as active by default after scene load
         this.editorCameraService.switchToEditorCamera();
+        
+        // Update transform controls camera
+        const activeCamera = this.gameWorld.getCameraManager().getActiveCamera();
+        if (activeCamera) {
+          this.transformControlsManager.updateCamera(activeCamera);
+        }
         
         setCurrentScene(sceneData);
         setGameState("initial");
@@ -239,6 +272,7 @@ export class GameWorldService {
     }
     this.editorCameraService.dispose();
     this.selectionManager.dispose();
+    this.transformControlsManager.dispose();
 
     } catch (error) {
       console.error("Failed to dispose game world:", error);
@@ -251,6 +285,10 @@ export class GameWorldService {
 
   getSelectionManager(): SelectionManager {
     return this.selectionManager;
+  }
+
+  getTransformControlsManager(): TransformControlsManager {
+    return this.transformControlsManager;
   }
 
   // Camera Management Methods
@@ -291,6 +329,11 @@ export class GameWorldService {
       const success = this.editorCameraService.switchToEditorCamera();
       if (success) {
         setActiveCamera(cameraId);
+        // Update transform controls camera
+        const activeCamera = this.gameWorld.getCameraManager().getActiveCamera();
+        if (activeCamera) {
+          this.transformControlsManager.updateCamera(activeCamera);
+        }
       }
       
       // Simulate transition for smooth UX
@@ -305,6 +348,11 @@ export class GameWorldService {
       const success = this.editorCameraService.switchToSceneCamera(cameraId);
       if (success) {
         setActiveCamera(cameraId);
+        // Update transform controls camera
+        const activeCamera = this.gameWorld.getCameraManager().getActiveCamera();
+        if (activeCamera) {
+          this.transformControlsManager.updateCamera(activeCamera);
+        }
       }
       
       // Simulate transition for smooth UX
