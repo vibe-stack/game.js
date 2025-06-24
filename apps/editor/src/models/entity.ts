@@ -327,6 +327,35 @@ export abstract class Entity extends THREE.Object3D {
 
   setPosition(x: number, y: number, z: number): this {
     this.position.set(x, y, z);
+    
+    // Debug: Check if this is a Mesh3D and log details
+    if (this.metadata.type === "mesh3d") {
+      console.log("Mesh3D setPosition called:", {
+        entityName: this.entityName,
+        newPosition: { x, y, z },
+        entityChildren: this.children.length,
+        childrenTypes: this.children.map(child => child.constructor.name),
+        entityMatrixAutoUpdate: this.matrixAutoUpdate,
+        entityMatrixWorldNeedsUpdate: this.matrixWorldNeedsUpdate
+      });
+
+      // Check mesh matrix settings and world position after entity position change
+      this.updateMatrixWorld(true);
+      if (this.children.length > 0) {
+        const mesh = this.children[0];
+        const worldPos = new THREE.Vector3();
+        mesh.getWorldPosition(worldPos);
+        console.log("After setPosition - Mesh details:", { 
+          meshWorldPosition: { x: worldPos.x, y: worldPos.y, z: worldPos.z },
+          meshLocalPosition: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z },
+          meshMatrixAutoUpdate: mesh.matrixAutoUpdate,
+          meshMatrixWorldNeedsUpdate: mesh.matrixWorldNeedsUpdate,
+          meshVisible: mesh.visible,
+          debugMarker: (mesh as any).debugMarker
+        });
+      }
+    }
+    
     this.updatePhysicsTransform();
     this.emitChange();
     return this;
@@ -545,8 +574,10 @@ export abstract class Entity extends THREE.Object3D {
   }
 
   protected serializeCharacterController() {
-    if (!this.characterControllerConfig) return undefined;
-    return { ...this.characterControllerConfig };
+    if (!this.hasCharacterController || !this.characterControllerConfig) return undefined;
+    return {
+      ...this.characterControllerConfig
+    };
   }
 
   // Script system methods

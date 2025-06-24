@@ -74,8 +74,8 @@ export class PhysicsManager {
   createCollider(
     id: string,
     rigidBodyId: string,
-    shape: "ball" | "cuboid" | "capsule" | "trimesh" | "heightfield",
-    dimensions: THREE.Vector3 | number | { heights: number[][]; scale: THREE.Vector3 },
+    shape: "ball" | "cuboid" | "capsule" | "trimesh" | "heightfield" | "convexhull",
+    dimensions: THREE.Vector3 | number | { heights: number[][]; scale: THREE.Vector3 } | { vertices: Float32Array; indices?: Uint32Array },
     config?: PhysicsConfig
   ): RapierType.Collider | null {
 
@@ -113,6 +113,27 @@ export class PhysicsManager {
         const height = typeof dimensions === "number" ? dimensions : (dimensions as THREE.Vector3).y;
         const capsuleRadius = typeof dimensions === "number" ? dimensions / 4 : (dimensions as THREE.Vector3).x / 2;
         colliderDesc = this.rapierModule.ColliderDesc.capsule(height / 2, capsuleRadius);
+        break;
+      }
+      case "convexhull": {
+        const convexData = dimensions as { vertices: Float32Array; indices?: Uint32Array };
+        // Rapier convexHull expects vertices as Float32Array
+        const convexDesc = this.rapierModule.ColliderDesc.convexHull(convexData.vertices);
+        if (!convexDesc) {
+          console.warn("Failed to create convex hull, falling back to trimesh");
+          if (convexData.indices) {
+            colliderDesc = this.rapierModule.ColliderDesc.trimesh(convexData.vertices, convexData.indices);
+          } else {
+            return null;
+          }
+        } else {
+          colliderDesc = convexDesc;
+        }
+        break;
+      }
+      case "trimesh": {
+        const trimeshData = dimensions as { vertices: Float32Array; indices: Uint32Array };
+        colliderDesc = this.rapierModule.ColliderDesc.trimesh(trimeshData.vertices, trimeshData.indices);
         break;
       }
       case "heightfield": {

@@ -18,7 +18,8 @@ import {
   DirectionalLight,
   PointLight,
   SpotLight,
-  Entity
+  Entity,
+  Mesh3D
 } from "@/models";
 import { GameWorldService } from "../../services/game-world-service";
 
@@ -208,6 +209,16 @@ export class EntityCreator {
           castShadow: true,
         });
         break;
+
+      // 3D Models
+      case "mesh-3d":
+        entity = new Mesh3D({
+          name: `Mesh ${this.entityCounter++}`,
+          position: spawnPosition,
+          castShadow: true,
+          receiveShadow: true,
+        });
+        break;
       
       default:
         throw new Error(`Unknown entity type: ${entityType}`);
@@ -314,6 +325,9 @@ export class EntityCreator {
           break;
         case "spot-light":
           newEntity = new SpotLight(duplicatedConfig);
+          break;
+        case "mesh-3d":
+          newEntity = new Mesh3D(duplicatedConfig);
           break;
         default:
           throw new Error(`Unsupported entity type for duplication: ${entityType}`);

@@ -8,6 +8,7 @@ import { GameWorldService } from "../../services/game-world-service";
 import useGameStudioStore from "@/stores/game-studio-store";
 import SceneTree from "./scene-tree";
 import AddEntityMenu from "./add-entity-menu";
+import FileBrowser from "./file-browser";
 import { motion } from "motion/react";
 import { EntityCreator } from "./entity-creator";
 
@@ -200,9 +201,7 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
         </TabsContent>
 
         <TabsContent value="files" className="m-2 flex-1">
-          <div className="p-4 text-center text-gray-400">
-            Files panel coming soon...
-          </div>
+          <FileBrowser gameWorldService={gameWorldService} />
         </TabsContent>
       </Tabs>
     </motion.div>

@@ -2,16 +2,19 @@ import { GameWorld } from "../game-world";
 import { EntityLoader } from "./entity-loader";
 import { PhysicsLoader } from "./physics-loader";
 import { SceneData, LoaderContext } from "./types";
+import { AssetManager } from "../asset-manager";
 import { materialSystem } from "../../services/material-system";
 import * as THREE from "three/webgpu";
 
 export class SceneLoader {
   private entityLoader: EntityLoader;
   private physicsLoader: PhysicsLoader;
+  private assetManager?: AssetManager;
 
-  constructor() {
+  constructor(assetManager?: AssetManager) {
     this.entityLoader = new EntityLoader();
     this.physicsLoader = new PhysicsLoader();
+    this.assetManager = assetManager;
   }
 
   async loadScene(gameWorld: GameWorld, sceneData: SceneData): Promise<void> {
@@ -20,6 +23,7 @@ export class SceneLoader {
       materials: new Map(),
       geometries: new Map(),
       textures: new Map(),
+      assetManager: this.assetManager,
     };
 
     try {

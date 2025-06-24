@@ -1,5 +1,6 @@
 import { GameWorld } from "../game-world";
 import { SceneData as ProjectSceneData } from "../../types/project";
+import { AssetManager } from "../asset-manager";
 import * as THREE from "three/webgpu";
 
 // Re-export the main SceneData type for clarity
@@ -10,6 +11,7 @@ export interface LoaderContext {
   materials: Map<string, THREE.Material>;
   geometries: Map<string, THREE.BufferGeometry>;
   textures: Map<string, THREE.Texture>;
+  assetManager?: AssetManager;
 }
 
 // Keep other types for loader-specific data shapes if they differ

@@ -2,14 +2,38 @@ import { LoaderContext, EntityData } from "./types";
 import { Entity, Box, Sphere, Cylinder, Cone, Torus, Capsule, Ring, Plane, Heightfield, Mesh3D, AmbientLight, DirectionalLight, PointLight, SpotLight } from "../index";
 import { CameraManager } from "../camera-manager";
 import * as THREE from "three/webgpu";
+import useGameStudioStore from "../../stores/game-studio-store";
 
 export class EntityLoader {
   async load(context: LoaderContext, entityData: EntityData[]): Promise<void> {
     const entityMap = new Map<string, Entity>();
+    const mesh3dEntities: Array<{ entity: any, data: EntityData }> = [];
+    
     for (const data of entityData) {
       const entity = await this.createEntity(context, data, entityMap);
       if (entity) {
         entityMap.set(data.id, entity);
+        
+        // Track mesh3d entities that need model loading
+        if (data.type === 'mesh3d' && data.properties?.modelPath) {
+          mesh3dEntities.push({ entity, data });
+        }
+      }
+    }
+    
+    // Post-process: Load GLB files for mesh3d entities
+    const currentProject = useGameStudioStore.getState().currentProject;
+    if (currentProject && context.assetManager) {
+      for (const { entity, data } of mesh3dEntities) {
+        try {
+          if (entity.loadFromPath && data.properties?.modelPath) {
+            // Set the AssetManager on the entity before loading
+            entity.setAssetManager(context.assetManager);
+            await entity.loadFromPath(currentProject.path, data.properties.modelPath);
+          }
+        } catch (error) {
+          console.error(`Failed to load model for entity ${data.id}:`, error);
+        }
       }
     }
   }

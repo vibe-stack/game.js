@@ -8,7 +8,8 @@ import {
   Mountain,
   Lightbulb,
   Shapes,
-  ChevronRight
+  ChevronRight,
+  Package
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -133,6 +134,19 @@ const ENTITY_CATEGORIES: EntityCategory[] = [
         name: "Icosahedron",
         icon: <Shapes className="h-4 w-4" />,
         description: "A 20-sided polyhedron",
+      },
+    ],
+  },
+  {
+    id: "models",
+    name: "3D Models",
+    icon: <Package className="h-4 w-4" />,
+    entities: [
+      {
+        id: "mesh-3d",
+        name: "3D Mesh",
+        icon: <Package className="h-4 w-4" />,
+        description: "Empty mesh for GLB models",
       },
     ],
   },

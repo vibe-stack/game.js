@@ -38,6 +38,13 @@ export interface CharacterControllerConfig {
   cameraUpLimit: number; // in radians
   cameraDownLimit: number; // in radians
   cameraSensitivity: number;
+  
+  // Animation settings
+  idleAnimation?: string;
+  walkAnimation?: string;
+  sprintAnimation?: string;
+  jumpAnimation?: string;
+  fallAnimation?: string;
 }
 
 export interface CharacterState {
@@ -48,6 +55,7 @@ export interface CharacterState {
   velocity: THREE.Vector3;
   inputDirection: THREE.Vector3;
   cameraRotation: { pitch: number; yaw: number };
+  currentAnimation?: string;
 }
 
 export class CharacterController {
@@ -85,6 +93,9 @@ export class CharacterController {
   // Movement
   private desiredVelocity: THREE.Vector3 = new THREE.Vector3();
   private verticalVelocity: number = 0;
+  
+  // Animation state
+  private lastAnimation: string | undefined;
   
   constructor(
     character: Entity,
@@ -252,22 +263,7 @@ export class CharacterController {
   }
   
   private setupInput(): void {
-    // Only register jump binding, movement is handled by direct keyboard state reading
-    const bindings: InputBinding[] = [
-      {
-        id: `character-jump-${this.cameraId}`,
-        name: "Jump",
-        inputs: [{ type: "keyboard", key: "Space" }],
-        callback: () => {
-          // Only trigger if this controller is active
-          if (this.enabled && this.cameraManager.getActiveCameraId() === this.cameraId) {
-            this.jump();
-          }
-        }
-      }
-    ];
-    
-    bindings.forEach(binding => this.inputManager.addBinding(binding));
+    // Remove the jump binding since we'll handle it directly in updateInputState
     
     // Setup mouse look for all camera modes
     this.setupMouseLook();
@@ -457,6 +453,45 @@ export class CharacterController {
     
     // Update third-person camera lookAt after camera follow system has updated position
     this.updateThirdPersonCameraLookAt();
+    
+    // Update animations based on character state
+    this.updateAnimation();
+  }
+  
+  private updateAnimation(): void {
+    // Check if the character has animation capabilities (e.g., Mesh3D with loaded model)
+    const mesh3d = this.character as any;
+    if (!mesh3d.playAnimation || !mesh3d.getAnimationNames) {
+      return; // Not an animated entity
+    }
+    
+    // Determine which animation should be playing based on state
+    let targetAnimation: string | undefined;
+    
+    if (!this.state.isGrounded && this.verticalVelocity < -2) {
+      // Falling
+      targetAnimation = this.config.fallAnimation;
+    } else if (this.state.isJumping && this.verticalVelocity > 0) {
+      // Jumping (going up)
+      targetAnimation = this.config.jumpAnimation;
+    } else if (this.state.isMoving) {
+      // Moving on ground
+      if (this.state.isSprinting && this.config.sprintAnimation) {
+        targetAnimation = this.config.sprintAnimation;
+      } else if (this.config.walkAnimation) {
+        targetAnimation = this.config.walkAnimation;
+      }
+    } else {
+      // Standing still
+      targetAnimation = this.config.idleAnimation;
+    }
+    
+    // Play the animation if it's different from current
+    if (targetAnimation && targetAnimation !== this.lastAnimation) {
+      mesh3d.playAnimation(targetAnimation, 0.2); // 0.2s fade time
+      this.lastAnimation = targetAnimation;
+      this.state.currentAnimation = targetAnimation;
+    }
   }
   
   private updateCharacterMovement(deltaTime: number): void {

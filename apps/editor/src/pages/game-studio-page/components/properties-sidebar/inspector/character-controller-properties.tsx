@@ -302,6 +302,137 @@ export function CharacterControllerProperties({
 
       <Separator className="bg-white/10" />
 
+      {/* Animation Settings */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-gray-300">Animations</h4>
+        <div className="space-y-2 text-xs">
+          {/* Get available animations from the entity if it's a Mesh3D */}
+          {(() => {
+            const mesh3d = entity as any;
+            const animations = mesh3d.getAnimationNames ? mesh3d.getAnimationNames() : [];
+            
+            if (animations.length === 0) {
+              return (
+                <p className="text-xs text-gray-500 italic">
+                  No animations available. Load a model with animations.
+                </p>
+              );
+            }
+            
+            return (
+              <>
+                {/* Idle Animation */}
+                <div className="flex items-center gap-2">
+                  <span className="min-w-[60px] text-xs text-gray-400">Idle</span>
+                  <Select
+                    value={config.idleAnimation || "-"}
+                    onValueChange={(value) => handleConfigChange("idleAnimation", value || undefined)}
+                  >
+                    <SelectTrigger className="h-6 flex-1 border-gray-700 bg-gray-800 text-xs">
+                      <SelectValue placeholder="Select idle animation..." />
+                    </SelectTrigger>
+                    <SelectContent className="border-gray-700 bg-gray-800">
+                      <SelectItem value="0" className="text-xs">None</SelectItem>
+                      {animations.map((anim: string) => (
+                        <SelectItem key={anim} value={anim} className="text-xs">
+                          {anim}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Walk Animation */}
+                <div className="flex items-center gap-2">
+                  <span className="min-w-[60px] text-xs text-gray-400">Walk</span>
+                  <Select
+                    value={config.walkAnimation || "-"}
+                    onValueChange={(value) => handleConfigChange("walkAnimation", value || undefined)}
+                  >
+                    <SelectTrigger className="h-6 flex-1 border-gray-700 bg-gray-800 text-xs">
+                      <SelectValue placeholder="Select walk animation..." />
+                    </SelectTrigger>
+                    <SelectContent className="border-gray-700 bg-gray-800">
+                      <SelectItem value="0" className="text-xs">None</SelectItem>
+                      {animations.map((anim: string) => (
+                        <SelectItem key={anim} value={anim} className="text-xs">
+                          {anim}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Sprint Animation */}
+                <div className="flex items-center gap-2">
+                  <span className="min-w-[60px] text-xs text-gray-400">Sprint</span>
+                  <Select
+                    value={config.sprintAnimation || "-"}
+                    onValueChange={(value) => handleConfigChange("sprintAnimation", value || undefined)}
+                  >
+                    <SelectTrigger className="h-6 flex-1 border-gray-700 bg-gray-800 text-xs">
+                      <SelectValue placeholder="Select sprint animation..." />
+                    </SelectTrigger>
+                    <SelectContent className="border-gray-700 bg-gray-800">
+                      <SelectItem value="0" className="text-xs">None</SelectItem>
+                      {animations.map((anim: string) => (
+                        <SelectItem key={anim} value={anim} className="text-xs">
+                          {anim}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Jump Animation */}
+                <div className="flex items-center gap-2">
+                  <span className="min-w-[60px] text-xs text-gray-400">Jump</span>
+                  <Select
+                    value={config.jumpAnimation || "-"}
+                    onValueChange={(value) => handleConfigChange("jumpAnimation", value || undefined)}
+                  >
+                    <SelectTrigger className="h-6 flex-1 border-gray-700 bg-gray-800 text-xs">
+                      <SelectValue placeholder="Select jump animation..." />
+                    </SelectTrigger>
+                    <SelectContent className="border-gray-700 bg-gray-800">
+                      <SelectItem value="0" className="text-xs">None</SelectItem>
+                      {animations.map((anim: string) => (
+                        <SelectItem key={anim} value={anim} className="text-xs">
+                          {anim}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Fall Animation */}
+                <div className="flex items-center gap-2">
+                  <span className="min-w-[60px] text-xs text-gray-400">Fall</span>
+                  <Select
+                    value={config.fallAnimation || "-"}
+                    onValueChange={(value) => handleConfigChange("fallAnimation", value || undefined)}
+                  >
+                    <SelectTrigger className="h-6 flex-1 border-gray-700 bg-gray-800 text-xs">
+                      <SelectValue placeholder="Select fall animation..." />
+                    </SelectTrigger>
+                    <SelectContent className="border-gray-700 bg-gray-800">
+                      <SelectItem value="0" className="text-xs">None</SelectItem>
+                      {animations.map((anim: string) => (
+                        <SelectItem key={anim} value={anim} className="text-xs">
+                          {anim}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      </div>
+
+      <Separator className="bg-white/10" />
+
       {/* Physics Forces */}
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-gray-300">Physics</h4>

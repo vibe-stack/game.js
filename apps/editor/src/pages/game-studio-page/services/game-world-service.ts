@@ -1,4 +1,4 @@
-import { GameWorld, SceneLoader, SceneSerializer, CharacterController, Entity } from "@/models";
+import { GameWorld, SceneLoader, SceneSerializer, CharacterController, Entity, AssetManager } from "@/models";
 import useGameStudioStore from "@/stores/game-studio-store";
 import { EditorCameraService } from "./editor-camera-service";
 import { SelectionManager } from "./selection-manager";
@@ -8,6 +8,7 @@ export class GameWorldService {
   private gameWorld: GameWorld | null = null;
   private sceneLoader: SceneLoader;
   private sceneSerializer: SceneSerializer;
+  private assetManager: AssetManager;
   private currentSceneData: any = null;
   private editorCameraService: EditorCameraService;
   private selectionManager: SelectionManager;
@@ -16,7 +17,8 @@ export class GameWorldService {
   private prePlaActiveCamera: string | null = null; // Store active camera before gameplay
 
   constructor() {
-    this.sceneLoader = new SceneLoader();
+    this.assetManager = new AssetManager();
+    this.sceneLoader = new SceneLoader(this.assetManager);
     this.sceneSerializer = new SceneSerializer();
     this.editorCameraService = new EditorCameraService();
     this.selectionManager = new SelectionManager();
@@ -267,13 +269,13 @@ export class GameWorldService {
 
     try {
       if (this.gameWorld) {
-      this.gameWorld.dispose();
-      this.gameWorld = null;
-    }
-    this.editorCameraService.dispose();
-    this.selectionManager.dispose();
-    this.transformControlsManager.dispose();
-
+        this.gameWorld.dispose();
+        this.gameWorld = null;
+      }
+      this.editorCameraService.dispose();
+      this.selectionManager.dispose();
+      this.transformControlsManager.dispose();
+      this.assetManager.dispose();
     } catch (error) {
       console.error("Failed to dispose game world:", error);
     }

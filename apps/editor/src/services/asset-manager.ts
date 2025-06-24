@@ -94,13 +94,13 @@ export class AssetManager {
 
       const extension = path.extname(assetPath).toLowerCase();
       
-      // For multi-file formats like GLTF, use HTTP server
-      if (extension === '.gltf') {
+      // For 3D model formats, use HTTP server
+      if (['.gltf', '.glb'].includes(extension)) {
         const port = await AssetManager.startAssetServer(projectPath);
         return `http://localhost:${port}/${assetPath}`;
       }
       
-      // For single-file formats like GLB, use data URL (existing behavior)
+      // For other formats, use data URL
       return AssetManager.getAssetDataUrl(projectPath, assetPath);
     } catch (error) {
       console.error("Error getting asset URL:", error);
