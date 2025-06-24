@@ -180,7 +180,7 @@ export default function FileBrowser({ gameWorldService }: FileBrowserProps) {
           });
 
           // Store the model path for serialization
-          mesh.metadata.modelPath = fileItem.path;
+          (mesh.metadata as any).modelPath = fileItem.path;
 
           // Add physics configuration
           mesh.physicsConfig = {

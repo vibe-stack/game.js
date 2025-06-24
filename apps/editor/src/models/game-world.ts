@@ -229,6 +229,11 @@ export class GameWorld {
       if (!entity.isDestroyed()) {
         entity.syncPhysics();
         entity.updateTweens(delta);
+        
+        // Update animations for Mesh3D entities
+        if (entity.metadata.type === "mesh3d" && (entity as any).updateAnimations) {
+          (entity as any).updateAnimations(delta);
+        }
       }
     });
 

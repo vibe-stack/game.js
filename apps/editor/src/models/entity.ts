@@ -330,14 +330,6 @@ export abstract class Entity extends THREE.Object3D {
     
     // Debug: Check if this is a Mesh3D and log details
     if (this.metadata.type === "mesh3d") {
-      console.log("Mesh3D setPosition called:", {
-        entityName: this.entityName,
-        newPosition: { x, y, z },
-        entityChildren: this.children.length,
-        childrenTypes: this.children.map(child => child.constructor.name),
-        entityMatrixAutoUpdate: this.matrixAutoUpdate,
-        entityMatrixWorldNeedsUpdate: this.matrixWorldNeedsUpdate
-      });
 
       // Check mesh matrix settings and world position after entity position change
       this.updateMatrixWorld(true);
@@ -345,14 +337,6 @@ export abstract class Entity extends THREE.Object3D {
         const mesh = this.children[0];
         const worldPos = new THREE.Vector3();
         mesh.getWorldPosition(worldPos);
-        console.log("After setPosition - Mesh details:", { 
-          meshWorldPosition: { x: worldPos.x, y: worldPos.y, z: worldPos.z },
-          meshLocalPosition: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z },
-          meshMatrixAutoUpdate: mesh.matrixAutoUpdate,
-          meshMatrixWorldNeedsUpdate: mesh.matrixWorldNeedsUpdate,
-          meshVisible: mesh.visible,
-          debugMarker: (mesh as any).debugMarker
-        });
       }
     }
     
@@ -544,6 +528,10 @@ export abstract class Entity extends THREE.Object3D {
     // Automatically enable kinematic physics for character controller
     if (!this.hasPhysics() || this.getPhysicsConfig()?.type !== 'kinematic') {
       this.enableKinematicPhysics();
+    } else if (this.physicsManager && this.rigidBodyId && this.colliderId) {
+      // If physics already enabled, recreate collider with capsule shape
+      this.physicsManager.removeCollider(this.colliderId);
+      this.createCollider({});
     }
     
     this.emitChange();
@@ -564,6 +552,18 @@ export abstract class Entity extends THREE.Object3D {
   updateCharacterControllerConfig(newConfig: Partial<CharacterControllerConfig>): this {
     if (this.characterControllerConfig) {
       this.characterControllerConfig = { ...this.characterControllerConfig, ...newConfig };
+      
+      // If capsule dimensions changed, recreate the collider
+      if ((newConfig.capsuleHalfHeight !== undefined || newConfig.capsuleRadius !== undefined) && 
+          this.physicsManager && this.rigidBodyId && this.colliderId) {
+        
+        // Remove old collider
+        this.physicsManager.removeCollider(this.colliderId);
+        
+        // Create new collider with updated dimensions
+        this.createCollider({});
+      }
+      
       this.emitChange();
     }
     return this;

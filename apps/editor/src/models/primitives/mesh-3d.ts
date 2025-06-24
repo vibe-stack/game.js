@@ -1,652 +1,539 @@
 import * as THREE from "three/webgpu";
-import { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { GLTF, GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { Entity } from "../entity";
-import { AssetManager } from "../asset-manager";
+import { EntityConfig } from "../types";
 import { EntityData } from "../scene-loader";
+import { AssetManager } from "../asset-manager";
 
-export interface Mesh3DConfig {
-  name?: string;
-  position?: THREE.Vector3;
-  rotation?: THREE.Euler;
-  scale?: THREE.Vector3;
-  
+export interface Mesh3DConfig extends EntityConfig {
   // Model loading
-  modelId?: string;
   modelPath?: string;
+  modelUrl?: string;
+  
+  // Geometry and material overrides
   geometry?: THREE.BufferGeometry;
   material?: THREE.Material | THREE.Material[];
-  materialId?: string;
   
-  // Rendering options
+  // Loading options
   castShadow?: boolean;
   receiveShadow?: boolean;
-  visible?: boolean;
-  renderOrder?: number;
-  frustumCulled?: boolean;
+  enableDraco?: boolean;
   
-  // Animation
-  animations?: string[];
-  autoPlay?: string;
+  // Transform options
+  centerModel?: boolean;
+  normalizeScale?: boolean;
+  targetScale?: number;
   
-  // LOD (Level of Detail)
-  lodLevels?: Array<{
-    geometry: THREE.BufferGeometry;
-    material?: THREE.Material | THREE.Material[];
-    distance: number;
-  }>;
-  
-  // Instancing
-  instanceCount?: number;
-  instanceMatrices?: Float32Array;
-  instanceColors?: Float32Array;
+  // Asset management
+  assetManager?: AssetManager;
 }
 
 export class Mesh3D extends Entity {
-  private mesh: THREE.Mesh | THREE.InstancedMesh | THREE.LOD | THREE.Group | null = null;
-  private assetManager: AssetManager | null = null;
-  private animationMixer: THREE.AnimationMixer | null = null;
-  private animationActions = new Map<string, THREE.AnimationAction>();
-  private currentAnimation: string | null = null;
-  private originalGLTF: GLTF | null = null;
-  private loadedGeometry: THREE.BufferGeometry | null = null;
-  private loadedMaterials: THREE.Material[] = [];
-  private modelId: string | null = null;
-  private modelPath: string | null = null;
-
+  private meshes: THREE.Mesh[] = [];
+  private loadedGLTF?: GLTF;
+  private originalMaterials: THREE.Material[] = [];
+  private assetManager?: AssetManager;
+  
+  // Animation system
+  private animationMixer?: THREE.AnimationMixer;
+  private animationActions: Map<string, THREE.AnimationAction> = new Map();
+  private currentAnimation?: string;
+  private animationClips: THREE.AnimationClip[] = [];
+  
+  // Loading state
+  private isLoading = false;
+  private loadPromise?: Promise<void>;
+  
+  // Configuration
+  public modelPath?: string;
+  public modelUrl?: string;
+  private readonly config: {
+    castShadow: boolean;
+    receiveShadow: boolean;
+    enableDraco: boolean;
+    centerModel: boolean;
+    normalizeScale: boolean;
+    targetScale: number;
+  };
+  
   constructor(config: Mesh3DConfig = {}) {
-    console.log("Mesh3D constructor: Config position:", config.position);
-
-    super({
-      name: config.name,
-      position: config.position,
-      rotation: config.rotation,
-      scale: config.scale,
-    });
-
-    console.log("Mesh3D constructor: Entity position after super():", {
-      x: this.position.x, y: this.position.y, z: this.position.z
-    });
-
-    this.metadata.type = "mesh3d";
-    this.modelPath = config.modelPath || null;
+    super(config);
     
-    if (config.geometry) {
-      this.createFromGeometry(config);
-      this.finalizeMeshSetup(config);
-    } else {
-      this.setupMesh(config);
+    this.config = {
+      castShadow: config.castShadow ?? true,
+      receiveShadow: config.receiveShadow ?? true,
+      enableDraco: config.enableDraco ?? true,
+      centerModel: config.centerModel ?? false,
+      normalizeScale: config.normalizeScale ?? false,
+      targetScale: config.targetScale ?? 1.0,
+    };
+    
+    this.modelPath = config.modelPath;
+    this.modelUrl = config.modelUrl;
+    this.assetManager = config.assetManager;
+    
+    // Initialize with empty geometry if no model provided
+    if (!config.geometry && !config.modelPath && !config.modelUrl) {
+      this.createEmptyMesh(config.material);
+    } else if (config.geometry) {
+      this.createMeshFromGeometry(config.geometry, config.material);
+    }
+    
+    this.metadata.type = "mesh3d";
+    this.addTag("mesh3d");
+    
+    // Auto-load if modelPath or modelUrl is provided
+    if (config.modelPath) {
+      // Note: We can't auto-load from path without projectPath, will need to be loaded manually
+    } else if (config.modelUrl) {
+      this.loadFromUrl(config.modelUrl).catch((error: Error) => {
+        console.error("Failed to auto-load model:", error);
+      });
+    }
+  }
+
+  private createEmptyMesh(material?: THREE.Material | THREE.Material[]): void {
+    const defaultMaterial = material || new THREE.MeshStandardMaterial({ 
+      color: 0x888888,
+      wireframe: true 
+    });
+    
+    const emptyGeometry = new THREE.BufferGeometry();
+    const mesh = new THREE.Mesh(emptyGeometry, defaultMaterial);
+    mesh.castShadow = this.config.castShadow;
+    mesh.receiveShadow = this.config.receiveShadow;
+    
+    this.meshes = [mesh];
+    this.add(mesh);
+  }
+
+  private createMeshFromGeometry(
+    geometry: THREE.BufferGeometry, 
+    material?: THREE.Material | THREE.Material[]
+  ): void {
+    const defaultMaterial = material || new THREE.MeshStandardMaterial({ color: 0x888888 });
+    const mesh = new THREE.Mesh(geometry, defaultMaterial);
+    mesh.castShadow = this.config.castShadow;
+    mesh.receiveShadow = this.config.receiveShadow;
+    
+    this.meshes = [mesh];
+    this.add(mesh);
+  }
+
+  /**
+   * Set the asset manager for loading models
+   */
+  setAssetManager(assetManager: AssetManager): void {
+    this.assetManager = assetManager;
+  }
+
+  /**
+   * Load a model from a project-relative path
+   */
+  async loadFromPath(projectPath: string, modelPath: string): Promise<void> {
+    if (this.isLoading) {
+      return this.loadPromise;
     }
 
-    console.log("Mesh3D constructor: Final entity position:", {
-      x: this.position.x, y: this.position.y, z: this.position.z
-    });
+    this.modelPath = modelPath;
+    
+    // Get the asset URL using the project service
+    let modelUrl: string;
+    
+    try {
+      // Use window.projectAPI if available (in renderer context)
+      if (typeof window !== 'undefined' && (window as any).projectAPI) {
+        const url = await (window as any).projectAPI.getAssetUrl(projectPath, modelPath);
+        if (!url) {
+          throw new Error(`Failed to get asset URL for ${modelPath}`);
+        }
+        modelUrl = url;
+      } else {
+        // Fallback for other contexts
+        throw new Error("Project API not available");
+      }
+    } catch (error) {
+      console.error("Failed to get asset URL:", error);
+      throw new Error(`Cannot load model from path: ${modelPath}`);
+    }
+
+    return this.loadFromUrl(modelUrl);
   }
 
-  public setAssetManager(assetManager: AssetManager): this {
-    this.assetManager = assetManager;
-    return this;
+  /**
+   * Load a model from a URL
+   */
+  async loadFromUrl(url: string): Promise<void> {
+    if (this.isLoading) {
+      return this.loadPromise;
+    }
+
+    this.isLoading = true;
+    this.modelUrl = url;
+
+    this.loadPromise = this._loadModel(url);
+    
+    try {
+      await this.loadPromise;
+    } finally {
+      this.isLoading = false;
+      this.loadPromise = undefined;
+    }
   }
 
-  private async setupMesh(config: Mesh3DConfig): Promise<void> {
-    this.clearExistingMesh();
+  /**
+   * Load model using the asset manager
+   */
+  async loadWithAssetManager(assetId: string): Promise<void> {
+    if (!this.assetManager) {
+      throw new Error("Asset manager not set");
+    }
+
+    if (this.isLoading) {
+      return this.loadPromise;
+    }
+
+    this.isLoading = true;
+    
+    this.loadPromise = this._loadWithAssetManager(assetId);
+    
+    try {
+      await this.loadPromise;
+    } finally {
+      this.isLoading = false;
+      this.loadPromise = undefined;
+    }
+  }
+
+  private async _loadWithAssetManager(assetId: string): Promise<void> {
+    if (!this.assetManager) {
+      throw new Error("Asset manager not available");
+    }
 
     try {
-      if (config.modelPath) {
-        // Store the model path but don't load it yet - loading happens later via loadFromPath
-        this.storeModelPath(config.modelPath);
-        this.createEmptyMesh(); // Create placeholder mesh
-      } else if (config.modelId && this.assetManager) {
-        await this.loadFromAsset(config.modelId, config);
-      } else if (config.geometry) {
-        this.createFromGeometry(config);
-      } else {
-        this.createEmptyMesh();
-      }
-
-      this.finalizeMeshSetup(config);
-    } catch (error) {
-      console.error('Failed to setup Mesh3D:', error);
-      // Create empty mesh as fallback
-      this.createEmptyMesh();
-      this.finalizeMeshSetup(config);
-    }
-  }
-
-  private clearExistingMesh(): void {
-    if (this.mesh) {
-      console.log("clearExistingMesh: Removing mesh from entity:", {
-        meshType: this.mesh.constructor.name,
-        meshParent: this.mesh.parent?.constructor.name,
-        entityChildren: this.children.length
-      });
-      this.remove(this.mesh);
-      this.disposeMesh();
-      console.log("clearExistingMesh: After removal, entity children:", this.children.length);
-    }
-  }
-
-  private storeModelPath(modelPath: string): void {
-    this.modelPath = modelPath;
-    (this.metadata as any).modelPath = modelPath;
-  }
-
-  private finalizeMeshSetup(config: Mesh3DConfig): void {
-    if (this.mesh) {
-      this.applyMeshProperties(config);
-      
-      // Add unique identifier to the mesh for debugging
-      (this.mesh as any).entityId = this.entityId;
-      (this.mesh as any).entityName = this.entityName;
-      (this.mesh as any).debugMarker = `MESH_FOR_${this.entityName}_${this.entityId}`;
-      
-      this.add(this.mesh);
-      this.updateMatrixWorld(true);
-
-      // Debug: Check parent-child relationship AND mesh transforms
-      console.log("Mesh3D finalizeMeshSetup debug:", {
-        entityPosition: { x: this.position.x, y: this.position.y, z: this.position.z },
-        entityName: this.entityName,
-        entityId: this.entityId,
-        meshType: this.mesh.constructor.name,
-        meshParent: this.mesh.parent?.constructor.name,
-        meshChildren: this.children.length,
-        isAddedToEntity: this.children.includes(this.mesh),
-        meshLocalPosition: { x: this.mesh.position.x, y: this.mesh.position.y, z: this.mesh.position.z },
-        meshWorldPosition: { x: 0, y: 0, z: 0 }, // Will fill below
-        meshMatrixAutoUpdate: this.mesh.matrixAutoUpdate,
-        entityMatrixAutoUpdate: this.matrixAutoUpdate,
-        meshDebugMarker: (this.mesh as any).debugMarker
-      });
-
-      // Get mesh world position
-      const worldPos = new THREE.Vector3();
-      this.mesh.getWorldPosition(worldPos);
-      console.log("Mesh world position:", { x: worldPos.x, y: worldPos.y, z: worldPos.z });
-
+      // Load model using asset manager
+      const gltf = await this.assetManager.loadModel(assetId, ''); // URL will be managed by asset manager
+      this._processLoadedGLTF(gltf);
       this.emitChange();
+    } catch (error) {
+      console.error("Failed to load model with asset manager:", error);
+      throw error;
     }
   }
 
-  private async loadFromAsset(modelId: string, config: Mesh3DConfig): Promise<void> {
-    if (!this.assetManager) {
-      throw new Error('AssetManager not set');
+  private async _loadModel(url: string): Promise<void> {
+    const loader = new GLTFLoader();
+    
+    // Setup DRACO loader if enabled
+    if (this.config.enableDraco) {
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath('/draco/');
+      loader.setDRACOLoader(dracoLoader);
     }
 
-    const gltf = await this.assetManager.getModel(modelId);
-    if (!gltf) {
-      throw new Error(`Model ${modelId} not found`);
-    }
-
-    this.processGLTF(gltf, config);
-  }
-
-  private processGLTF(gltf: GLTF, config: Mesh3DConfig): void {
-    console.log("processGLTF: Entity position before processing:", {
-      x: this.position.x, y: this.position.y, z: this.position.z
-    });
-
-    console.log("processGLTF: Original GLTF scene transform:", {
-      position: { x: gltf.scene.position.x, y: gltf.scene.position.y, z: gltf.scene.position.z },
-      rotation: { x: gltf.scene.rotation.x, y: gltf.scene.rotation.y, z: gltf.scene.rotation.z },
-      scale: { x: gltf.scene.scale.x, y: gltf.scene.scale.y, z: gltf.scene.scale.z }
-    });
-
-    this.originalGLTF = gltf;
-    const scene = gltf.scene.clone();
-    
-    console.log("processGLTF: Cloned scene transform before reset:", {
-      position: { x: scene.position.x, y: scene.position.y, z: scene.position.z },
-      rotation: { x: scene.rotation.x, y: scene.rotation.y, z: scene.rotation.z },
-      scale: { x: scene.scale.x, y: scene.scale.y, z: scene.scale.z }
-    });
-    
-    // Reset the scene's transform to ensure it doesn't interfere with entity positioning
-    scene.position.set(0, 0, 0);
-    scene.rotation.set(0, 0, 0);
-    scene.scale.set(1, 1, 1);
-    scene.updateMatrix();
-    
-    console.log("processGLTF: Scene transform after reset:", {
-      position: { x: scene.position.x, y: scene.position.y, z: scene.position.z },
-      rotation: { x: scene.rotation.x, y: scene.rotation.y, z: scene.rotation.z },
-      scale: { x: scene.scale.x, y: scene.scale.y, z: scene.scale.z },
-      matrixAutoUpdate: scene.matrixAutoUpdate
-    });
-    
-    // Use the entire scene as our mesh - this properly handles multiple meshes and complex hierarchies
-    this.mesh = scene;
-    this.mesh.matrixAutoUpdate = true;
-    
-    // CRITICAL: Also ensure all children have matrixAutoUpdate enabled
-    this.mesh.traverse((child) => {
-      child.matrixAutoUpdate = true;
-      console.log("Setting matrixAutoUpdate=true for child:", {
-        type: child.constructor.name,
-        position: { x: child.position.x, y: child.position.y, z: child.position.z }
+    try {
+      const gltf = await new Promise<GLTF>((resolve, reject) => {
+        loader.load(
+          url,
+          resolve,
+                     (progress) => {
+             const percentage = (progress.loaded / progress.total) * 100;
+             // Emit loading progress event if needed
+             this.dispatchEvent({ type: 'loadProgress', percentage, loaded: progress.loaded, total: progress.total });
+           },
+          reject
+        );
       });
-    });
 
-    console.log("processGLTF: Entity position after processing:", {
-      x: this.position.x, y: this.position.y, z: this.position.z
-    });
-
-    this.setupAnimations(gltf.animations, config);
-    
-    if (config.materialId && this.assetManager) {
-      this.applyMaterialOverride(config.materialId);
+             this._processLoadedGLTF(gltf);
+       this.emitChange();
+       // Emit custom events using THREE.js event system
+       this.dispatchEvent({ type: 'modelLoaded', gltf, url });
+     } catch (error) {
+       console.error("Failed to load GLTF model:", error);
+       this.dispatchEvent({ type: 'modelError', error, url });
+       throw error;
     }
   }
 
-  private createFromGeometry(config: Mesh3DConfig): void {
-    const material = config.material || new THREE.MeshStandardMaterial();
+  private _processLoadedGLTF(gltf: GLTF): void {
+    // Clear existing meshes
+    this.clearMeshes();
     
-    this.loadedGeometry = config.geometry!;
-    this.loadedMaterials = Array.isArray(material) ? material : [material];
-
-    if (config.instanceCount && config.instanceCount > 1) {
-      this.createInstancedMesh(config.geometry!, material, config);
-    } else if (config.lodLevels) {
-      this.mesh = this.createLOD(config);
-    } else {
-      this.mesh = new THREE.Mesh(config.geometry, material);
-    }
-  }
-
-  private createInstancedMesh(geometry: THREE.BufferGeometry, material: THREE.Material | THREE.Material[], config: Mesh3DConfig): void {
-    this.mesh = new THREE.InstancedMesh(geometry, material, config.instanceCount!);
+    // Store the loaded GLTF
+    this.loadedGLTF = gltf;
     
-    if (config.instanceMatrices) {
-      (this.mesh as THREE.InstancedMesh).instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      this.setInstanceMatrices(config.instanceMatrices);
-    }
+    // Extract meshes from the GLTF scene
+    const meshes: THREE.Mesh[] = [];
+    const materials: THREE.Material[] = [];
     
-    if (config.instanceColors) {
-      (this.mesh as THREE.InstancedMesh).instanceColor = new THREE.InstancedBufferAttribute(
-        config.instanceColors, 3
-      );
-    }
-  }
-
-  private createEmptyMesh(): void {
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({ 
-      color: 0x888888, 
-      transparent: true, 
-      opacity: 0.5,
-      wireframe: true
-    });
-    
-    this.mesh = new THREE.Mesh(geometry, material);
-    this.loadedGeometry = geometry;
-    this.loadedMaterials = [material];
-  }
-
-  private createLOD(config: Mesh3DConfig): THREE.LOD {
-    const lod = new THREE.LOD();
-    
-    if (config.lodLevels) {
-      config.lodLevels.forEach((level) => {
-        const mesh = new THREE.Mesh(level.geometry, level.material || this.loadedMaterials[0]);
-        lod.addLevel(mesh, level.distance);
-      });
-    }
-    
-    return lod;
-  }
-
-  private applyMeshProperties(config: Mesh3DConfig): void {
-    if (!this.mesh) return;
-
-    const properties = {
-      castShadow: config.castShadow,
-      receiveShadow: config.receiveShadow,
-      visible: config.visible,
-      renderOrder: config.renderOrder,
-      frustumCulled: config.frustumCulled
-    };
-
-    // Apply properties to the mesh itself if it's a direct mesh
-    if (this.mesh instanceof THREE.Mesh || this.mesh instanceof THREE.InstancedMesh) {
-      Object.entries(properties).forEach(([key, value]) => {
-        if (value !== undefined) {
-          (this.mesh as any)[key] = value;
+    gltf.scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        meshes.push(child);
+        
+        // Store original materials
+        if (Array.isArray(child.material)) {
+          materials.push(...child.material);
+        } else {
+          materials.push(child.material);
         }
-      });
-    } else {
-      // If mesh is a scene/group, apply properties to all child meshes
-      this.mesh.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          Object.entries(properties).forEach(([key, value]) => {
-            if (value !== undefined) {
-              (child as any)[key] = value;
-            }
-          });
-        }
-      });
-    }
-  }
-
-  private setupAnimations(animations: THREE.AnimationClip[] | undefined, config: Mesh3DConfig): void {
-    if (!this.mesh || !animations || animations.length === 0) return;
-
-    this.animationMixer = new THREE.AnimationMixer(this.mesh);
-    
-    animations.forEach((clip) => {
-      const action = this.animationMixer!.clipAction(clip);
-      this.animationActions.set(clip.name, action);
-    });
-
-    if (config.autoPlay && this.animationActions.has(config.autoPlay)) {
-      this.playAnimation(config.autoPlay);
-    }
-  }
-
-  private async applyMaterialOverride(materialId: string): Promise<void> {
-    if (!this.assetManager || !this.mesh) return;
-
-    const material = await this.assetManager.getMaterial(materialId);
-    if (!material) return;
-
-    if (this.mesh instanceof THREE.Mesh || this.mesh instanceof THREE.InstancedMesh) {
-      this.mesh.material = material;
-    } else {
-      this.mesh.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.material = material;
-        }
-      });
-    }
-  }
-
-  // Animation methods
-  public playAnimation(name: string, fadeTime: number = 0.2): boolean {
-    if (!this.animationMixer || !this.animationActions.has(name)) {
-      return false;
-    }
-
-    if (this.currentAnimation && this.currentAnimation !== name) {
-      const currentAction = this.animationActions.get(this.currentAnimation);
-      if (currentAction) {
-        currentAction.fadeOut(fadeTime);
+        
+        // Apply shadow settings
+        child.castShadow = this.config.castShadow;
+        child.receiveShadow = this.config.receiveShadow;
       }
-    }
+    });
 
-    const action = this.animationActions.get(name)!;
-    action.reset().fadeIn(fadeTime).play();
-    this.currentAnimation = name;
-    return true;
-  }
+    // Store meshes and materials
+    this.meshes = meshes;
+    this.originalMaterials = materials;
 
-  public stopAnimation(name?: string, fadeTime: number = 0.2): void {
-    if (!this.animationMixer) return;
+    // Add the entire scene to this entity
+    this.add(gltf.scene);
 
-    if (name) {
-      const action = this.animationActions.get(name);
-      if (action) {
-        action.fadeOut(fadeTime);
-        if (this.currentAnimation === name) {
-          this.currentAnimation = null;
-        }
-      }
-    } else {
-      this.animationActions.forEach((action) => action.fadeOut(fadeTime));
-      this.currentAnimation = null;
-    }
-  }
+    // Setup animations if they exist
+    this.setupAnimations(gltf);
 
-  public pauseAnimation(name?: string): void {
-    if (!this.animationMixer) return;
-
-    if (name) {
-      const action = this.animationActions.get(name);
-      if (action) action.paused = true;
-    } else {
-      this.animationActions.forEach((action) => action.paused = true);
-    }
-  }
-
-  public resumeAnimation(name?: string): void {
-    if (!this.animationMixer) return;
-
-    if (name) {
-      const action = this.animationActions.get(name);
-      if (action) action.paused = false;
-    } else {
-      this.animationActions.forEach((action) => action.paused = false);
-    }
-  }
-
-  public setAnimationSpeed(name: string, speed: number): boolean {
-    const action = this.animationActions.get(name);
-    if (action) {
-      action.timeScale = speed;
-      return true;
-    }
-    return false;
-  }
-
-  public getAnimationNames(): string[] {
-    return Array.from(this.animationActions.keys());
-  }
-
-  public isAnimationPlaying(name: string): boolean {
-    const action = this.animationActions.get(name);
-    return action ? action.isRunning() && !action.paused : false;
-  }
-
-  // Instance methods
-  public setInstanceMatrices(matrices: Float32Array): void {
-    if (this.mesh instanceof THREE.InstancedMesh) {
-      this.mesh.instanceMatrix.array.set(matrices);
-      this.mesh.instanceMatrix.needsUpdate = true;
-    }
-  }
-
-  public setInstanceMatrix(index: number, matrix: THREE.Matrix4): void {
-    if (this.mesh instanceof THREE.InstancedMesh) {
-      this.mesh.setMatrixAt(index, matrix);
-      this.mesh.instanceMatrix.needsUpdate = true;
-    }
-  }
-
-  public getInstanceMatrix(index: number, target: THREE.Matrix4): THREE.Matrix4 {
-    if (this.mesh instanceof THREE.InstancedMesh) {
-      this.mesh.getMatrixAt(index, target);
-    }
-    return target;
-  }
-
-  public setInstanceColor(index: number, color: THREE.Color): void {
-    if (this.mesh instanceof THREE.InstancedMesh && this.mesh.instanceColor) {
-      this.mesh.setColorAt(index, color);
-      this.mesh.instanceColor.needsUpdate = true;
-    }
-  }
-
-  // Geometry and material access
-  public getGeometry(): THREE.BufferGeometry | null {
-    if (this.mesh instanceof THREE.Mesh || this.mesh instanceof THREE.InstancedMesh) {
-      return this.mesh.geometry;
+    // Apply transformations if needed
+    if (this.config.centerModel) {
+      this.centerModel();
     }
     
-    // If mesh is a scene/group, find the first mesh with geometry
-    if (this.mesh) {
-      let foundGeometry: THREE.BufferGeometry | null = null;
-      this.mesh.traverse((child) => {
-        if (child instanceof THREE.Mesh && child.geometry && !foundGeometry) {
-          foundGeometry = child.geometry;
-        }
-      });
-      if (foundGeometry) return foundGeometry;
-    }
-    
-    return this.loadedGeometry;
-  }
-
-  public getMaterial(): THREE.Material | THREE.Material[] | null {
-    if (this.mesh instanceof THREE.Mesh || this.mesh instanceof THREE.InstancedMesh) {
-      return this.mesh.material;
-    }
-    
-    // If mesh is a scene/group, collect materials from all meshes
-    if (this.mesh && this.loadedMaterials.length === 0) {
-      const materials: THREE.Material[] = [];
-      this.mesh.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          const childMaterials = Array.isArray(child.material) ? child.material : [child.material];
-          materials.push(...childMaterials);
-        }
-      });
-      if (materials.length > 0) {
-        return materials.length === 1 ? materials[0] : materials;
-      }
-    }
-    
-    return this.loadedMaterials.length > 0 ? 
-      (this.loadedMaterials.length === 1 ? this.loadedMaterials[0] : this.loadedMaterials) : 
-      null;
-  }
-
-  public setMaterial(material: THREE.Material | THREE.Material[]): void {
-    if (this.mesh instanceof THREE.Mesh || this.mesh instanceof THREE.InstancedMesh) {
-      this.mesh.material = material;
-    } else if (this.mesh) {
-      // If mesh is a scene/group, apply material to all child meshes
-      this.mesh.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.material = material;
-        }
-      });
-    }
-    this.loadedMaterials = Array.isArray(material) ? material : [material];
-  }
-
-  public getMesh(): THREE.Mesh | THREE.InstancedMesh | THREE.LOD | THREE.Group | null {
-    return this.mesh;
-  }
-
-  public raycast(raycaster: THREE.Raycaster, intersects: THREE.Intersection[]): void {
-    if (this.mesh) {
-      this.mesh.raycast(raycaster, intersects);
+    if (this.config.normalizeScale) {
+      this.normalizeModelScale();
     }
   }
 
-  // Physics collider creation
-  protected createCollider(config: any): void {
-    if (!this.physicsManager || !this.colliderId || !this.rigidBodyId) return;
-
-    const geometry = this.getGeometry();
-    if (!geometry) return;
-
-    const worldScale = this.getWorldScale(new THREE.Vector3());
-
-    if (geometry instanceof THREE.BoxGeometry) {
-      const size = new THREE.Vector3();
-      geometry.computeBoundingBox();
-      geometry.boundingBox!.getSize(size);
-      size.multiply(worldScale);
-      this.physicsManager.createCollider(this.colliderId, this.rigidBodyId, "cuboid", size, config);
-    } else if (geometry instanceof THREE.SphereGeometry) {
-      const scaledRadius = geometry.parameters.radius * Math.max(worldScale.x, worldScale.y, worldScale.z);
-      this.physicsManager.createCollider(this.colliderId, this.rigidBodyId, "ball", scaledRadius, config);
-    } else {
-      this.createComplexCollider(geometry, worldScale, config);
-    }
-  }
-
-  private createComplexCollider(geometry: THREE.BufferGeometry, worldScale: THREE.Vector3, config: any): void {
-    const positionAttribute = geometry.getAttribute('position');
-    if (!positionAttribute) return;
-
-    const originalVertices = new Float32Array(positionAttribute.array);
-    const vertices = new Float32Array(originalVertices.length);
-    
-    for (let i = 0; i < originalVertices.length; i += 3) {
-      vertices[i] = originalVertices[i] * worldScale.x;
-      vertices[i + 1] = originalVertices[i + 1] * worldScale.y;
-      vertices[i + 2] = originalVertices[i + 2] * worldScale.z;
-    }
-    
-    const collider = this.physicsManager!.createCollider(
-      this.colliderId!, 
-      this.rigidBodyId!, 
-      "convexhull", 
-      { vertices },
-      config
-    );
-    
-    if (!collider && geometry.index) {
-      const indices = new Uint32Array(geometry.index.array);
-      this.physicsManager!.createCollider(
-        this.colliderId!,
-        this.rigidBodyId!,
-        "trimesh",
-        { vertices, indices },
-        config
-      );
-    }
-  }
-
-  public updateTweens(delta: number): void {
-    super.updateTweens(delta);
-    
-    if (this.animationMixer) {
-      this.animationMixer.update(delta);
-    }
-  }
-
-  private disposeMesh(): void {
+  private clearMeshes(): void {
+    // Stop and clear animations
     if (this.animationMixer) {
       this.animationMixer.stopAllAction();
-      this.animationMixer = null;
     }
-    
     this.animationActions.clear();
-    this.currentAnimation = null;
-
-    if (this.loadedGeometry && !this.originalGLTF) {
-      this.loadedGeometry.dispose();
+    this.animationClips = [];
+    this.currentAnimation = undefined;
+    this.animationMixer = undefined;
+    
+    // Remove all children (previous models)
+    while (this.children.length > 0) {
+      const child = this.children[0];
+      this.remove(child);
+      
+      // Dispose geometries and materials if they're disposable
+      if (child instanceof THREE.Mesh) {
+        if (child.geometry) {
+          child.geometry.dispose();
+        }
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(mat => mat.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      }
     }
     
-    this.loadedMaterials.forEach((material) => {
-      if (!this.originalGLTF) {
-        material.dispose();
+    this.meshes = [];
+    this.originalMaterials = [];
+  }
+
+  private centerModel(): void {
+    if (this.meshes.length === 0) return;
+    
+    const box = new THREE.Box3();
+    this.meshes.forEach(mesh => {
+      box.expandByObject(mesh);
+    });
+    
+    const center = box.getCenter(new THREE.Vector3());
+    this.children.forEach(child => {
+      child.position.sub(center);
+    });
+  }
+
+  private normalizeModelScale(): void {
+    if (this.meshes.length === 0) return;
+    
+    const box = new THREE.Box3();
+    this.meshes.forEach(mesh => {
+      box.expandByObject(mesh);
+    });
+    
+    const size = box.getSize(new THREE.Vector3());
+    const maxDimension = Math.max(size.x, size.y, size.z);
+    
+    if (maxDimension > 0) {
+      const scaleFactor = this.config.targetScale / maxDimension;
+      this.children.forEach(child => {
+        child.scale.multiplyScalar(scaleFactor);
+      });
+    }
+  }
+
+  /**
+   * Get all meshes in the loaded model
+   */
+  getMeshes(): THREE.Mesh[] {
+    return [...this.meshes];
+  }
+
+  /**
+   * Get the first mesh (for compatibility with existing code)
+   */
+  getMesh(): THREE.Mesh | null {
+    return this.meshes.length > 0 ? this.meshes[0] : null;
+  }
+
+  /**
+   * Get geometry from the first mesh (for compatibility with existing UI)
+   */
+  getGeometry(): THREE.BufferGeometry | null {
+    const mesh = this.getMesh();
+    return mesh ? mesh.geometry : null;
+  }
+
+  /**
+   * Get the loaded GLTF object
+   */
+  getGLTF(): GLTF | null {
+    return this.loadedGLTF || null;
+  }
+
+  /**
+   * Replace material on all meshes
+   */
+  setMaterial(material: THREE.Material | THREE.Material[]): void {
+    this.meshes.forEach(mesh => {
+      mesh.material = material;
+    });
+    this.emitChange();
+  }
+
+  /**
+   * Get materials from all meshes
+   */
+  getMaterials(): THREE.Material[] {
+    const materials: THREE.Material[] = [];
+    this.meshes.forEach(mesh => {
+      if (Array.isArray(mesh.material)) {
+        materials.push(...mesh.material);
+      } else {
+        materials.push(mesh.material);
       }
     });
-
-    this.loadedGeometry = null;
-    this.loadedMaterials = [];
-    this.originalGLTF = null;
+    return materials;
   }
 
-  public destroy(): void {
-    this.disposeMesh();
-    super.destroy();
+  /**
+   * Restore original materials from the loaded model
+   */
+  restoreOriginalMaterials(): void {
+    if (this.originalMaterials.length === 0) return;
+    
+    let materialIndex = 0;
+    this.meshes.forEach(mesh => {
+      if (materialIndex < this.originalMaterials.length) {
+        mesh.material = this.originalMaterials[materialIndex++];
+      }
+    });
+    this.emitChange();
   }
 
-  // Static factory methods
-  public static async fromModel(
-    assetManager: AssetManager, 
-    modelId: string, 
-    config: Omit<Mesh3DConfig, 'modelId'> = {}
-  ): Promise<Mesh3D> {
-    const mesh = new Mesh3D({ ...config, modelId });
-    mesh.setAssetManager(assetManager);
-    await mesh.setupMesh({ ...config, modelId });
-    return mesh;
+  /**
+   * Check if model is currently loading
+   */
+  isModelLoading(): boolean {
+    return this.isLoading;
   }
 
-  public static fromGeometry(
-    geometry: THREE.BufferGeometry,
-    material?: THREE.Material | THREE.Material[],
-    config: Omit<Mesh3DConfig, 'geometry' | 'material'> = {}
-  ): Mesh3D {
-    return new Mesh3D({ ...config, geometry, material });
+  /**
+   * Check if model has been loaded
+   */
+  hasModel(): boolean {
+    return this.loadedGLTF !== undefined && this.meshes.length > 0;
   }
 
-  // Serialization
+  /**
+   * Get model loading progress
+   */
+  getLoadingProgress(): number {
+    // This would need to be implemented with proper progress tracking
+    // For now, return 100 if loaded, 0 if not
+    return this.hasModel() ? 100 : 0;
+  }
+
+  /**
+   * Create physics collider from loaded geometry
+   */
+  protected createCollider(config: any): void {
+    if (!this.physicsManager || !this.rigidBodyId) {
+      return;
+    }
+
+    // Check if this entity has a character controller - if so, create a capsule collider
+    if (this.hasCharacterController && this.characterControllerConfig) {
+      // Create capsule collider for character controller
+      const capsuleSize = new THREE.Vector3(
+        this.characterControllerConfig.capsuleRadius * 2,
+        this.characterControllerConfig.capsuleHalfHeight * 2,
+        this.characterControllerConfig.capsuleRadius * 2
+      );
+      
+      this.physicsManager.createCollider(
+        this.colliderId!, 
+        this.rigidBodyId, 
+        "capsule", 
+        capsuleSize, 
+        config
+      );
+      return;
+    }
+
+    // For regular physics, use mesh-based collider if we have meshes
+    if (this.meshes.length > 0) {
+      const firstMesh = this.meshes[0];
+      if (firstMesh && firstMesh.geometry) {
+        const geometry = firstMesh.geometry;
+        
+        // Calculate bounding box for collider
+        geometry.computeBoundingBox();
+        const boundingBox = geometry.boundingBox;
+        
+        if (boundingBox) {
+          const size = new THREE.Vector3();
+          boundingBox.getSize(size);
+          
+          // Create a box collider based on the bounding box
+          this.physicsManager.createCollider(
+            this.colliderId!, 
+            this.rigidBodyId, 
+            "cuboid", 
+            size, 
+            config
+          );
+          return;
+        }
+      }
+    }
+    
+    // Fallback: create a default box collider
+    const defaultSize = new THREE.Vector3(1, 1, 1);
+    this.physicsManager.createCollider(
+      this.colliderId!, 
+      this.rigidBodyId, 
+      "cuboid", 
+      defaultSize, 
+      config
+    );
+  }
+
+  /**
+   * Serialize the entity including model path
+   */
   serialize(): EntityData {
-    const meshData: EntityData = {
+    return {
       id: this.entityId,
       name: this.entityName,
       type: "mesh3d",
@@ -656,155 +543,189 @@ export class Mesh3D extends Entity {
         scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
       },
       visible: this.visible,
-      castShadow: this.castShadow,
-      receiveShadow: this.receiveShadow,
-      physics: this.physicsConfig ? {
-        enabled: true,
-        type: this.physicsConfig.type || "dynamic",
-        mass: this.physicsConfig.mass,
-        restitution: this.physicsConfig.restitution,
-        friction: this.physicsConfig.friction,
-      } : undefined,
-      characterController: this.serializeCharacterController(),
+      castShadow: this.config.castShadow,
+      receiveShadow: this.config.receiveShadow,
       userData: { ...this.userData },
       tags: [...this.metadata.tags],
       layer: this.metadata.layer,
+      physics: this.serializePhysics(),
+      characterController: this.serializeCharacterController(),
       properties: {
-        modelPath: this.modelPath || (this.metadata as any).modelPath,
+        modelPath: this.modelPath,
+        modelUrl: this.modelUrl,
+        centerModel: this.config.centerModel,
+        normalizeScale: this.config.normalizeScale,
+        targetScale: this.config.targetScale,
+        enableDraco: this.config.enableDraco,
+        currentAnimation: this.currentAnimation,
+        animationNames: this.getAnimationNames(),
       }
     };
-
-    this.serializeGeometryAndMaterial(meshData);
-    return meshData;
   }
 
-  private serializeGeometryAndMaterial(meshData: EntityData): void {
-    if (!meshData.properties?.modelPath && this.mesh) {
-      if (this.mesh instanceof THREE.Mesh || this.mesh instanceof THREE.InstancedMesh) {
-        const geometry = this.mesh.geometry;
-        if (geometry) {
-          meshData.geometry = {
-            type: geometry.type,
-            parameters: (geometry as any).parameters || {}
-          };
-        }
-        
-        const material = this.mesh.material;
-        if (material) {
-          meshData.material = {
-            type: (material as any).type,
-            properties: {}
-          };
-          if ('color' in material) {
-            meshData.material.properties.color = (material as any).color.getHex();
-          }
-        }
-      }
-    }
-  }
+  /**
+   * Load model from serialized data
+   */
+  async loadFromSerialized(data: EntityData, projectPath?: string): Promise<void> {
+    if (!data.properties) return;
 
-  // Model loading methods
-  public async loadFromUrl(url: string): Promise<void> {
-    if (!this.assetManager) {
-      throw new Error('AssetManager not set - cannot load model from URL');
-    }
-
-    try {
-      // Use the URL as the asset ID, or generate a unique ID
-      const assetId = `model_${url.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      const gltf = await this.assetManager.loadModel(assetId, url);
-
-      this.clearExistingMesh();
-      this.processGLTF(gltf, {});
-      this.finalizeMeshSetup({
-        castShadow: this.castShadow,
-        receiveShadow: this.receiveShadow
-      });
-    } catch (error) {
-      console.error('Failed to load model from URL:', error);
-      throw error;
-    }
-  }
-
-  public async loadFromPath(projectPath: string, modelPath: string): Promise<void> {
-    if (!this.assetManager) {
-      throw new Error('AssetManager not set - cannot load model from path');
-    }
-
-    try {
-      // Get the asset URL from the project API
-      const assetUrl = await window.projectAPI.getAssetUrl(projectPath, modelPath);
-      if (!assetUrl) {
-        throw new Error(`Could not resolve asset URL for path: ${modelPath}`);
-      }
-
-      // Use the model path as the asset ID for consistency
-      const assetId = `model_${modelPath.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      const gltf = await this.assetManager.loadModel(assetId, assetUrl);
-
-      this.clearExistingMesh();
-      this.processGLTF(gltf, {});
-      this.finalizeMeshSetup({
-        castShadow: this.castShadow,
-        receiveShadow: this.receiveShadow
-      });
-
-      // Store the model path for serialization
-      this.modelPath = modelPath;
-      (this.metadata as any).modelPath = modelPath;
-    } catch (error) {
-      console.error('Failed to load model from path:', error);
-      throw error;
-    }
-  }
-
-  public static async fromSerializedData(data: EntityData, assetManager?: AssetManager): Promise<Mesh3D> {
-    const config: Mesh3DConfig = {
-      name: data.name,
-      position: data.transform?.position ? new THREE.Vector3(
-        data.transform.position.x,
-        data.transform.position.y,
-        data.transform.position.z
-      ) : undefined,
-      rotation: data.transform?.rotation ? new THREE.Euler(
-        data.transform.rotation.x,
-        data.transform.rotation.y,
-        data.transform.rotation.z
-      ) : undefined,
-      scale: data.transform?.scale ? new THREE.Vector3(
-        data.transform.scale.x,
-        data.transform.scale.y,
-        data.transform.scale.z
-      ) : undefined,
-      modelPath: data.properties?.modelPath,
-      castShadow: data.castShadow,
-      receiveShadow: data.receiveShadow,
-    };
-
-    const mesh = new Mesh3D(config);
+    const { modelPath, modelUrl, currentAnimation } = data.properties;
     
-    if (config.modelPath) {
-      mesh.modelPath = config.modelPath;
-      (mesh.metadata as any).modelPath = config.modelPath;
+    if (modelPath && projectPath) {
+      await this.loadFromPath(projectPath, modelPath);
+    } else if (modelUrl) {
+      await this.loadFromUrl(modelUrl);
     }
-
-    if (data.physics) {
-      mesh.physicsConfig = {
-        type: data.physics.type,
-        mass: data.physics.mass,
-        restitution: data.physics.restitution,
-        friction: data.physics.friction,
-      };
+    
+    // Restore animation state if it was playing
+    if (currentAnimation && this.hasAnimations()) {
+      this.playAnimation(currentAnimation);
     }
-
-    if (data.tags) {
-      mesh.metadata.tags = [...data.tags];
-    }
-
-    return mesh;
   }
 
-  // Transform methods removed - using base Entity class implementation
-  // The mesh is added as a child via this.add(this.mesh), so it inherits
-  // the entity's transform automatically through THREE.js parent-child hierarchy
-} 
+     /**
+    * Setup animations from loaded GLTF
+    */
+   private setupAnimations(gltf: GLTF): void {
+     // Clear existing animations
+     this.animationActions.clear();
+     this.animationClips = [];
+     
+     if (gltf.animations && gltf.animations.length > 0) {
+       // Create animation mixer
+       this.animationMixer = new THREE.AnimationMixer(gltf.scene);
+       
+       // Store animation clips
+       this.animationClips = gltf.animations;
+       
+       // Create actions for each animation
+       gltf.animations.forEach((clip) => {
+         const action = this.animationMixer!.clipAction(clip);
+         this.animationActions.set(clip.name, action);
+       });
+     }
+   }
+
+   /**
+    * Get list of available animation names
+    */
+   getAnimationNames(): string[] {
+     return this.animationClips.map(clip => clip.name);
+   }
+
+   /**
+    * Play an animation by name
+    */
+   playAnimation(animationName: string, fadeTime: number = 0.2): boolean {
+     if (!this.animationMixer || !this.animationActions.has(animationName)) {
+       return false;
+     }
+
+     const action = this.animationActions.get(animationName)!;
+     
+     // Stop current animation if different
+     if (this.currentAnimation && this.currentAnimation !== animationName) {
+       const currentAction = this.animationActions.get(this.currentAnimation);
+       if (currentAction) {
+         if (fadeTime > 0) {
+           currentAction.fadeOut(fadeTime);
+         } else {
+           currentAction.stop();
+         }
+       }
+     }
+
+     // Start new animation
+     if (fadeTime > 0) {
+       action.reset().fadeIn(fadeTime).play();
+     } else {
+       action.reset().play();
+     }
+
+     this.currentAnimation = animationName;
+     return true;
+   }
+
+   /**
+    * Stop current animation
+    */
+   stopAnimation(fadeTime: number = 0.2): void {
+     if (this.currentAnimation) {
+       const action = this.animationActions.get(this.currentAnimation);
+       if (action) {
+         if (fadeTime > 0) {
+           action.fadeOut(fadeTime);
+         } else {
+           action.stop();
+         }
+       }
+       this.currentAnimation = undefined;
+     }
+   }
+
+   /**
+    * Update animation mixer (should be called in render loop)
+    */
+   updateAnimations(deltaTime: number): void {
+     if (this.animationMixer) {
+       this.animationMixer.update(deltaTime);
+     }
+   }
+
+   /**
+    * Get current playing animation name
+    */
+   getCurrentAnimation(): string | undefined {
+     return this.currentAnimation;
+   }
+
+   /**
+    * Check if animations are available
+    */
+   hasAnimations(): boolean {
+     return this.animationClips.length > 0;
+   }
+
+   /**
+    * Get animation mixer for advanced control
+    */
+   getAnimationMixer(): THREE.AnimationMixer | undefined {
+     return this.animationMixer;
+   }
+
+   /**
+    * Cleanup resources
+    */
+   dispose(): void {
+     this.clearMeshes();
+     
+     // Dispose animation mixer
+     if (this.animationMixer) {
+       this.animationMixer.stopAllAction();
+       this.animationActions.clear();
+       this.animationClips = [];
+       this.animationMixer = undefined;
+       this.currentAnimation = undefined;
+     }
+     
+     if (this.loadedGLTF) {
+       // Dispose GLTF resources
+       this.loadedGLTF.scene.traverse((child) => {
+         if (child instanceof THREE.Mesh) {
+           if (child.geometry) {
+             child.geometry.dispose();
+           }
+           if (child.material) {
+             if (Array.isArray(child.material)) {
+               child.material.forEach(mat => mat.dispose());
+             } else {
+               child.material.dispose();
+             }
+           }
+         }
+       });
+     }
+     
+     this.loadedGLTF = undefined;
+   }
+}
