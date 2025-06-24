@@ -111,7 +111,9 @@ export class Sphere extends Entity {
 
   protected createCollider(config: any): void {
     if (this.physicsManager && this.rigidBodyId) {
-      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "ball", this.radius, config);
+      // Use scaled radius to ensure collider matches visual size
+      const scaledRadius = this.getScaledRadius(this.radius);
+      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "ball", scaledRadius, config);
     }
   }
   

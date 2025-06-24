@@ -71,11 +71,15 @@ export class Torus extends Entity {
     
     // For torus, we'll use a convex hull approximation
     // In a more sophisticated implementation, you might want to use compound colliders
+    // Use scaled radius to ensure collider matches visual size
+    const baseRadius = this.dimensions.radius + this.dimensions.tube;
+    const scaledRadius = baseRadius * Math.max(this.scale.x, this.scale.y, this.scale.z);
+    
     this.physicsManager.createCollider(
       this.colliderId!,
       this.rigidBodyId,
       "ball",
-      this.dimensions.radius + this.dimensions.tube
+      scaledRadius
     );
   }
 

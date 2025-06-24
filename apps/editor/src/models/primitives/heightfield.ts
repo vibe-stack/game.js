@@ -232,10 +232,11 @@ export class Heightfield extends Entity {
 
     // Scale represents the total dimensions of the heightfield in world units
     // After rotation: geometry width -> physics Z, geometry depth -> physics X
+    // Apply entity scale to the physics scale
     const scale = new THREE.Vector3(
-      this.dimensions.depth, // X scale: depth becomes X after rotation
-      this.displacementScale, // Y scale: height multiplier
-      this.dimensions.width, // Z scale: width becomes Z after rotation
+      this.dimensions.depth * this.scale.x, // X scale: depth becomes X after rotation
+      this.displacementScale * this.scale.y, // Y scale: height multiplier
+      this.dimensions.width * this.scale.z, // Z scale: width becomes Z after rotation
     );
 
     this.physicsManager.createCollider(

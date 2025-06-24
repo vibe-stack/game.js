@@ -61,15 +61,18 @@ export class Capsule extends Entity {
   protected createCollider(): void {
     if (!this.physicsManager || !this.rigidBodyId) return;
 
+    // Use scaled dimensions to ensure collider matches visual size
+    const scaledDimensions = new THREE.Vector3(
+      this.dimensions.radius * this.scale.x,
+      this.dimensions.length * this.scale.y,
+      this.dimensions.radius * this.scale.z
+    );
+
     this.physicsManager.createCollider(
       this.colliderId!,
       this.rigidBodyId,
       "capsule",
-      new THREE.Vector3(
-        this.dimensions.radius,
-        this.dimensions.length,
-        this.dimensions.radius,
-      ),
+      scaledDimensions,
     );
   }
 

@@ -144,7 +144,9 @@ export class Box extends Entity {
 
   protected createCollider(config: any): void {
     if (this.physicsManager && this.rigidBodyId) {
-      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "cuboid", this.dimensions, config);
+      // Use scaled dimensions to ensure collider matches visual size
+      const scaledDimensions = this.getScaledDimensions(this.dimensions);
+      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "cuboid", scaledDimensions, config);
     }
   }
 

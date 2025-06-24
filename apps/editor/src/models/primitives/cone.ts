@@ -77,12 +77,19 @@ export class Cone extends Entity {
   protected createCollider(): void {
     if (!this.physicsManager || !this.rigidBodyId) return;
     
+    // Use scaled dimensions to ensure collider matches visual size
+    const scaledDimensions = new THREE.Vector3(
+      this.dimensions.radius * Math.max(this.scale.x, this.scale.z),
+      this.dimensions.height * this.scale.y,
+      this.dimensions.radius * Math.max(this.scale.x, this.scale.z)
+    );
+    
     // Use proper cone collider
     this.physicsManager.createCollider(
       this.colliderId!,
       this.rigidBodyId,
       "cone",
-      new THREE.Vector3(this.dimensions.radius, this.dimensions.height, this.dimensions.radius)
+      scaledDimensions
     );
   }
 

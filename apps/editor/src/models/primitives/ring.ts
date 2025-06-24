@@ -80,11 +80,15 @@ export class Ring extends Entity {
     const avgRadius = (this.dimensions.innerRadius + this.dimensions.outerRadius) / 2;
     const thickness = (this.dimensions.outerRadius - this.dimensions.innerRadius) / 2;
     
+    // Use scaled radius to ensure collider matches visual size
+    const baseRadius = avgRadius + thickness;
+    const scaledRadius = baseRadius * Math.max(this.scale.x, this.scale.y, this.scale.z);
+    
     this.physicsManager.createCollider(
       this.colliderId!,
       this.rigidBodyId,
       "ball",
-      avgRadius + thickness
+      scaledRadius
     );
   }
 

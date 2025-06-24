@@ -46,11 +46,14 @@ abstract class Polyhedron extends Entity {
     if (!this.physicsManager || !this.rigidBodyId) return;
     
     // Use sphere collider as approximation for all polyhedrons
+    // Use scaled radius to ensure collider matches visual size
+    const scaledRadius = this.radius * Math.max(this.scale.x, this.scale.y, this.scale.z);
+    
     this.physicsManager.createCollider(
       this.colliderId!,
       this.rigidBodyId,
       "ball",
-      this.radius
+      scaledRadius
     );
   }
 

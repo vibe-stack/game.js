@@ -474,18 +474,18 @@ export class Mesh3D extends Entity {
 
     // Check if this entity has a character controller - if so, create a capsule collider
     if (this.hasCharacterController && this.characterControllerConfig) {
-      // Create capsule collider for character controller
-      const capsuleSize = new THREE.Vector3(
-        this.characterControllerConfig.capsuleRadius * 2,
-        this.characterControllerConfig.capsuleHalfHeight * 2,
-        this.characterControllerConfig.capsuleRadius * 2
+      // Create capsule collider for character controller with scaling
+      const scaledCapsuleSize = new THREE.Vector3(
+        this.characterControllerConfig.capsuleRadius * 2 * Math.max(this.scale.x, this.scale.z),
+        this.characterControllerConfig.capsuleHalfHeight * 2 * this.scale.y,
+        this.characterControllerConfig.capsuleRadius * 2 * Math.max(this.scale.x, this.scale.z)
       );
       
       this.physicsManager.createCollider(
         this.colliderId!, 
         this.rigidBodyId, 
         "capsule", 
-        capsuleSize, 
+        scaledCapsuleSize, 
         config
       );
       return;
@@ -505,12 +505,15 @@ export class Mesh3D extends Entity {
           const size = new THREE.Vector3();
           boundingBox.getSize(size);
           
-          // Create a box collider based on the bounding box
+          // Apply entity scale to the bounding box size
+          const scaledSize = this.getScaledDimensions(size);
+          
+          // Create a box collider based on the scaled bounding box
           this.physicsManager.createCollider(
             this.colliderId!, 
             this.rigidBodyId, 
             "cuboid", 
-            size, 
+            scaledSize, 
             config
           );
           return;
@@ -518,13 +521,14 @@ export class Mesh3D extends Entity {
       }
     }
     
-    // Fallback: create a default box collider
+    // Fallback: create a default scaled box collider
     const defaultSize = new THREE.Vector3(1, 1, 1);
+    const scaledDefaultSize = this.getScaledDimensions(defaultSize);
     this.physicsManager.createCollider(
       this.colliderId!, 
       this.rigidBodyId, 
       "cuboid", 
-      defaultSize, 
+      scaledDefaultSize, 
       config
     );
   }

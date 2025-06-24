@@ -63,12 +63,19 @@ export class Plane extends Entity {
   protected createCollider(config: any): void {
     if (!this.physicsManager || !this.rigidBodyId) return;
     
+    // Use scaled dimensions to ensure collider matches visual size
+    const scaledDimensions = new THREE.Vector3(
+      this.dimensions.width * this.scale.x,
+      0.01 * this.scale.y, // Keep thin but allow Y scaling
+      this.dimensions.height * this.scale.z
+    );
+    
     // Create a thin box collider for the plane
     this.physicsManager.createCollider(
       this.colliderId!,
       this.rigidBodyId,
       "cuboid",
-      new THREE.Vector3(this.dimensions.width, 0.01, this.dimensions.height),
+      scaledDimensions,
       config
     );
   }

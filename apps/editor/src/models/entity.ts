@@ -354,8 +354,35 @@ export abstract class Entity extends THREE.Object3D {
 
   setScale(x: number, y: number = x, z: number = x): this {
     this.scale.set(x, y, z);
+    
+    // Recreate physics collider if it exists to account for scale changes
+    if (this.physicsManager && this.rigidBodyId && this.colliderId) {
+      this.physicsManager.removeCollider(this.colliderId);
+      this.createCollider(this.physicsConfig || {});
+    }
+    
     this.emitChange();
     return this;
+  }
+
+  /**
+   * Helper method to get the scaled dimensions for physics colliders.
+   * All createCollider methods should use this to ensure scale is properly applied.
+   */
+  protected getScaledDimensions(baseDimensions: THREE.Vector3): THREE.Vector3 {
+    return new THREE.Vector3(
+      baseDimensions.x * this.scale.x,
+      baseDimensions.y * this.scale.y,
+      baseDimensions.z * this.scale.z
+    );
+  }
+
+  /**
+   * Helper method to get a scaled radius for spherical colliders.
+   * Uses the maximum scale component to ensure the collider encompasses the scaled mesh.
+   */
+  protected getScaledRadius(baseRadius: number): number {
+    return baseRadius * Math.max(this.scale.x, this.scale.y, this.scale.z);
   }
 
   private updatePhysicsTransform(): void {

@@ -86,20 +86,33 @@ export class Cylinder extends Entity {
     
     // Use proper cylinder collider for regular cylinders (equal radii)
     if (this.dimensions.radiusTop === this.dimensions.radiusBottom) {
+      // Use scaled dimensions to ensure collider matches visual size
+      const scaledDimensions = new THREE.Vector3(
+        this.dimensions.radiusTop * Math.max(this.scale.x, this.scale.z),
+        this.dimensions.height * this.scale.y,
+        this.dimensions.radiusTop * Math.max(this.scale.x, this.scale.z)
+      );
+      
       this.physicsManager.createCollider(
         this.colliderId!,
         this.rigidBodyId,
         "cylinder",
-        new THREE.Vector3(this.dimensions.radiusTop, this.dimensions.height, this.dimensions.radiusTop),
+        scaledDimensions,
         config
       );
     } else {
       // For truncated cones (different radii), use cone collider with the bottom radius
+      const scaledDimensions = new THREE.Vector3(
+        this.dimensions.radiusBottom * Math.max(this.scale.x, this.scale.z),
+        this.dimensions.height * this.scale.y,
+        this.dimensions.radiusBottom * Math.max(this.scale.x, this.scale.z)
+      );
+      
       this.physicsManager.createCollider(
         this.colliderId!,
         this.rigidBodyId,
         "cone",
-        new THREE.Vector3(this.dimensions.radiusBottom, this.dimensions.height, this.dimensions.radiusBottom),
+        scaledDimensions,
         config
       );
     }
