@@ -24,6 +24,16 @@ export default function GameStudioPage() {
     }
   }, [currentProject, navigate]);
 
+  // Expose gameWorldService globally for debugging
+  useEffect(() => {
+    if (gameWorldServiceRef.current) {
+      (window as any).gameWorldService = gameWorldServiceRef.current;
+    }
+    return () => {
+      (window as any).gameWorldService = null;
+    };
+  }, [gameWorldServiceRef.current]);
+
   const handleGoHome = () => {
     if (gameWorldServiceRef.current) {
       gameWorldServiceRef.current.dispose();

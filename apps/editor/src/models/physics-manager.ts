@@ -74,7 +74,7 @@ export class PhysicsManager {
   createCollider(
     id: string,
     rigidBodyId: string,
-    shape: "ball" | "cuboid" | "capsule" | "trimesh" | "heightfield" | "convexhull",
+    shape: "ball" | "cuboid" | "capsule" | "cylinder" | "cone" | "trimesh" | "heightfield" | "convexhull",
     dimensions: THREE.Vector3 | number | { heights: number[][]; scale: THREE.Vector3 } | { vertices: Float32Array; indices?: Uint32Array },
     config?: PhysicsConfig
   ): RapierType.Collider | null {
@@ -113,6 +113,18 @@ export class PhysicsManager {
         const height = typeof dimensions === "number" ? dimensions : (dimensions as THREE.Vector3).y;
         const capsuleRadius = typeof dimensions === "number" ? dimensions / 4 : (dimensions as THREE.Vector3).x / 2;
         colliderDesc = this.rapierModule.ColliderDesc.capsule(height / 2, capsuleRadius);
+        break;
+      }
+      case "cylinder": {
+        const height = typeof dimensions === "number" ? dimensions : (dimensions as THREE.Vector3).y;
+        const radius = typeof dimensions === "number" ? dimensions / 2 : (dimensions as THREE.Vector3).x;
+        colliderDesc = this.rapierModule.ColliderDesc.cylinder(height / 2, radius);
+        break;
+      }
+      case "cone": {
+        const height = typeof dimensions === "number" ? dimensions : (dimensions as THREE.Vector3).y;
+        const radius = typeof dimensions === "number" ? dimensions / 2 : (dimensions as THREE.Vector3).x;
+        colliderDesc = this.rapierModule.ColliderDesc.cone(height / 2, radius);
         break;
       }
       case "convexhull": {
@@ -266,6 +278,7 @@ export class PhysicsManager {
 
     object3D.position.set(translation.x, translation.y, translation.z);
     object3D.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+
   }
 
   applyForce(id: string, force: THREE.Vector3, point?: THREE.Vector3): void {

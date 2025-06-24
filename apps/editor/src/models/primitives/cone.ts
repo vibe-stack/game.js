@@ -77,13 +77,12 @@ export class Cone extends Entity {
   protected createCollider(): void {
     if (!this.physicsManager || !this.rigidBodyId) return;
     
-    // Use a cylinder collider as approximation for cone
-    const radius = this.dimensions.radius * 0.5;
+    // Use proper cone collider
     this.physicsManager.createCollider(
       this.colliderId!,
       this.rigidBodyId,
-      "capsule",
-      new THREE.Vector3(radius, this.dimensions.height, radius)
+      "cone",
+      new THREE.Vector3(this.dimensions.radius, this.dimensions.height, this.dimensions.radius)
     );
   }
 

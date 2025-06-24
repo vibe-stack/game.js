@@ -1,5 +1,6 @@
 import { GameWorld, SceneLoader, SceneSerializer, CharacterController, Entity, AssetManager } from "@/models";
 import useGameStudioStore from "@/stores/game-studio-store";
+import { materialSystem } from "@/services/material-system";
 import { EditorCameraService } from "./editor-camera-service";
 import { SelectionManager } from "./selection-manager";
 import { TransformControlsManager } from "./transform-controls-manager";
@@ -164,15 +165,21 @@ export class GameWorldService {
   }
 
   async saveScene(): Promise<void> {
-    if (!this.gameWorld) throw new Error("Game world not initialized");
+    if (!this.gameWorld) return;
+
+    // FIXED: Clean up duplicate materials before saving
+    const duplicatesRemoved = materialSystem.cleanupDuplicateMaterials();
+    if (duplicatesRemoved > 0) {
+      console.log(`Cleaned up ${duplicatesRemoved} duplicate materials before saving`);
+    }
+
     const { currentProject, currentScene, sceneFileName } = useGameStudioStore.getState();
-    
-    if (!currentProject) throw new Error("No project loaded");
-    if (!currentScene) throw new Error("No scene loaded");
+    if (!currentProject) return;
+    if (!currentScene) return;
 
     try {
-      // Serialize the current scene
-      const sceneData = await this.sceneSerializer.serializeScene(this.gameWorld, currentScene.name || "Untitled Scene");
+      const serializer = new SceneSerializer();
+      const serializedScene = await serializer.serializeScene(this.gameWorld, currentScene.name);
       
       // Use the stored scene filename if available, otherwise fall back to scene ID/name
       let filenameToUse = sceneFileName;
@@ -189,13 +196,35 @@ export class GameWorldService {
         setSceneFileName(filenameToUse);
       }
       
-      // Use the proper IPC method to save the scene
-      await window.projectAPI.saveScene(currentProject.path, filenameToUse, sceneData);
-      
+      await window.projectAPI.saveScene(currentProject.path, filenameToUse, serializedScene);
+      useGameStudioStore.getState().setCurrentScene(serializedScene);
     } catch (error) {
       console.error("Failed to save scene:", error);
       throw error;
     }
+  }
+
+  /**
+   * Clean up duplicate materials in the material system
+   */
+  cleanupDuplicateMaterials(): number {
+    return materialSystem.cleanupDuplicateMaterials();
+  }
+
+  /**
+   * Get material system statistics for debugging
+   */
+  getMaterialSystemStats(): { totalMaterials: number; materialsByCategory: Record<string, number> } {
+    const allMaterials = materialSystem.getAllMaterialDefinitions();
+    const totalMaterials = allMaterials.length;
+    
+    const materialsByCategory: Record<string, number> = {};
+    allMaterials.forEach(material => {
+      const category = material.metadata.category || 'uncategorized';
+      materialsByCategory[category] = (materialsByCategory[category] || 0) + 1;
+    });
+
+    return { totalMaterials, materialsByCategory };
   }
 
   play(): void {

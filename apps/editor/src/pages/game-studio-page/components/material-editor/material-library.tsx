@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from "react";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MaterialDefinition } from "@/types/project";
 import { materialSystem } from "@/services/material-system";
+import { MaterialCreationService } from "./material-creation-service";
 import { CreateMaterialDialog } from "./create-material-dialog";
+import { toast } from "sonner";
 
 interface MaterialLibraryProps {
   selectedMaterial: MaterialDefinition | null;
@@ -52,6 +54,25 @@ export function MaterialLibrary({ selectedMaterial, onMaterialSelect }: Material
     onMaterialSelect(newMaterial);
   };
 
+  const handleCleanupDuplicates = () => {
+    const duplicatesRemoved = MaterialCreationService.cleanupDuplicates();
+    if (duplicatesRemoved > 0) {
+      toast.success(`Cleaned up ${duplicatesRemoved} duplicate materials`);
+      setRefreshKey(prev => prev + 1); // Refresh the list
+    } else {
+      toast.info("No duplicate materials found");
+    }
+  };
+
+  const materialsByCategory = useMemo(() => {
+    const categoryCount: Record<string, number> = {};
+    allMaterials.forEach(material => {
+      const category = material.metadata.category || 'uncategorized';
+      categoryCount[category] = (categoryCount[category] || 0) + 1;
+    });
+    return categoryCount;
+  }, [allMaterials]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Search and Create */}
@@ -91,7 +112,7 @@ export function MaterialLibrary({ selectedMaterial, onMaterialSelect }: Material
       </div>
 
       {/* Material List */}
-      <div className="flex-1 max-h-[500px] overflow-y-auto">
+      <div className="flex-1 max-h-[400px] overflow-y-auto">
         <div className="space-y-1 p-2">
           {filteredMaterials.map((material) => (
             <div
@@ -128,6 +149,32 @@ export function MaterialLibrary({ selectedMaterial, onMaterialSelect }: Material
             {searchQuery ? "No materials found matching your search" : "No materials available"}
           </div>
         )}
+      </div>
+
+      {/* Debug Panel - Simple and Non-Intrusive */}
+      <div className="border-t border-gray-700 p-3 bg-gray-800/50">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-gray-300">
+            Debug: {allMaterials.length} materials
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCleanupDuplicates}
+            className="h-6 px-2 text-xs"
+          >
+            <Trash2 className="w-3 h-3 mr-1" />
+            Clean Dupes
+          </Button>
+        </div>
+        <div className="text-xs text-gray-400 space-y-1">
+          {Object.entries(materialsByCategory).map(([category, count]) => (
+            <div key={category} className="flex justify-between">
+              <span>{category}:</span>
+              <span>{count}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <CreateMaterialDialog

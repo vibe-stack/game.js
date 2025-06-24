@@ -27,25 +27,25 @@ export class MaterialCreationService {
   }
 
   /**
-   * Add a material to the material system
+   * Add a material to the material system - FIXED: No longer creates duplicate libraries
    */
   static addMaterialToSystem(material: MaterialDefinition): void {
-    // Create a temporary library for the new material
-    const tempLibrary = {
-      id: 'user-materials',
-      name: 'User Materials',
-      version: '1.0.0',
-      materials: [material],
-      sharedShaderGraphs: [],
-      sharedTextures: [],
-      metadata: {
-        created: new Date(),
-        modified: new Date()
-      }
-    };
+    // Use the new addMaterialDefinition method instead of creating new libraries
+    materialSystem.addMaterialDefinition(material);
+  }
 
-    // Load into material system
-    materialSystem.loadMaterialLibrary(tempLibrary);
+  /**
+   * Update an existing material in the system
+   */
+  static updateMaterialInSystem(material: MaterialDefinition): void {
+    materialSystem.updateMaterialDefinition(material);
+  }
+
+  /**
+   * Clean up duplicate materials in the system
+   */
+  static cleanupDuplicates(): number {
+    return materialSystem.cleanupDuplicateMaterials();
   }
 
   /**

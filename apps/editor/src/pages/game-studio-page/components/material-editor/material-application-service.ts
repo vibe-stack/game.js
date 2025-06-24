@@ -46,39 +46,8 @@ export class MaterialApplicationService {
    */
   private static async updateMaterialInRegistry(materialDefinition: MaterialDefinition): Promise<void> {
     try {
-      // Check if material exists in registry
-      const existingMaterial = materialSystem.getMaterialDefinition(materialDefinition.id);
-      
-      if (existingMaterial) {
-        // Update existing material - we need to update the internal registry
-        // Since materialSystem doesn't have an update method, we need to work around this
-        materialSystem.loadMaterialLibrary({
-          id: 'updated-materials',
-          name: 'Updated Materials',
-          version: '1.0.0',
-          materials: [materialDefinition],
-          sharedShaderGraphs: [],
-          sharedTextures: [],
-          metadata: {
-            created: new Date(),
-            modified: new Date()
-          }
-        });
-      } else {
-        // Add new material to registry
-        materialSystem.loadMaterialLibrary({
-          id: 'new-materials',
-          name: 'New Materials',
-          version: '1.0.0',
-          materials: [materialDefinition],
-          sharedShaderGraphs: [],
-          sharedTextures: [],
-          metadata: {
-            created: new Date(),
-            modified: new Date()
-          }
-        });
-      }
+      // Use the new material system methods instead of creating new libraries
+      materialSystem.addMaterialDefinition(materialDefinition);
     } catch (error) {
       console.error('Failed to update material in registry:', error);
     }
@@ -235,6 +204,7 @@ export class MaterialApplicationService {
 
   /**
    * Get the current material from an entity and convert it to a MaterialDefinition
+   * FIXED: Now reuses existing materials instead of creating new ones for each entity
    */
   static getCurrentMaterialFromEntity(entity: Entity): MaterialDefinition | null {
     try {
@@ -245,7 +215,13 @@ export class MaterialApplicationService {
       const threeMaterial = (entity as any).getMaterial();
       if (!threeMaterial) return null;
 
-      // Convert THREE.js material back to MaterialDefinition
+      // First, try to find an existing material that matches this THREE.js material
+      const existingMaterial = this.findMatchingMaterialDefinition(threeMaterial);
+      if (existingMaterial) {
+        return existingMaterial;
+      }
+
+      // Only create a new material definition if we can't find a matching one
       return this.convertThreeMaterialToDefinition(threeMaterial, entity.entityId.toString());
     } catch (error) {
       console.error('Failed to get current material from entity:', error);
@@ -254,19 +230,90 @@ export class MaterialApplicationService {
   }
 
   /**
+   * Find an existing MaterialDefinition that matches the given THREE.js material
+   */
+  private static findMatchingMaterialDefinition(threeMaterial: THREE.Material): MaterialDefinition | null {
+    const allMaterials = materialSystem.getAllMaterialDefinitions();
+    
+    for (const materialDef of allMaterials) {
+      if (this.doesMaterialMatchDefinition(threeMaterial, materialDef)) {
+        return materialDef;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Check if a THREE.js material matches a MaterialDefinition
+   */
+  private static doesMaterialMatchDefinition(threeMaterial: THREE.Material, materialDef: MaterialDefinition): boolean {
+    // Check material type
+    const materialType = this.getThreeMaterialType(threeMaterial);
+    if (materialType !== materialDef.type) {
+      return false;
+    }
+
+    // Check key properties
+    const props = materialDef.properties;
+    
+    // Check color
+    if ('color' in threeMaterial && props.color) {
+      const currentColor = '#' + (threeMaterial as any).color.getHexString();
+      if (currentColor !== props.color) {
+        return false;
+      }
+    }
+
+    // Check opacity
+    if (Math.abs(threeMaterial.opacity - (props.opacity || 1)) > 0.001) {
+      return false;
+    }
+
+    // Check transparency
+    if (threeMaterial.transparent !== (props.transparent || false)) {
+      return false;
+    }
+
+    // Check material-specific properties
+    if ('metalness' in threeMaterial && props.metalness !== undefined) {
+      if (Math.abs((threeMaterial as any).metalness - props.metalness) > 0.001) {
+        return false;
+      }
+    }
+
+    if ('roughness' in threeMaterial && props.roughness !== undefined) {
+      if (Math.abs((threeMaterial as any).roughness - props.roughness) > 0.001) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Get the material type string from a THREE.js material
+   */
+  private static getThreeMaterialType(material: THREE.Material): MaterialDefinition['type'] {
+    if (material instanceof THREE.MeshBasicMaterial) return 'basic';
+    if (material instanceof THREE.MeshLambertMaterial) return 'lambert';
+    if (material instanceof THREE.MeshPhongMaterial) return 'phong';
+    if (material instanceof THREE.MeshStandardMaterial) return 'standard';
+    if (material instanceof THREE.MeshPhysicalMaterial) return 'physical';
+    if (material instanceof THREE.MeshToonMaterial) return 'toon';
+    return 'standard';
+  }
+
+  /**
    * Convert THREE.js material to MaterialDefinition
+   * FIXED: Now creates reusable materials instead of entity-specific ones
    */
   private static convertThreeMaterialToDefinition(material: THREE.Material, entityId: string): MaterialDefinition {
     let type: MaterialDefinition['type'] = 'standard';
     const properties: any = {};
 
     // Determine material type
-    if (material instanceof THREE.MeshBasicMaterial) type = 'basic';
-    else if (material instanceof THREE.MeshLambertMaterial) type = 'lambert';
-    else if (material instanceof THREE.MeshPhongMaterial) type = 'phong';
-    else if (material instanceof THREE.MeshStandardMaterial) type = 'standard';
-    else if (material instanceof THREE.MeshPhysicalMaterial) type = 'physical';
-    else if (material instanceof THREE.MeshToonMaterial) type = 'toon';
+    type = this.getThreeMaterialType(material);
 
     // Extract common properties
     if ('color' in material) {
@@ -297,15 +344,37 @@ export class MaterialApplicationService {
       properties.shininess = (material as any).shininess;
     }
 
-    return {
-      id: `entity-material-${entityId}`,
-      name: `${material.constructor.name} (${entityId})`,
+    // Create a reusable material ID based on content, not entity
+    const materialSignature = JSON.stringify({ type, properties });
+    const materialHash = this.hashString(materialSignature);
+    
+    const materialDefinition: MaterialDefinition = {
+      id: `auto-material-${type}-${materialHash}`,
+      name: `Auto ${type.charAt(0).toUpperCase() + type.slice(1)} Material`,
       type,
       properties,
       metadata: {
-        category: 'entity',
-        tags: ['entity', type]
+        category: 'auto-generated',
+        tags: ['auto-generated', type]
       }
     };
+
+    // Add the new material to the system
+    materialSystem.addMaterialDefinition(materialDefinition);
+
+    return materialDefinition;
+  }
+
+  /**
+   * Simple hash function for creating consistent material IDs
+   */
+  private static hashString(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(16);
   }
 } 

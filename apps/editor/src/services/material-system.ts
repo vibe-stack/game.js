@@ -58,6 +58,140 @@ export class MaterialSystem {
       );
   }
 
+  // NEW: Update existing material definition
+  updateMaterialDefinition(materialDefinition: MaterialDefinition): void {
+    // Update the material definition in the registry
+    this.materialDefinitions.set(materialDefinition.id, materialDefinition);
+    
+    // Clear compiled material cache to force regeneration
+    this.compiledMaterials.delete(materialDefinition.id);
+    
+    // Update the material in its library
+    for (const [libraryId, library] of this.materialLibraries) {
+      const materialIndex = library.materials.findIndex(m => m.id === materialDefinition.id);
+      if (materialIndex !== -1) {
+        library.materials[materialIndex] = materialDefinition;
+        library.metadata.modified = new Date();
+        break;
+      }
+    }
+  }
+
+  // NEW: Add single material without creating new library
+  addMaterialDefinition(materialDefinition: MaterialDefinition): void {
+    // Check if material already exists
+    if (this.materialDefinitions.has(materialDefinition.id)) {
+      this.updateMaterialDefinition(materialDefinition);
+      return;
+    }
+
+    // Add to definitions registry
+    this.materialDefinitions.set(materialDefinition.id, materialDefinition);
+
+    // Find or create user materials library
+    let userLibrary = this.materialLibraries.get('user-materials');
+    if (!userLibrary) {
+      userLibrary = {
+        id: 'user-materials',
+        name: 'User Materials',
+        version: '1.0.0',
+        materials: [],
+        sharedShaderGraphs: [],
+        sharedTextures: [],
+        metadata: {
+          created: new Date(),
+          modified: new Date()
+        }
+      };
+      this.materialLibraries.set('user-materials', userLibrary);
+    }
+
+    // Add material to user library
+    userLibrary.materials.push(materialDefinition);
+    userLibrary.metadata.modified = new Date();
+  }
+
+  // NEW: Remove material definition
+  removeMaterialDefinition(materialId: string): boolean {
+    if (!this.materialDefinitions.has(materialId)) {
+      return false;
+    }
+
+    // Remove from definitions registry
+    this.materialDefinitions.delete(materialId);
+    
+    // Clear compiled material cache
+    this.compiledMaterials.delete(materialId);
+
+    // Remove from all libraries
+    for (const [libraryId, library] of this.materialLibraries) {
+      const materialIndex = library.materials.findIndex(m => m.id === materialId);
+      if (materialIndex !== -1) {
+        library.materials.splice(materialIndex, 1);
+        library.metadata.modified = new Date();
+      }
+    }
+
+    return true;
+  }
+
+  // NEW: Clean up duplicate materials by consolidating identical ones
+  cleanupDuplicateMaterials(): number {
+    const materialsByContent = new Map<string, MaterialDefinition[]>();
+    let duplicatesRemoved = 0;
+
+    // Group materials by their content signature
+    for (const material of this.materialDefinitions.values()) {
+      const signature = this.getMaterialSignature(material);
+      if (!materialsByContent.has(signature)) {
+        materialsByContent.set(signature, []);
+      }
+      materialsByContent.get(signature)!.push(material);
+    }
+
+    // Remove duplicates, keeping the oldest one (first in timestamp)
+    for (const [signature, materials] of materialsByContent) {
+      if (materials.length > 1) {
+        // Sort by creation time, keep the first one
+        materials.sort((a, b) => {
+          const aTime = this.getMaterialCreationTime(a);
+          const bTime = this.getMaterialCreationTime(b);
+          return aTime - bTime;
+        });
+
+        const keepMaterial = materials[0];
+        const duplicates = materials.slice(1);
+
+        // Remove duplicates
+        for (const duplicate of duplicates) {
+          this.removeMaterialDefinition(duplicate.id);
+          duplicatesRemoved++;
+        }
+      }
+    }
+
+    return duplicatesRemoved;
+  }
+
+  // Helper method to create material signature for duplicate detection
+  private getMaterialSignature(material: MaterialDefinition): string {
+    return JSON.stringify({
+      type: material.type,
+      properties: material.properties,
+      // Exclude id, name, and timestamps from signature
+    });
+  }
+
+  // Helper method to extract creation time from material
+  private getMaterialCreationTime(material: MaterialDefinition): number {
+    // Try to extract timestamp from ID
+    const timestampMatch = material.id.match(/material-(\d+)-/);
+    if (timestampMatch) {
+      return parseInt(timestampMatch[1], 10);
+    }
+    return 0; // Default to 0 if no timestamp found
+  }
+
   // Texture Management
   async loadTexture(asset: EnhancedAssetReference): Promise<THREE.Texture> {
     if (this.loadedTextures.has(asset.id)) {

@@ -65,24 +65,12 @@ export class SceneLoader {
       if (materialAsset.metadata?.materialDefinition) {
         const materialDef = materialAsset.metadata.materialDefinition;
         
-        // Add the material definition to the material system
-        materialSystem.loadMaterialLibrary({
-          id: `scene-materials-${Date.now()}`,
-          name: 'Scene Materials',
-          version: '1.0.0',
-          materials: [materialDef],
-          sharedShaderGraphs: [],
-          sharedTextures: [],
-          metadata: {
-            created: new Date(),
-            modified: new Date()
-          }
-        });
+        // FIXED: Use the new material system methods instead of creating new libraries
+        materialSystem.addMaterialDefinition(materialDef);
         
         // Create the THREE.js material and store it in the context
         const threeMaterial = await this.createMaterialFromDefinition(materialDef);
         context.materials.set(materialDef.id, threeMaterial);
-        
       }
     }
     
@@ -91,22 +79,11 @@ export class SceneLoader {
       const materials = (sceneData.metadata as any).materials;
       for (const materialDef of materials) {
         if (!context.materials.has(materialDef.id)) {
-          materialSystem.loadMaterialLibrary({
-            id: `scene-materials-metadata-${Date.now()}`,
-            name: 'Scene Materials (Metadata)',
-            version: '1.0.0',
-            materials: [materialDef],
-            sharedShaderGraphs: [],
-            sharedTextures: [],
-            metadata: {
-              created: new Date(),
-              modified: new Date()
-            }
-          });
+          // FIXED: Use the new material system methods instead of creating new libraries
+          materialSystem.addMaterialDefinition(materialDef);
           
           const threeMaterial = await this.createMaterialFromDefinition(materialDef);
           context.materials.set(materialDef.id, threeMaterial);
-          
         }
       }
     }
