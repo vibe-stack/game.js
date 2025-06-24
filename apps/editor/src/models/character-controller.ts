@@ -85,6 +85,12 @@ export class CharacterController {
     jump: boolean;
   };
   
+  // Jump buffering for better responsiveness
+  private jumpBuffer: number = 0;
+  private coyoteTime: number = 0;
+  private readonly JUMP_BUFFER_TIME = 0.15; // 150ms jump buffer
+  private readonly COYOTE_TIME = 0.1; // 100ms coyote time
+  
   // Camera
   private cameraId: string;
   private pointerLocked: boolean = false;
@@ -350,8 +356,7 @@ export class CharacterController {
       // Also rotate the character body to match camera yaw for movement direction
       this.character.setRotation(0, this.state.cameraRotation.yaw, 0);
     } else {
-      // For third-person mode, rotate the character
-      this.character.setRotation(0, this.state.cameraRotation.yaw, 0);
+      // For third-person mode, don't rotate the character here - let movement handle it
       
       // Update camera follow offset based on rotation
       const followConfig = this.cameraManager.getCameraFollow(this.cameraId);
@@ -361,11 +366,12 @@ export class CharacterController {
         const yaw = this.state.cameraRotation.yaw;
         const pitch = this.state.cameraRotation.pitch;
         
-        // Calculate camera offset based on spherical coordinates
+        // Calculate camera offset to position it behind the character
+        // Use negative distance values to position camera behind
         const offset = new THREE.Vector3(
-          Math.sin(yaw) * Math.cos(pitch) * distance,
+          -Math.sin(yaw) * Math.cos(pitch) * distance,
           height + Math.sin(pitch) * distance,
-          Math.cos(yaw) * Math.cos(pitch) * distance
+          -Math.cos(yaw) * Math.cos(pitch) * distance
         );
         
         followConfig.offset = offset;
@@ -407,12 +413,15 @@ export class CharacterController {
   private updateInputState(): void {
     const inputState = this.inputManager.getInputState();
     
-    this.inputState.forward = inputState.keyboard.get("KeyW") || false;
-    this.inputState.backward = inputState.keyboard.get("KeyS") || false;
-    this.inputState.left = inputState.keyboard.get("KeyA") || false;
-    this.inputState.right = inputState.keyboard.get("KeyD") || false;
-    this.inputState.jump = inputState.keyboard.get("Space") || false;
-    this.inputState.sprint = inputState.keyboard.get("ShiftLeft") || false;
+    // Support multiple keys for movement (including arrow keys) to handle keyboard ghosting
+    this.inputState.forward = inputState.keyboard.get("KeyW") || inputState.keyboard.get("ArrowUp") || false;
+    this.inputState.backward = inputState.keyboard.get("KeyS") || inputState.keyboard.get("ArrowDown") || false;
+    this.inputState.left = inputState.keyboard.get("KeyA") || inputState.keyboard.get("ArrowLeft") || false;
+    this.inputState.right = inputState.keyboard.get("KeyD") || inputState.keyboard.get("ArrowRight") || false;
+    
+    // Support multiple keys for jumping and sprinting
+    this.inputState.jump = inputState.keyboard.get("Space") || inputState.keyboard.get("KeyJ") || false;
+    this.inputState.sprint = inputState.keyboard.get("ShiftLeft") || inputState.keyboard.get("ShiftRight") || inputState.keyboard.get("KeyX") || false;
     
     // Calculate input direction based on camera yaw (consistent for all modes)
     this.state.inputDirection.set(0, 0, 0);
@@ -421,13 +430,44 @@ export class CharacterController {
     const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
     
-    if (this.inputState.forward) this.state.inputDirection.add(forward);
-    if (this.inputState.backward) this.state.inputDirection.sub(forward);
-    if (this.inputState.right) this.state.inputDirection.add(right);
-    if (this.inputState.left) this.state.inputDirection.sub(right);
+    if (this.inputState.forward) {
+      if (this.config.cameraMode === "third-person") {
+        this.state.inputDirection.sub(forward);
+      } else {
+        this.state.inputDirection.add(forward);
+      }
+    }
+    if (this.inputState.backward) {
+      if (this.config.cameraMode === "third-person") {
+        this.state.inputDirection.add(forward);
+      } else {
+        this.state.inputDirection.sub(forward);
+      }
+    }
+    if (this.inputState.right) {
+      if (this.config.cameraMode === "third-person") {
+        this.state.inputDirection.sub(right);
+      } else {
+        this.state.inputDirection.add(right);
+
+      }
+    }
+    if (this.inputState.left) {
+      if (this.config.cameraMode === "third-person") {
+        this.state.inputDirection.add(right);
+      } else {
+        this.state.inputDirection.sub(right);
+      }
+    }
     
     if (this.state.inputDirection.length() > 0) {
       this.state.inputDirection.normalize();
+      
+      // In third-person mode, rotate character to face movement direction
+      if (this.config.cameraMode === "third-person") {
+        const movementYaw = Math.atan2(this.state.inputDirection.x, this.state.inputDirection.z);
+        this.character.setRotation(0, movementYaw, 0);
+      }
     }
     
     this.state.isSprinting = this.inputState.sprint;
@@ -506,11 +546,27 @@ export class CharacterController {
       return;
     }
 
-    // Handle jump input
-    const jumpPressed = this.inputState.jump && !this.previousInputState.jump;
-    if (jumpPressed && this.state.isGrounded) {
+    // Update jump buffer and coyote time
+    if (this.inputState.jump && !this.previousInputState.jump) {
+      this.jumpBuffer = this.JUMP_BUFFER_TIME;
+    }
+    if (this.jumpBuffer > 0) {
+      this.jumpBuffer -= deltaTime;
+    }
+    
+    if (this.state.isGrounded) {
+      this.coyoteTime = this.COYOTE_TIME;
+    } else if (this.coyoteTime > 0) {
+      this.coyoteTime -= deltaTime;
+    }
+
+    // Handle jump input with buffering and coyote time
+    const canJump = (this.state.isGrounded || this.coyoteTime > 0) && !this.state.isJumping;
+    if (this.jumpBuffer > 0 && canJump) {
       this.verticalVelocity = this.config.jumpForce;
       this.state.isJumping = true;
+      this.jumpBuffer = 0; // Consume the jump buffer
+      this.coyoteTime = 0; // Consume coyote time
     }
     this.previousInputState.jump = this.inputState.jump;
 
@@ -522,20 +578,26 @@ export class CharacterController {
       this.verticalVelocity = this.config.maxFallSpeed;
     }
 
-    // Calculate horizontal movement
+    // Calculate horizontal movement with improved responsiveness
     const targetSpeed = this.config.maxSpeed * (this.state.isSprinting ? this.config.sprintMultiplier : 1.0);
+    const targetVelocity = this.state.inputDirection.clone().multiplyScalar(targetSpeed);
     
     if (this.state.isMoving) {
-      // Lerp towards target velocity for smooth acceleration
-      this.desiredVelocity.lerp(
-        this.state.inputDirection.clone().multiplyScalar(targetSpeed),
-        Math.min(1.0, this.config.acceleration * deltaTime)
-      );
+      // Check if we're changing direction - use faster acceleration for direction changes
+      const currentDirection = this.desiredVelocity.clone().normalize();
+      const targetDirection = this.state.inputDirection.clone();
+      const directionAlignment = currentDirection.dot(targetDirection);
+      
+      // Use faster acceleration when changing direction or starting from rest
+      const accelerationMultiplier = (directionAlignment < 0.5 || this.desiredVelocity.length() < 0.1) ? 2.0 : 1.0;
+      const accelerationRate = Math.min(1.0, this.config.acceleration * accelerationMultiplier * deltaTime);
+      
+      this.desiredVelocity.lerp(targetVelocity, accelerationRate);
     } else {
-      // Decelerate when no input
+      // Faster deceleration for better stopping control
       this.desiredVelocity.lerp(
         new THREE.Vector3(0, 0, 0),
-        Math.min(1.0, this.config.acceleration * 2.0 * deltaTime)
+        Math.min(1.0, this.config.acceleration * 3.0 * deltaTime)
       );
     }
 
@@ -568,19 +630,36 @@ export class CharacterController {
         // Update character visual position
         this.character.setPosition(newTranslation.x, newTranslation.y, newTranslation.z);
         
-        // Check if we're grounded based on vertical movement
+        // More reliable grounded detection
+        const wasGrounded = this.state.isGrounded;
         const verticalMovement = correctedMovement.y;
-        const expectedVerticalMovement = this.verticalVelocity * deltaTime;
         
-        // If we didn't fall as much as expected, we're probably grounded
-        if (this.verticalVelocity <= 0 && Math.abs(verticalMovement) < Math.abs(expectedVerticalMovement * 0.1)) {
-          this.state.isGrounded = true;
+        // Check if we hit something below us
+        let groundCollision = false;
+        for (let i = 0; i < this.rapierCharacterController.numComputedCollisions(); i++) {
+          const collision = this.rapierCharacterController.computedCollision(i);
+          // Check if collision normal points upward (ground collision)
+          if (collision && collision.normal2.y > 0.7) { // 0.7 ~= cos(45°), reasonable slope threshold
+            groundCollision = true;
+            break;
+          }
+        }
+        
+        // We're grounded if:
+        // 1. We had downward velocity but didn't move down much (hit ground)
+        // 2. We have a ground collision
+        // 3. We were already grounded and have minimal vertical movement
+        const hitGround = this.verticalVelocity < -0.5 && Math.abs(verticalMovement) < 0.01;
+        const stayingGrounded = wasGrounded && Math.abs(verticalMovement) < 0.02 && this.verticalVelocity <= 0.1;
+        
+        this.state.isGrounded = groundCollision || hitGround || stayingGrounded;
+        
+        // If we just landed, reset vertical velocity and jumping state
+        if (this.state.isGrounded && (!wasGrounded || this.verticalVelocity < 0)) {
           this.verticalVelocity = 0;
-          if (this.state.isJumping) {
+          if (this.state.isJumping && this.verticalVelocity <= 0) {
             this.state.isJumping = false;
           }
-        } else {
-          this.state.isGrounded = false;
         }
 
         // Update state velocity for external systems
