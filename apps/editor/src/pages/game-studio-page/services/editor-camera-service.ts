@@ -1,5 +1,5 @@
 import * as THREE from "three/webgpu";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GameWorld } from "@/models";
 
 export class EditorCameraService {

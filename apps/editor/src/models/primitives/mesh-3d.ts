@@ -1,6 +1,6 @@
 import * as THREE from "three/webgpu";
-import { GLTF, GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
+import { GLTF, GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { Entity } from "../entity";
 import { EntityConfig } from "../types";
 import { EntityData } from "../scene-loader";

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { DragInput } from "@/components/ui/drag-input";
+import { Vector3Input } from "./vector3-input";
 import {
   Select,
   SelectContent,
@@ -196,6 +197,19 @@ export function CharacterControllerProperties({
             max={2}
             compact
             className="text-xs"
+          />
+        </div>
+        
+        {/* Collider Offset */}
+        <div className="space-y-2">
+          <Vector3Input
+            label="Collider Offset"
+            value={config.colliderOffset}
+            onChange={(value) => handleConfigChange("colliderOffset", value)}
+            step={0.1}
+            precision={2}
+            min={-5}
+            max={5}
           />
         </div>
       </div>

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import * as THREE from "three/webgpu";
-import { GLTFLoader, GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { GLTFLoader, GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { GameWorldService } from "../../services/game-world-service";
 import { Mesh3D } from "@/models/primitives/mesh-3d";
 import useGameStudioStore from "@/stores/game-studio-store";
@@ -177,10 +177,9 @@ export default function FileBrowser({ gameWorldService }: FileBrowserProps) {
             material: child.material,
             castShadow: true,
             receiveShadow: true,
+            modelPath: fileItem.path,
+            modelUrl: assetUrl,
           });
-
-          // Store the model path for serialization
-          (mesh.metadata as any).modelPath = fileItem.path;
 
           // Add physics configuration
           mesh.physicsConfig = {
@@ -194,9 +193,11 @@ export default function FileBrowser({ gameWorldService }: FileBrowserProps) {
           gameWorld.createEntity(mesh);
 
           // Select the new entity
-          const selectionManager = gameWorldService.current.getSelectionManager();
-          selectionManager.onEntityAdded(mesh);
-          selectionManager.selectEntity(mesh.entityId);
+          const selectionManager = gameWorldService.current?.getSelectionManager();
+          if (selectionManager) {
+            selectionManager.onEntityAdded(mesh);
+            selectionManager.selectEntity(mesh.entityId);
+          }
 
           toast.success(`Added ${fileItem.name} to scene`);
         }

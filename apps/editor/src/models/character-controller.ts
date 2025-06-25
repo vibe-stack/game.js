@@ -10,6 +10,9 @@ export interface CharacterControllerConfig {
   capsuleHalfHeight: number;
   capsuleRadius: number;
   
+  // Collider positioning - offset from the entity's origin
+  colliderOffset: THREE.Vector3;
+  
   // Movement physics
   maxSpeed: number;
   acceleration: number;
@@ -119,6 +122,7 @@ export class CharacterController {
     this.config = {
       capsuleHalfHeight: 0.9,
       capsuleRadius: 0.4,
+      colliderOffset: new THREE.Vector3(0, 0, 0),
       maxSpeed: 8.0,
       acceleration: 50.0,
       jumpForce: 12.0,
@@ -628,7 +632,16 @@ export class CharacterController {
         rigidBody.setNextKinematicTranslation(newTranslation);
         
         // Update character visual position
-        this.character.setPosition(newTranslation.x, newTranslation.y, newTranslation.z);
+        const visualPosition = new THREE.Vector3(newTranslation.x, newTranslation.y, newTranslation.z);
+        if (this.config.colliderOffset) {
+          visualPosition.sub(this.config.colliderOffset);
+        }
+        
+        // IMPORTANT: We set the position directly on the THREE.Object3D,
+        // bypassing the Entity's setPosition method to avoid the feedback loop
+        // where updatePhysicsTransform would be called again.
+        this.character.position.copy(visualPosition);
+        (this.character as any).emitChange();
         
         // More reliable grounded detection
         const wasGrounded = this.state.isGrounded;
@@ -771,6 +784,7 @@ export const FPS_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
   cameraMode: "first-person",
   cameraDistance: 0,
   cameraHeight: 1.7,
+  colliderOffset: new THREE.Vector3(0, 0, 0),
   maxSpeed: 10.0,
   acceleration: 80.0,
   jumpForce: 15.0,
@@ -782,6 +796,7 @@ export const THIRD_PERSON_CHARACTER_CONFIG: Partial<CharacterControllerConfig> =
   cameraMode: "third-person",
   cameraDistance: -8.0,
   cameraHeight: 2.0,
+  colliderOffset: new THREE.Vector3(0, 0, 0),
   maxSpeed: 6.0,
   acceleration: 50.0,
   jumpForce: 12.0,
@@ -792,6 +807,7 @@ export const PLATFORMER_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
   cameraMode: "third-person",
   cameraDistance: -12.0,
   cameraHeight: 3.0,
+  colliderOffset: new THREE.Vector3(0, 0, 0),
   maxSpeed: 8.0,
   acceleration: 60.0,
   jumpForce: 18.0,

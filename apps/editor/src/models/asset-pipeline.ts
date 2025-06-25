@@ -1,5 +1,5 @@
 import * as THREE from "three/webgpu";
-import { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { AssetManager, AssetData, LoadingProgress } from "./asset-manager";
 
 // Asset pipeline configuration

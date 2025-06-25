@@ -54,7 +54,7 @@ export class GameWorldService {
         this.selectionManager.initialize(this.gameWorld);
         
         // Initialize transform controls manager
-        this.transformControlsManager.initialize(this.gameWorld, canvas);
+        await this.transformControlsManager.initialize(this.gameWorld, canvas);
         
         // Connect orbit controls to transform controls manager
         const orbitControls = this.editorCameraService.getOrbitControls();
@@ -110,8 +110,8 @@ export class GameWorldService {
         // Reinitialize selection manager after scene reload
         this.selectionManager.initialize(this.gameWorld);
         
-        // Reinitialize transform controls manager after scene reload
-        this.transformControlsManager.initialize(this.gameWorld, canvas);
+        // Reinitialize transform controls manager AFTER scene is loaded (so entities exist)
+        await this.transformControlsManager.initialize(this.gameWorld, canvas);
         
         // Connect orbit controls to transform controls manager
         const orbitControls = this.editorCameraService.getOrbitControls();

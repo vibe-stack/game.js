@@ -316,7 +316,14 @@ export abstract class Entity extends THREE.Object3D {
   private setupPhysics(config: PhysicsConfig): void {
     if (!this.physicsManager) return;
     this.rigidBodyId = `${this.entityId}_body`;
-    const rigidBody = this.physicsManager.createRigidBody(this.rigidBodyId, config, this.position, this.quaternion);
+    
+    // Calculate physics body position with collider offset for character controllers
+    let physicsPosition = this.position.clone();
+    if (this.hasCharacterController && this.characterControllerConfig) {
+      physicsPosition.add(this.characterControllerConfig.colliderOffset);
+    }
+    
+    const rigidBody = this.physicsManager.createRigidBody(this.rigidBodyId, config, physicsPosition, this.quaternion);
     if (rigidBody) {
       this.colliderId = `${this.entityId}_collider`;
       this.createCollider(config);
@@ -389,16 +396,56 @@ export abstract class Entity extends THREE.Object3D {
     if (!this.physicsManager || !this.rigidBodyId) return;
     const rigidBody = this.physicsManager.getRigidBody(this.rigidBodyId);
     if (rigidBody) {
-      rigidBody.setTranslation(this.position, true);
+      // Calculate physics body position with collider offset for character controllers
+      let physicsPosition = this.position.clone();
+      if (this.hasCharacterController && this.characterControllerConfig) {
+        physicsPosition.add(this.characterControllerConfig.colliderOffset);
+      }
+      
+      rigidBody.setTranslation(physicsPosition, true);
       rigidBody.setRotation(this.quaternion, true);
     }
+  }
+
+  /**
+   * Syncs the entity's visual transform (position and rotation) from its physics rigid body.
+   * This is the authoritative way to update visuals based on the physics simulation.
+   * It correctly handles the character controller's collider offset.
+   */
+  syncVisualsFromPhysics(): void {
+    if (!this.physicsManager || !this.rigidBodyId) return;
+    const rigidBody = this.physicsManager.getRigidBody(this.rigidBodyId);
+    if (!rigidBody) return;
+
+    const rigidBodyPosition = rigidBody.translation();
+    
+    // Create a new Vector3 from the rigid body's position
+    const newVisualPosition = new THREE.Vector3(rigidBodyPosition.x, rigidBodyPosition.y, rigidBodyPosition.z);
+
+    // If the entity has a character controller with an offset, we must subtract it
+    // from the physics body's position to get the correct visual mesh position.
+    // The physics body is the source of truth for position, and it's already offset.
+    if (this.hasCharacterController && this.characterControllerConfig?.colliderOffset) {
+      newVisualPosition.sub(this.characterControllerConfig.colliderOffset);
+    }
+
+    this.position.copy(newVisualPosition);
+    this.quaternion.copy(rigidBody.rotation() as THREE.Quaternion);
+
+    this.emitChange();
   }
 
   syncPhysics(): void {
     if (!this.physicsManager || !this.rigidBodyId) return;
     const rigidBody = this.physicsManager.getRigidBody(this.rigidBodyId);
     if (rigidBody?.isDynamic()) {
-      this.physicsManager.syncTransform(this.rigidBodyId, this);
+      const rigidBodyPosition = rigidBody.translation();
+      const newVisualPosition = new THREE.Vector3(rigidBodyPosition.x, rigidBodyPosition.y, rigidBodyPosition.z);
+      if (this.hasCharacterController && this.characterControllerConfig?.colliderOffset) {
+        newVisualPosition.sub(this.characterControllerConfig.colliderOffset);
+      }
+      this.position.copy(newVisualPosition);
+      this.quaternion.copy(rigidBody.rotation() as THREE.Quaternion);
       this.emitChange();
     }
   }
@@ -526,6 +573,7 @@ export abstract class Entity extends THREE.Object3D {
     const defaultConfig: CharacterControllerConfig = {
       capsuleHalfHeight: 0.9,
       capsuleRadius: 0.4,
+      colliderOffset: new THREE.Vector3(0, 0, 0),
       maxSpeed: 8.0,
       acceleration: 50.0,
       jumpForce: 12.0,
@@ -580,15 +628,27 @@ export abstract class Entity extends THREE.Object3D {
     if (this.characterControllerConfig) {
       this.characterControllerConfig = { ...this.characterControllerConfig, ...newConfig };
       
-      // If capsule dimensions changed, recreate the collider
-      if ((newConfig.capsuleHalfHeight !== undefined || newConfig.capsuleRadius !== undefined) && 
+      // If capsule dimensions or collider offset changed, recreate the physics setup
+      if ((newConfig.capsuleHalfHeight !== undefined || 
+           newConfig.capsuleRadius !== undefined ||
+           newConfig.colliderOffset !== undefined) && 
           this.physicsManager && this.rigidBodyId && this.colliderId) {
         
-        // Remove old collider
+        // Remove old physics setup
         this.physicsManager.removeCollider(this.colliderId);
         
-        // Create new collider with updated dimensions
-        this.createCollider({});
+        // If collider offset changed, we need to recreate the rigid body too
+        if (newConfig.colliderOffset !== undefined) {
+          this.physicsManager.removeRigidBody(this.rigidBodyId);
+          this.rigidBodyId = null;
+          this.colliderId = null;
+          
+          // Recreate physics with new offset
+          this.setupPhysics(this.physicsConfig || { type: "kinematic" });
+        } else {
+          // Just recreate the collider with new dimensions
+          this.createCollider({});
+        }
       }
       
       this.emitChange();
@@ -602,8 +662,16 @@ export abstract class Entity extends THREE.Object3D {
 
   protected serializeCharacterController() {
     if (!this.hasCharacterController || !this.characterControllerConfig) return undefined;
+    
+    // Convert THREE.Vector3 to plain object for serialization
+    const config = { ...this.characterControllerConfig };
     return {
-      ...this.characterControllerConfig
+      ...config,
+      colliderOffset: {
+        x: this.characterControllerConfig.colliderOffset.x,
+        y: this.characterControllerConfig.colliderOffset.y,
+        z: this.characterControllerConfig.colliderOffset.z
+      }
     };
   }
 

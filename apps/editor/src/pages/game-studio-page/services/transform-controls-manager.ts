@@ -1,9 +1,9 @@
 import * as THREE from "three/webgpu";
-import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
+import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { Entity } from "@/models";
 import { GameWorld } from "@/models/game-world";
 import useGameStudioStore from "@/stores/game-studio-store";
-import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 export class TransformControlsManager {
   private gameWorld: GameWorld | null = null;
@@ -16,8 +16,10 @@ export class TransformControlsManager {
 
   constructor() {}
 
-  initialize(gameWorld: GameWorld, canvas: HTMLCanvasElement): void {
-    if (this.isInitialized) return;
+  async initialize(gameWorld: GameWorld, canvas: HTMLCanvasElement): Promise<void> {
+    if (this.isInitialized) {
+      this.dispose(); // Clean up existing instance
+    }
     this.gameWorld = gameWorld;
 
     const camera = gameWorld.getCameraManager().getActiveCamera();
@@ -26,15 +28,29 @@ export class TransformControlsManager {
       return;
     }
 
-    this.transformControls = new TransformControls(camera, canvas);
-    this.transformControls.setSpace("world");
-    this.transformControls.setSize(0.8);
-    
-    this.gameWorld.getScene().add(this.transformControls as THREE.Object3D);
+    try {
+      // Wait for the WebGPU renderer to be fully initialized
+      const renderer = gameWorld.getRenderer();
+      if (renderer && renderer.info) {
+        // Wait a bit more to ensure everything is ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
-    this.setupEventListeners();
-    this.setupStoreListeners();
-    this.isInitialized = true;
+      this.transformControls = new TransformControls(camera, canvas);
+      this.transformControls.setSpace("world");
+      this.transformControls.setSize(0.8);
+      
+      // Add the transform controls helper to the scene (required since Three.js r169+)
+      // TransformControls is no longer a THREE.Object3D and must be added via getHelper()
+      this.gameWorld.getScene().add(this.transformControls.getHelper());
+
+      this.setupEventListeners();
+      this.setupStoreListeners();
+      this.isInitialized = true;
+    } catch (error) {
+      console.error("Failed to initialize transform controls:", error);
+      return;
+    }
   }
 
   private setupEventListeners(): void {
@@ -45,6 +61,12 @@ export class TransformControlsManager {
       
       if (this.orbitControls) {
         this.orbitControls.enabled = !event.value;
+      }
+
+      // When transformation ends, ensure final state is properly saved
+      if (!event.value && this.currentEntity) {
+        // Final update to ensure all transforms are applied
+        this.updateEntityTransform();
       }
     });
 
@@ -82,20 +104,33 @@ export class TransformControlsManager {
   }
 
   private updateSelectedEntity(selectedEntityId: string | null): void {
-    if (!this.transformControls || !this.gameWorld) return;
+    if (!this.transformControls || !this.gameWorld) {
+      return;
+    }
 
     // Detach from current entity
     this.transformControls.detach();
     this.currentEntity = null;
 
-    if (!selectedEntityId) return;
+    if (!selectedEntityId) {
+      return;
+    }
 
     // Find the selected entity
-    const entitiesRegistry = this.gameWorld.getRegistryManager().getRegistry<Entity>("entities");
-    if (!entitiesRegistry) return;
+    const registryManager = this.gameWorld.getRegistryManager();
+    if (!registryManager) {
+      return;
+    }
+    
+    const entitiesRegistry = registryManager.getRegistry<Entity>("entities");
+    if (!entitiesRegistry) {
+      return;
+    }
 
     const entity = entitiesRegistry.get(selectedEntityId);
-    if (!entity) return;
+    if (!entity) {
+      return;
+    }
 
     this.currentEntity = entity;
 
@@ -108,20 +143,29 @@ export class TransformControlsManager {
   }
 
   private updateTransformMode(editorMode: "select" | "move" | "rotate" | "scale"): void {
-    if (!this.transformControls || !this.currentEntity) return;
+    if (!this.transformControls || !this.currentEntity) {
+      return;
+    }
 
     const { gameState } = useGameStudioStore.getState();
     
     // Only show transform controls when not playing and not in select mode
     if (gameState === "playing" || editorMode === "select") {
-      this.transformControls.visible = false;
+      // Hide the helper object that was added to the scene
+      const helper = this.transformControls.getHelper();
+      if (helper) {
+        helper.visible = false;
+      }
       this.currentMode = null;
       return;
     }
 
     // Show and configure transform controls based on editor mode
-    this.transformControls.visible = true;
-    console.log("editorMode", editorMode)
+    const helper = this.transformControls.getHelper();
+    if (helper) {
+      helper.visible = true;
+    }
+    
     switch (editorMode) {
       case "move":
         this.transformControls.setMode("translate");
@@ -136,7 +180,10 @@ export class TransformControlsManager {
         this.currentMode = "scale";
         break;
       default:
-        this.transformControls.visible = false;
+        // Hide for unknown modes
+        if (helper) {
+          helper.visible = false;
+        }
         this.currentMode = null;
         break;
     }
@@ -158,23 +205,32 @@ export class TransformControlsManager {
   private updateEntityTransform(): void {
     if (!this.currentEntity) return;
 
-    // Get the current transform from the entity (which is now updated by transform controls)
-    const position = this.currentEntity.position;
-    const rotation = this.currentEntity.rotation;
-    const scale = this.currentEntity.scale;
+    // Force update the entity's matrix world to ensure transforms are applied
+    this.currentEntity.updateMatrixWorld(true);
 
     // Update physics if the entity has physics
     if (this.currentEntity.hasPhysics()) {
       this.currentEntity.syncPhysicsFromTransform();
     }
 
+    // CRITICAL FIX: Update the GameWorld's entity snapshot so transforms persist through game play/reset cycles
+    if (this.gameWorld) {
+      const sceneSnapshot = (this.gameWorld as any).sceneSnapshot;
+      if (sceneSnapshot && sceneSnapshot instanceof Map) {
+        sceneSnapshot.set(this.currentEntity.entityId, {
+          position: this.currentEntity.position.clone(),
+          rotation: this.currentEntity.rotation.clone(),
+          scale: this.currentEntity.scale.clone(),
+          visible: this.currentEntity.visible,
+        });
+      }
+    }
+
+    // Emit change event for React synchronization
     (this.currentEntity as any).emitChange();
 
-    console.log(`Entity ${this.currentEntity.entityName} transformed:`, {
-      position: { x: position.x, y: position.y, z: position.z },
-      rotation: { x: rotation.x, y: rotation.y, z: rotation.z },
-      scale: { x: scale.x, y: scale.y, z: scale.z }
-    });
+    // Force update the entity's metadata timestamp to ensure it's considered "modified"
+    this.currentEntity.metadata.updated = Date.now();
   }
 
   // Method to set orbit controls reference to disable during transform
@@ -201,8 +257,13 @@ export class TransformControlsManager {
 
   dispose(): void {
     if (this.transformControls && this.gameWorld) {
-      this.transformControls.dispose();
-      this.gameWorld.getScene().remove(this.transformControls as THREE.Object3D);
+      try {
+        // Remove the helper from the scene
+        this.gameWorld.getScene().remove(this.transformControls.getHelper());
+        this.transformControls.dispose();
+      } catch (error) {
+        console.error("Error disposing transform controls:", error);
+      }
       this.transformControls = null;
     }
     

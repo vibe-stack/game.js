@@ -88,7 +88,19 @@ export class EntityLoader {
       
       // Apply character controller if present in data
       if (data.characterController) {
-        entity.enableCharacterController(data.characterController);
+        // Convert plain object colliderOffset back to THREE.Vector3
+        const characterControllerConfig = { ...data.characterController } as any;
+        if (characterControllerConfig.colliderOffset) {
+          characterControllerConfig.colliderOffset = new THREE.Vector3(
+            characterControllerConfig.colliderOffset.x,
+            characterControllerConfig.colliderOffset.y,
+            characterControllerConfig.colliderOffset.z
+          );
+        } else {
+          // Backward compatibility: add default colliderOffset for older save files
+          characterControllerConfig.colliderOffset = new THREE.Vector3(0, 0, 0);
+        }
+        entity.enableCharacterController(characterControllerConfig);
       }
       
       if (data.children && data.children.length > 0) {

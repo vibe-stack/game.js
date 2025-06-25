@@ -1,6 +1,6 @@
 import { LoaderContext, CameraData } from "./types";
 import * as THREE from "three/webgpu";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 export class CameraLoader {
   async load(context: LoaderContext, cameraData: CameraData[]): Promise<void> {

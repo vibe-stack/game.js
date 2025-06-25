@@ -42,6 +42,7 @@ export interface EntityData {
   characterController?: {
     capsuleHalfHeight: number;
     capsuleRadius: number;
+    colliderOffset: { x: number; y: number; z: number };
     maxSpeed: number;
     acceleration: number;
     jumpForce: number;

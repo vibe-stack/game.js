@@ -185,7 +185,7 @@ export function DragInput({
   }
 
   return (
-    <div className={cn("flex items-center gap-1 w-full", className)}>
+    <div className={cn("flex items-center gap-1 w-full overflow-hidden", className)}>
       {label && (
         <span className={cn("text-xs text-zinc-400 flex-shrink-0", compact ? "min-w-0" : "min-w-[40px]")}>{label}</span>
       )}
@@ -199,7 +199,7 @@ export function DragInput({
           onBlur={handleInputBlur}
           onKeyDown={handleInputKeyDown}
           disabled={disabled}
-          className={`flex-1 h-6 px-2 text-xs border rounded focus:outline-none min-w-0 ${
+          className={`flex-1 h-6 px-2 text-xs border rounded focus:outline-none min-w-0 w-0 ${
             disabled 
               ? 'bg-zinc-800/50 border-zinc-700/30 text-zinc-500 cursor-not-allowed'
               : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 focus:border-emerald-500'

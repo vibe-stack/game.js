@@ -11,7 +11,7 @@ interface PhysicsPropertiesProps {
 }
 
 export function PhysicsProperties({ entity }: PhysicsPropertiesProps) {
-  const { physicsType, physicsMass, physicsRestitution, physicsFriction } = useEntityProperties(entity);
+  const { physicsType, physicsMass, physicsRestitution, physicsFriction } = useEntityProperties(entity) as any;
 
   // Read values directly from entity properties
   const hasPhysics = entity.physicsConfig !== null && entity.getRigidBodyId() !== null;

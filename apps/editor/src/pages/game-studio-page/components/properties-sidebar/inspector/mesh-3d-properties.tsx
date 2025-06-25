@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { GLTFLoader, GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { GLTFLoader, GLTF } from "three/addons/loaders/GLTFLoader.js";
 import * as THREE from "three/webgpu";
 import { Mesh3D } from "@/models/primitives/mesh-3d";
 import { toast } from "sonner";
