@@ -199,8 +199,12 @@ export class MaterialSystem {
     }
 
     const loader = new THREE.TextureLoader();
+    
+    // Use the asset URL if available, otherwise load from path
+    const url = asset.url || asset.path;
+    
     const texture = await new Promise<THREE.Texture>((resolve, reject) => {
-      loader.load(asset.path, resolve, undefined, reject);
+      loader.load(url, resolve, undefined, reject);
     });
 
     // Apply texture properties
@@ -228,6 +232,33 @@ export class MaterialSystem {
 
     this.loadedTextures.set(asset.id, texture);
     return texture;
+  }
+
+  // Load texture from project path
+  async loadTextureFromPath(projectPath: string, texturePath: string, textureProps?: any): Promise<THREE.Texture | null> {
+    try {
+      // Get asset server URL for the texture
+      const textureUrl = await window.projectAPI.getAssetUrl(projectPath, texturePath);
+      if (!textureUrl) return null;
+
+      const loader = new THREE.TextureLoader();
+      const texture = await new Promise<THREE.Texture>((resolve, reject) => {
+        loader.load(textureUrl, resolve, undefined, reject);
+      });
+
+      // Apply texture properties
+      if (textureProps) {
+        if (textureProps.repeat) texture.repeat.set(textureProps.repeat.x, textureProps.repeat.y);
+        if (textureProps.offset) texture.offset.set(textureProps.offset.x, textureProps.offset.y);
+        if (textureProps.rotation !== undefined) texture.rotation = textureProps.rotation;
+        texture.needsUpdate = true;
+      }
+
+      return texture;
+    } catch (error) {
+      console.error('Failed to load texture:', error);
+      return null;
+    }
   }
 
   getTextureReference(textureId: string): TextureReference | undefined {
@@ -298,22 +329,22 @@ export class MaterialSystem {
 
     switch (definition.properties.type) {
       case 'basic':
-        material = this.createBasicMaterial(definition.properties, assets);
+        material = await this.createBasicMaterial(definition.properties, assets);
         break;
       case 'lambert':
-        material = this.createLambertMaterial(definition.properties, assets);
+        material = await this.createLambertMaterial(definition.properties, assets);
         break;
       case 'phong':
-        material = this.createPhongMaterial(definition.properties, assets);
+        material = await this.createPhongMaterial(definition.properties, assets);
         break;
       case 'standard':
-        material = this.createStandardMaterial(definition.properties, assets);
+        material = await this.createStandardMaterial(definition.properties, assets);
         break;
       case 'physical':
-        material = this.createPhysicalMaterial(definition.properties, assets);
+        material = await this.createPhysicalMaterial(definition.properties, assets);
         break;
       case 'toon':
-        material = this.createToonMaterial(definition.properties, assets);
+        material = await this.createToonMaterial(definition.properties, assets);
         break;
       case 'shader':
         if (definition.properties.shaderGraph) {
@@ -336,17 +367,22 @@ export class MaterialSystem {
   }
 
   // Helper Methods for Material Creation
-  private createBasicMaterial(props: any, _assets: Map<string, EnhancedAssetReference>): THREE.MeshBasicMaterial {
+  private async createBasicMaterial(props: any, _assets: Map<string, EnhancedAssetReference>): Promise<THREE.MeshBasicMaterial> {
     const material = new THREE.MeshBasicMaterial();
     this.applyBaseMaterialProperties(material, props);
     
     material.color.set(props.color || '#ffffff');
-    // Apply textures...
+    
+    // Apply textures
+    if (props.map && props.projectPath) {
+      const texture = await this.loadTextureFromPath(props.projectPath, props.map, props.mapProps);
+      if (texture) material.map = texture;
+    }
     
     return material;
   }
 
-  private createStandardMaterial(props: any, _assets: Map<string, EnhancedAssetReference>): THREE.MeshStandardMaterial {
+  private async createStandardMaterial(props: any, _assets: Map<string, EnhancedAssetReference>): Promise<THREE.MeshStandardMaterial> {
     const material = new THREE.MeshStandardMaterial();
     this.applyBaseMaterialProperties(material, props);
     
@@ -357,12 +393,61 @@ export class MaterialSystem {
     material.metalness = props.metalness || 0;
     material.envMapIntensity = props.envMapIntensity || 1;
     
-    // Apply textures...
+    // Apply textures
+    if (props.projectPath) {
+      // Base color map
+      if (props.map) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.map, props.mapProps);
+        if (texture) material.map = texture;
+      }
+      
+      // Normal map
+      if (props.normalMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.normalMap, props.normalMapProps);
+        if (texture) {
+          material.normalMap = texture;
+          material.normalScale.set(props.normalScale || 1, props.normalScale || 1);
+        }
+      }
+      
+      // Roughness map
+      if (props.roughnessMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.roughnessMap, props.roughnessMapProps);
+        if (texture) material.roughnessMap = texture;
+      }
+      
+      // Metalness map
+      if (props.metalnessMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.metalnessMap, props.metalnessMapProps);
+        if (texture) material.metalnessMap = texture;
+      }
+      
+      // Ambient occlusion map
+      if (props.aoMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.aoMap, props.aoMapProps);
+        if (texture) {
+          material.aoMap = texture;
+          material.aoMapIntensity = props.aoMapIntensity || 1;
+        }
+      }
+      
+      // Emissive map
+      if (props.emissiveMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.emissiveMap, props.emissiveMapProps);
+        if (texture) material.emissiveMap = texture;
+      }
+      
+      // Environment map (if supported)
+      if (props.envMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.envMap, props.envMapProps);
+        if (texture) material.envMap = texture;
+      }
+    }
     
     return material;
   }
 
-  private createPhysicalMaterial(props: any, _assets: Map<string, EnhancedAssetReference>): THREE.MeshPhysicalMaterial {
+  private async createPhysicalMaterial(props: any, _assets: Map<string, EnhancedAssetReference>): Promise<THREE.MeshPhysicalMaterial> {
     const material = new THREE.MeshPhysicalMaterial();
     this.applyBaseMaterialProperties(material, props);
     
@@ -391,10 +476,89 @@ export class MaterialSystem {
     material.specularIntensity = props.specularIntensity || 1;
     material.specularColor.set(props.specularColor || '#ffffff');
     
+    // Apply all standard material textures
+    if (props.projectPath) {
+      // Base color map
+      if (props.map) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.map, props.mapProps);
+        if (texture) material.map = texture;
+      }
+      
+      // Normal map
+      if (props.normalMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.normalMap, props.normalMapProps);
+        if (texture) {
+          material.normalMap = texture;
+          material.normalScale.set(props.normalScale || 1, props.normalScale || 1);
+        }
+      }
+      
+      // Roughness map
+      if (props.roughnessMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.roughnessMap, props.roughnessMapProps);
+        if (texture) material.roughnessMap = texture;
+      }
+      
+      // Metalness map
+      if (props.metalnessMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.metalnessMap, props.metalnessMapProps);
+        if (texture) material.metalnessMap = texture;
+      }
+      
+      // Physical material specific textures
+      if (props.clearcoatMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.clearcoatMap, props.clearcoatMapProps);
+        if (texture) material.clearcoatMap = texture;
+      }
+      
+      if (props.clearcoatRoughnessMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.clearcoatRoughnessMap, props.clearcoatRoughnessMapProps);
+        if (texture) material.clearcoatRoughnessMap = texture;
+      }
+      
+      if (props.clearcoatNormalMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.clearcoatNormalMap, props.clearcoatNormalMapProps);
+        if (texture) {
+          material.clearcoatNormalMap = texture;
+          material.clearcoatNormalScale.set(props.clearcoatNormalScale || 1, props.clearcoatNormalScale || 1);
+        }
+      }
+      
+      if (props.sheenColorMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.sheenColorMap, props.sheenColorMapProps);
+        if (texture) material.sheenColorMap = texture;
+      }
+      
+      if (props.sheenRoughnessMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.sheenRoughnessMap, props.sheenRoughnessMapProps);
+        if (texture) material.sheenRoughnessMap = texture;
+      }
+      
+      if (props.transmissionMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.transmissionMap, props.transmissionMapProps);
+        if (texture) material.transmissionMap = texture;
+      }
+      
+      if (props.thicknessMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.thicknessMap, props.thicknessMapProps);
+        if (texture) material.thicknessMap = texture;
+      }
+      
+      if (props.iridescenceMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.iridescenceMap, props.iridescenceMapProps);
+        if (texture) material.iridescenceMap = texture;
+      }
+      
+      if (props.iridescenceThicknessMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.iridescenceThicknessMap, props.iridescenceThicknessMapProps);
+        if (texture) material.iridescenceThicknessMap = texture;
+      }
+    }
+    
     return material;
   }
 
-  private createLambertMaterial(props: any, _assets: Map<string, EnhancedAssetReference>): THREE.MeshLambertMaterial {
+  private async createLambertMaterial(props: any, _assets: Map<string, EnhancedAssetReference>): Promise<THREE.MeshLambertMaterial> {
     const material = new THREE.MeshLambertMaterial();
     this.applyBaseMaterialProperties(material, props);
     
@@ -402,10 +566,23 @@ export class MaterialSystem {
     material.emissive.set(props.emissive || '#000000');
     material.emissiveIntensity = props.emissiveIntensity || 0;
     
+    // Apply textures
+    if (props.projectPath) {
+      if (props.map) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.map, props.mapProps);
+        if (texture) material.map = texture;
+      }
+      
+      if (props.emissiveMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.emissiveMap, props.emissiveMapProps);
+        if (texture) material.emissiveMap = texture;
+      }
+    }
+    
     return material;
   }
 
-  private createPhongMaterial(props: any, _assets: Map<string, EnhancedAssetReference>): THREE.MeshPhongMaterial {
+  private async createPhongMaterial(props: any, _assets: Map<string, EnhancedAssetReference>): Promise<THREE.MeshPhongMaterial> {
     const material = new THREE.MeshPhongMaterial();
     this.applyBaseMaterialProperties(material, props);
     
@@ -415,16 +592,55 @@ export class MaterialSystem {
     material.specular.set(props.specular || '#111111');
     material.shininess = props.shininess || 30;
     
+    // Apply textures
+    if (props.projectPath) {
+      if (props.map) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.map, props.mapProps);
+        if (texture) material.map = texture;
+      }
+      
+      if (props.emissiveMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.emissiveMap, props.emissiveMapProps);
+        if (texture) material.emissiveMap = texture;
+      }
+      
+      if (props.specularMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.specularMap, props.specularMapProps);
+        if (texture) material.specularMap = texture;
+      }
+      
+      if (props.normalMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.normalMap, props.normalMapProps);
+        if (texture) {
+          material.normalMap = texture;
+          material.normalScale.set(props.normalScale || 1, props.normalScale || 1);
+        }
+      }
+    }
+    
     return material;
   }
 
-  private createToonMaterial(props: any, _assets: Map<string, EnhancedAssetReference>): THREE.MeshToonMaterial {
+  private async createToonMaterial(props: any, _assets: Map<string, EnhancedAssetReference>): Promise<THREE.MeshToonMaterial> {
     const material = new THREE.MeshToonMaterial();
     this.applyBaseMaterialProperties(material, props);
     
     material.color.set(props.color || '#ffffff');
     material.emissive.set(props.emissive || '#000000');
     material.emissiveIntensity = props.emissiveIntensity || 0;
+    
+    // Apply textures
+    if (props.projectPath) {
+      if (props.map) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.map, props.mapProps);
+        if (texture) material.map = texture;
+      }
+      
+      if (props.emissiveMap) {
+        const texture = await this.loadTextureFromPath(props.projectPath, props.emissiveMap, props.emissiveMapProps);
+        if (texture) material.emissiveMap = texture;
+      }
+    }
     
     return material;
   }
@@ -515,12 +731,14 @@ export class MaterialSystem {
     const defaultLibrary: MaterialLibrary = {
       id: 'default',
       name: 'Default Materials',
+      version: '1.0.0',
       description: 'Built-in material presets',
       materials: [
         {
           id: 'standard-default',
           name: 'Standard Default',
           description: 'Basic PBR material',
+          type: 'standard',
           properties: {
             type: 'standard',
             color: '#ffffff',
@@ -564,12 +782,6 @@ export class MaterialSystem {
             displacementScale: 1,
             displacementBias: 0,
             envMapIntensity: 1
-          },
-          textures: [],
-          shaderGraphs: [],
-          previewSettings: {
-            geometry: 'sphere',
-            lighting: 'studio'
           },
           metadata: {
             tags: ['default', 'pbr'],

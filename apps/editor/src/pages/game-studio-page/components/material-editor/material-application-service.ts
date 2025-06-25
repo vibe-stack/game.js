@@ -2,6 +2,7 @@ import * as THREE from "three/webgpu";
 import { MaterialDefinition } from "@/types/project";
 import { materialSystem } from "@/services/material-system";
 import { Entity } from "@/models";
+import useGameStudioStore from "@/stores/game-studio-store";
 
 export class MaterialApplicationService {
   /**
@@ -59,12 +60,17 @@ export class MaterialApplicationService {
   private static async createThreeMaterialFromDefinition(
     definition: MaterialDefinition
   ): Promise<THREE.Material> {
-    // Create material directly since the material system might have registry issues
-    return this.createMaterialDirectly(definition);
+    // Create material directly with texture support
+    try {
+      return await this.createMaterialWithTextures(definition);
+    } catch (error) {
+      console.error('Failed to create material with textures, falling back to basic material:', error);
+      return this.createMaterialDirectly(definition);
+    }
   }
 
   /**
-   * Create material directly from properties with proper defaults
+   * Create material directly from properties without textures (fallback)
    */
   private static createMaterialDirectly(definition: MaterialDefinition): THREE.Material {
     const props = definition.properties;
@@ -93,10 +99,264 @@ export class MaterialApplicationService {
         material = new THREE.MeshStandardMaterial();
     }
 
-    // Apply properties with proper validation
+    // Apply basic properties only
     this.applyPropertiesToMaterial(material, props);
     
     return material;
+  }
+
+  /**
+   * Create material directly from properties with texture support
+   */
+  private static async createMaterialWithTextures(definition: MaterialDefinition): Promise<THREE.Material> {
+    const props = definition.properties;
+    let material: THREE.Material;
+
+    switch (definition.type) {
+      case 'basic':
+        material = new THREE.MeshBasicMaterial();
+        break;
+      case 'lambert':
+        material = new THREE.MeshLambertMaterial();
+        break;
+      case 'phong':
+        material = new THREE.MeshPhongMaterial();
+        break;
+      case 'standard':
+        material = new THREE.MeshStandardMaterial();
+        break;
+      case 'physical':
+        material = new THREE.MeshPhysicalMaterial();
+        break;
+      case 'toon':
+        material = new THREE.MeshToonMaterial();
+        break;
+      default:
+        material = new THREE.MeshStandardMaterial();
+    }
+
+    // Apply basic properties first
+    this.applyPropertiesToMaterial(material, props);
+    
+    // Apply textures if project is available
+    const currentProject = useGameStudioStore.getState().currentProject;
+    if (currentProject) {
+      await this.applyTexturesToMaterial(material, props, currentProject.path);
+    }
+    
+    return material;
+  }
+
+  /**
+   * Apply textures to material
+   */
+  private static async applyTexturesToMaterial(material: THREE.Material, props: any, projectPath: string): Promise<void> {
+    try {
+      const texturePromises: Promise<void>[] = [];
+
+      // Base color map
+      if (props.map && 'map' in material) {
+        texturePromises.push(
+          this.loadTexture(projectPath, props.map, props.mapProps).then(texture => {
+            if (texture) (material as any).map = texture;
+          })
+        );
+      }
+
+      // Normal map
+      if (props.normalMap && 'normalMap' in material) {
+        texturePromises.push(
+          this.loadTexture(projectPath, props.normalMap, props.normalMapProps).then(texture => {
+            if (texture) {
+              (material as any).normalMap = texture;
+              if (props.normalScale && 'normalScale' in material) {
+                (material as any).normalScale.set(props.normalScale, props.normalScale);
+              }
+            }
+          })
+        );
+      }
+
+      // Roughness map
+      if (props.roughnessMap && 'roughnessMap' in material) {
+        texturePromises.push(
+          this.loadTexture(projectPath, props.roughnessMap, props.roughnessMapProps).then(texture => {
+            if (texture) (material as any).roughnessMap = texture;
+          })
+        );
+      }
+
+      // Metalness map
+      if (props.metalnessMap && 'metalnessMap' in material) {
+        texturePromises.push(
+          this.loadTexture(projectPath, props.metalnessMap, props.metalnessMapProps).then(texture => {
+            if (texture) (material as any).metalnessMap = texture;
+          })
+        );
+      }
+
+      // AO map
+      if (props.aoMap && 'aoMap' in material) {
+        texturePromises.push(
+          this.loadTexture(projectPath, props.aoMap, props.aoMapProps).then(texture => {
+            if (texture) {
+              (material as any).aoMap = texture;
+              if (props.aoMapIntensity !== undefined) {
+                (material as any).aoMapIntensity = props.aoMapIntensity;
+              }
+            }
+          })
+        );
+      }
+
+      // Emissive map
+      if (props.emissiveMap && 'emissiveMap' in material) {
+        texturePromises.push(
+          this.loadTexture(projectPath, props.emissiveMap, props.emissiveMapProps).then(texture => {
+            if (texture) (material as any).emissiveMap = texture;
+          })
+        );
+      }
+
+      // Physical material specific textures
+      if (material instanceof THREE.MeshPhysicalMaterial) {
+        // Clearcoat maps
+        if (props.clearcoatMap) {
+          texturePromises.push(
+            this.loadTexture(projectPath, props.clearcoatMap, props.clearcoatMapProps).then(texture => {
+              if (texture) material.clearcoatMap = texture;
+            })
+          );
+        }
+        
+        if (props.clearcoatRoughnessMap) {
+          texturePromises.push(
+            this.loadTexture(projectPath, props.clearcoatRoughnessMap, props.clearcoatRoughnessMapProps).then(texture => {
+              if (texture) material.clearcoatRoughnessMap = texture;
+            })
+          );
+        }
+        
+        if (props.clearcoatNormalMap) {
+          texturePromises.push(
+            this.loadTexture(projectPath, props.clearcoatNormalMap, props.clearcoatNormalMapProps).then(texture => {
+              if (texture) {
+                material.clearcoatNormalMap = texture;
+                if (props.clearcoatNormalScale) {
+                  material.clearcoatNormalScale.set(props.clearcoatNormalScale, props.clearcoatNormalScale);
+                }
+              }
+            })
+          );
+        }
+
+        // Transmission and thickness
+        if (props.transmissionMap) {
+          texturePromises.push(
+            this.loadTexture(projectPath, props.transmissionMap, props.transmissionMapProps).then(texture => {
+              if (texture) material.transmissionMap = texture;
+            })
+          );
+        }
+        
+        if (props.thicknessMap) {
+          texturePromises.push(
+            this.loadTexture(projectPath, props.thicknessMap, props.thicknessMapProps).then(texture => {
+              if (texture) material.thicknessMap = texture;
+            })
+          );
+        }
+
+        // Iridescence
+        if (props.iridescenceMap) {
+          texturePromises.push(
+            this.loadTexture(projectPath, props.iridescenceMap, props.iridescenceMapProps).then(texture => {
+              if (texture) material.iridescenceMap = texture;
+            })
+          );
+        }
+        
+        if (props.iridescenceThicknessMap) {
+          texturePromises.push(
+            this.loadTexture(projectPath, props.iridescenceThicknessMap, props.iridescenceThicknessMapProps).then(texture => {
+              if (texture) material.iridescenceThicknessMap = texture;
+            })
+          );
+        }
+
+        // Sheen
+        if (props.sheenColorMap) {
+          texturePromises.push(
+            this.loadTexture(projectPath, props.sheenColorMap, props.sheenColorMapProps).then(texture => {
+              if (texture) material.sheenColorMap = texture;
+            })
+          );
+        }
+        
+        if (props.sheenRoughnessMap) {
+          texturePromises.push(
+            this.loadTexture(projectPath, props.sheenRoughnessMap, props.sheenRoughnessMapProps).then(texture => {
+              if (texture) material.sheenRoughnessMap = texture;
+            })
+          );
+        }
+      }
+
+      // Phong material specific textures
+      if (material instanceof THREE.MeshPhongMaterial && props.specularMap) {
+        texturePromises.push(
+          this.loadTexture(projectPath, props.specularMap, props.specularMapProps).then(texture => {
+            if (texture) material.specularMap = texture;
+          })
+        );
+      }
+
+      // Wait for all textures to load
+      await Promise.allSettled(texturePromises);
+      
+      // Force material update
+      material.needsUpdate = true;
+
+    } catch (error) {
+      console.error('Failed to load textures for material:', error);
+    }
+  }
+
+  /**
+   * Load texture from project path
+   */
+  private static async loadTexture(projectPath: string, texturePath: string, textureProps?: any): Promise<THREE.Texture | null> {
+    try {
+      const textureUrl = await window.projectAPI.getAssetUrl(projectPath, texturePath);
+      if (!textureUrl) {
+        console.warn(`Could not get URL for texture: ${texturePath}`);
+        return null;
+      }
+
+      const loader = new THREE.TextureLoader();
+      const texture = await new Promise<THREE.Texture>((resolve, reject) => {
+        loader.load(textureUrl, resolve, undefined, reject);
+      });
+
+      // Apply texture properties
+      if (textureProps) {
+        if (textureProps.repeat) {
+          texture.repeat.set(textureProps.repeat.x, textureProps.repeat.y);
+        }
+        if (textureProps.offset) {
+          texture.offset.set(textureProps.offset.x, textureProps.offset.y);
+        }
+        if (textureProps.rotation !== undefined) {
+          texture.rotation = textureProps.rotation;
+        }
+        texture.needsUpdate = true;
+      }
+
+      return texture;
+    } catch (error) {
+      console.error(`Failed to load texture ${texturePath}:`, error);
+      return null;
+    }
   }
 
   /**
@@ -337,11 +597,63 @@ export class MaterialApplicationService {
     if ('roughness' in material) {
       properties.roughness = (material as any).roughness;
     }
+    if ('envMapIntensity' in material) {
+      properties.envMapIntensity = (material as any).envMapIntensity;
+    }
     if ('specular' in material) {
       properties.specular = '#' + (material as any).specular.getHexString();
     }
     if ('shininess' in material) {
       properties.shininess = (material as any).shininess;
+    }
+
+    // Extract texture properties
+    this.extractTextureProperty(material, properties, 'map', 'mapProps');
+    this.extractTextureProperty(material, properties, 'normalMap', 'normalMapProps');
+    this.extractTextureProperty(material, properties, 'roughnessMap', 'roughnessMapProps');
+    this.extractTextureProperty(material, properties, 'metalnessMap', 'metalnessMapProps');
+    this.extractTextureProperty(material, properties, 'aoMap', 'aoMapProps');
+    this.extractTextureProperty(material, properties, 'emissiveMap', 'emissiveMapProps');
+    this.extractTextureProperty(material, properties, 'specularMap', 'specularMapProps');
+
+    // Normal scale
+    if ('normalScale' in material && (material as any).normalScale) {
+      properties.normalScale = (material as any).normalScale.x;
+    }
+
+    // AO Map intensity
+    if ('aoMapIntensity' in material) {
+      properties.aoMapIntensity = (material as any).aoMapIntensity;
+    }
+
+    // Physical material specific properties
+    if (material instanceof THREE.MeshPhysicalMaterial) {
+      properties.clearcoat = material.clearcoat;
+      properties.clearcoatRoughness = material.clearcoatRoughness;
+      properties.ior = material.ior;
+      properties.transmission = material.transmission;
+      properties.thickness = material.thickness;
+      properties.iridescence = material.iridescence;
+      properties.iridescenceIOR = material.iridescenceIOR;
+      properties.sheen = material.sheen;
+      properties.sheenColor = '#' + material.sheenColor.getHexString();
+      properties.sheenRoughness = material.sheenRoughness;
+
+      // Physical material textures
+      this.extractTextureProperty(material, properties, 'clearcoatMap', 'clearcoatMapProps');
+      this.extractTextureProperty(material, properties, 'clearcoatRoughnessMap', 'clearcoatRoughnessMapProps');
+      this.extractTextureProperty(material, properties, 'clearcoatNormalMap', 'clearcoatNormalMapProps');
+      this.extractTextureProperty(material, properties, 'transmissionMap', 'transmissionMapProps');
+      this.extractTextureProperty(material, properties, 'thicknessMap', 'thicknessMapProps');
+      this.extractTextureProperty(material, properties, 'iridescenceMap', 'iridescenceMapProps');
+      this.extractTextureProperty(material, properties, 'iridescenceThicknessMap', 'iridescenceThicknessMapProps');
+      this.extractTextureProperty(material, properties, 'sheenColorMap', 'sheenColorMapProps');
+      this.extractTextureProperty(material, properties, 'sheenRoughnessMap', 'sheenRoughnessMapProps');
+
+      // Clearcoat normal scale
+      if (material.clearcoatNormalScale) {
+        properties.clearcoatNormalScale = material.clearcoatNormalScale.x;
+      }
     }
 
     // Create a reusable material ID based on content, not entity
@@ -363,6 +675,30 @@ export class MaterialApplicationService {
     materialSystem.addMaterialDefinition(materialDefinition);
 
     return materialDefinition;
+  }
+
+  /**
+   * Extract texture property from THREE.js material
+   */
+  private static extractTextureProperty(material: THREE.Material, properties: any, textureProp: string, uvProp: string): void {
+    if (textureProp in material) {
+      const texture = (material as any)[textureProp] as THREE.Texture;
+      if (texture && texture.source && texture.source.data && texture.source.data.src) {
+        // Extract the asset path from the texture URL
+        const src = texture.source.data.src;
+        const assetMatch = src.match(/\/assets\/(.+)$/);
+        if (assetMatch) {
+          properties[textureProp] = `assets/${assetMatch[1]}`;
+          
+          // Save UV properties
+          properties[uvProp] = {
+            repeat: { x: texture.repeat.x, y: texture.repeat.y },
+            offset: { x: texture.offset.x, y: texture.offset.y },
+            rotation: texture.rotation
+          };
+        }
+      }
+    }
   }
 
   /**

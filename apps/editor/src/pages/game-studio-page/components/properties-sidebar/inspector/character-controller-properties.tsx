@@ -15,6 +15,7 @@ import {
   FPS_CHARACTER_CONFIG,
   THIRD_PERSON_CHARACTER_CONFIG,
   PLATFORMER_CHARACTER_CONFIG,
+  CS_SURF_CHARACTER_CONFIG,
 } from "@/models/character-controller";
 import { useEntityState } from "@/hooks/use-entity-state";
 
@@ -26,6 +27,7 @@ const PRESET_CONFIGS = {
   "first-person": FPS_CHARACTER_CONFIG,
   "third-person": THIRD_PERSON_CHARACTER_CONFIG,
   platformer: PLATFORMER_CHARACTER_CONFIG,
+  "cs-surf": CS_SURF_CHARACTER_CONFIG,
 };
 
 export function CharacterControllerProperties({
@@ -83,6 +85,9 @@ export function CharacterControllerProperties({
             </SelectItem>
             <SelectItem value="platformer" className="text-xs">
               Platformer
+            </SelectItem>
+            <SelectItem value="cs-surf" className="text-xs">
+              CS Surf
             </SelectItem>
           </SelectContent>
         </Select>
@@ -442,6 +447,215 @@ export function CharacterControllerProperties({
               </>
             );
           })()}
+        </div>
+      </div>
+
+      <Separator className="bg-white/10" />
+
+      {/* Advanced Movement - Air Strafing */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-cyan-300">Air Strafing</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <DragInput
+            label="Air Accel"
+            value={config.airAcceleration}
+            onChange={(value) => handleConfigChange("airAcceleration", value)}
+            step={1}
+            precision={1}
+            min={1}
+            max={100}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Air Max Speed"
+            value={config.airMaxSpeed}
+            onChange={(value) => handleConfigChange("airMaxSpeed", value)}
+            step={1}
+            precision={1}
+            min={5}
+            max={100}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Strafe Response"
+            value={config.strafeResponseiveness}
+            onChange={(value) => handleConfigChange("strafeResponseiveness", value)}
+            step={0.1}
+            precision={1}
+            min={0.1}
+            max={3}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Air Friction"
+            value={config.airFriction}
+            onChange={(value) => handleConfigChange("airFriction", value)}
+            step={0.01}
+            precision={2}
+            min={0}
+            max={1}
+            compact
+            className="text-xs"
+          />
+        </div>
+      </div>
+
+      <Separator className="bg-white/10" />
+
+      {/* Ground Movement */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-orange-300">Ground Movement</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <DragInput
+            label="Ground Friction"
+            value={config.groundFriction}
+            onChange={(value) => handleConfigChange("groundFriction", value)}
+            step={0.5}
+            precision={1}
+            min={0}
+            max={20}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Stop Speed"
+            value={config.stopSpeed}
+            onChange={(value) => handleConfigChange("stopSpeed", value)}
+            step={0.1}
+            precision={1}
+            min={0.1}
+            max={5}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Slope Friction"
+            value={config.slopeFriction}
+            onChange={(value) => handleConfigChange("slopeFriction", value)}
+            step={0.1}
+            precision={1}
+            min={0}
+            max={10}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Slide Threshold"
+            value={radiansToDegrees(config.slideThreshold)}
+            onChange={(value) =>
+              handleConfigChange("slideThreshold", degreesToRadians(value))
+            }
+            step={1}
+            precision={0}
+            min={15}
+            max={60}
+            suffix="°"
+            compact
+            className="text-xs"
+          />
+        </div>
+      </div>
+
+      <Separator className="bg-white/10" />
+
+      {/* Velocity & Physics */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-purple-300">Velocity & Physics</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <DragInput
+            label="Max Velocity"
+            value={config.maxVelocity}
+            onChange={(value) => handleConfigChange("maxVelocity", value)}
+            step={1}
+            precision={1}
+            min={10}
+            max={200}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Velocity Damping"
+            value={config.velocityDamping}
+            onChange={(value) => handleConfigChange("velocityDamping", value)}
+            step={0.001}
+            precision={3}
+            min={0.9}
+            max={1}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Momentum Keep"
+            value={config.momentumPreservation}
+            onChange={(value) => handleConfigChange("momentumPreservation", value)}
+            step={0.01}
+            precision={2}
+            min={0.5}
+            max={1}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Bounce Retention"
+            value={config.bounceVelocityRetention}
+            onChange={(value) => handleConfigChange("bounceVelocityRetention", value)}
+            step={0.05}
+            precision={2}
+            min={0}
+            max={1}
+            compact
+            className="text-xs"
+          />
+        </div>
+      </div>
+
+      <Separator className="bg-white/10" />
+
+      {/* Jump Mechanics */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-yellow-300">Jump Mechanics</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <DragInput
+            label="Pre-Speed Boost"
+            value={config.preSpeedBoost}
+            onChange={(value) => handleConfigChange("preSpeedBoost", value)}
+            step={0.1}
+            precision={1}
+            min={1}
+            max={2}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Bunny Hop Time"
+            value={config.bunnyHopTolerance}
+            onChange={(value) => handleConfigChange("bunnyHopTolerance", value)}
+            step={0.01}
+            precision={2}
+            min={0.05}
+            max={0.3}
+            suffix="s"
+            compact
+            className="text-xs"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="min-w-[60px] text-xs text-gray-400">Jump on Slopes</span>
+          <div 
+            className={`flex h-6 w-10 items-center rounded-full px-1 transition-colors cursor-pointer ${
+              config.jumpWhileSliding ? 'bg-cyan-500' : 'bg-gray-600'
+            }`}
+            onClick={() => handleConfigChange("jumpWhileSliding", !config.jumpWhileSliding)}
+          >
+            <div 
+              className={`h-4 w-4 rounded-full bg-white transition-transform ${
+                config.jumpWhileSliding ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </div>
         </div>
       </div>
 

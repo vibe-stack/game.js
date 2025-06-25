@@ -19,6 +19,27 @@ export interface CharacterControllerConfig {
   jumpForce: number;
   sprintMultiplier: number;
   
+  // Advanced movement mechanics (CS-like)
+  airAcceleration: number; // Air strafe acceleration
+  airMaxSpeed: number; // Maximum air strafe speed
+  groundFriction: number; // Friction when on ground
+  airFriction: number; // Air resistance
+  stopSpeed: number; // Speed below which extra friction is applied
+  slopeFriction: number; // Friction on slopes
+  slideThreshold: number; // Angle at which sliding starts (radians)
+  momentumPreservation: number; // How much momentum is preserved (0-1)
+  strafeResponseiveness: number; // How responsive air strafing is
+  
+  // Velocity and physics
+  maxVelocity: number; // Maximum allowed velocity magnitude
+  velocityDamping: number; // General velocity damping factor
+  bounceVelocityRetention: number; // How much velocity is kept after bouncing
+  
+  // Jump mechanics
+  preSpeedBoost: number; // Speed boost before jumping
+  jumpWhileSliding: boolean; // Allow jumping while sliding on slopes
+  bunnyHopTolerance: number; // Time window for bunny hopping
+  
   // Character controller settings
   offset: number; // Gap between character and environment
   maxSlopeClimbAngle: number; // in radians
@@ -59,6 +80,15 @@ export interface CharacterState {
   inputDirection: THREE.Vector3;
   cameraRotation: { pitch: number; yaw: number };
   currentAnimation?: string;
+  
+  // Advanced movement state
+  isSliding: boolean;
+  surfaceNormal: THREE.Vector3;
+  lastGroundedTime: number;
+  currentSpeed: number;
+  airTime: number;
+  lastJumpTime: number;
+  wishDirection: THREE.Vector3;
 }
 
 export class CharacterController {
@@ -103,6 +133,12 @@ export class CharacterController {
   private desiredVelocity: THREE.Vector3 = new THREE.Vector3();
   private verticalVelocity: number = 0;
   
+  // Advanced movement
+  private currentVelocity: THREE.Vector3 = new THREE.Vector3();
+  private mouseVelocity: { x: number; y: number } = { x: 0, y: 0 };
+  private lastMouseMovement: { x: number; y: number } = { x: 0, y: 0 };
+  private frameTime: number = 0;
+  
   // Animation state
   private lastAnimation: string | undefined;
   
@@ -127,6 +163,28 @@ export class CharacterController {
       acceleration: 50.0,
       jumpForce: 12.0,
       sprintMultiplier: 1.8,
+      
+      // Advanced movement mechanics (CS-like defaults)
+      airAcceleration: 40.0,
+      airMaxSpeed: 30.0,
+      groundFriction: 8.0,
+      airFriction: 0.1,
+      stopSpeed: 1.0,
+      slopeFriction: 2.0,
+      slideThreshold: Math.PI / 6, // 30 degrees
+      momentumPreservation: 0.95,
+      strafeResponseiveness: 1.0,
+      
+      // Velocity and physics
+      maxVelocity: 50.0,
+      velocityDamping: 0.99,
+      bounceVelocityRetention: 0.8,
+      
+      // Jump mechanics
+      preSpeedBoost: 1.2,
+      jumpWhileSliding: true,
+      bunnyHopTolerance: 0.1,
+      
       offset: 0.01,
       maxSlopeClimbAngle: Math.PI / 4, // 45 degrees
       minSlopeSlideAngle: Math.PI / 6, // 30 degrees
@@ -155,7 +213,16 @@ export class CharacterController {
       isMoving: false,
       velocity: new THREE.Vector3(0, 0, 0),
       inputDirection: new THREE.Vector3(),
-      cameraRotation: { pitch: 0, yaw: 0 }
+      cameraRotation: { pitch: 0, yaw: 0 },
+      
+      // Advanced movement state
+      isSliding: false,
+      surfaceNormal: new THREE.Vector3(0, 1, 0),
+      lastGroundedTime: 0,
+      currentSpeed: 0,
+      airTime: 0,
+      lastJumpTime: 0,
+      wishDirection: new THREE.Vector3()
     };
     
     this.inputState = {
@@ -308,6 +375,10 @@ export class CharacterController {
           this.cameraManager.getActiveCameraId() !== this.cameraId || 
           !this.pointerLocked) return;
 
+      // Track mouse movement for air strafing
+      this.lastMouseMovement.x = event.movementX;
+      this.lastMouseMovement.y = event.movementY;
+      
       // Apply mouse movement to camera rotation
       this.state.cameraRotation.yaw -= event.movementX * this.config.cameraSensitivity;
       
@@ -414,70 +485,232 @@ export class CharacterController {
     camera.lookAt(currentTarget);
   }
   
+  private updateMouseVelocity(deltaTime: number): void {
+    if (deltaTime > 0) {
+      this.mouseVelocity.x = this.lastMouseMovement.x / deltaTime;
+      this.mouseVelocity.y = this.lastMouseMovement.y / deltaTime;
+    }
+    
+    // Decay mouse movement for next frame
+    this.lastMouseMovement.x *= 0.8;
+    this.lastMouseMovement.y *= 0.8;
+  }
+  
+  private updateStateTracking(deltaTime: number): void {
+    // Update timing
+    if (this.state.isGrounded) {
+      this.state.lastGroundedTime = 0;
+      this.state.airTime = 0;
+    } else {
+      this.state.lastGroundedTime += deltaTime;
+      this.state.airTime += deltaTime;
+    }
+    
+    // Update current speed
+    this.state.currentSpeed = this.currentVelocity.length();
+  }
+
   private updateInputState(): void {
     const inputState = this.inputManager.getInputState();
     
     // Support multiple keys for movement (including arrow keys) to handle keyboard ghosting
-    this.inputState.forward = inputState.keyboard.get("KeyW") || inputState.keyboard.get("ArrowUp") || false;
-    this.inputState.backward = inputState.keyboard.get("KeyS") || inputState.keyboard.get("ArrowDown") || false;
-    this.inputState.left = inputState.keyboard.get("KeyA") || inputState.keyboard.get("ArrowLeft") || false;
-    this.inputState.right = inputState.keyboard.get("KeyD") || inputState.keyboard.get("ArrowRight") || false;
+    this.inputState.forward = inputState.keyboard.get("KeyS") || inputState.keyboard.get("ArrowUp") || false;
+    this.inputState.backward = inputState.keyboard.get("KeyW") || inputState.keyboard.get("ArrowDown") || false;
+    this.inputState.left = inputState.keyboard.get("KeyD") || inputState.keyboard.get("ArrowLeft") || false;
+    this.inputState.right = inputState.keyboard.get("KeyA") || inputState.keyboard.get("ArrowRight") || false;
     
     // Support multiple keys for jumping and sprinting
     this.inputState.jump = inputState.keyboard.get("Space") || inputState.keyboard.get("KeyJ") || false;
     this.inputState.sprint = inputState.keyboard.get("ShiftLeft") || inputState.keyboard.get("ShiftRight") || inputState.keyboard.get("KeyX") || false;
     
-    // Calculate input direction based on camera yaw (consistent for all modes)
-    this.state.inputDirection.set(0, 0, 0);
+    // Calculate wish direction (what the player wants to do)
+    this.state.wishDirection.set(0, 0, 0);
     
     const yaw = this.state.cameraRotation.yaw;
     const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
     
     if (this.inputState.forward) {
-      if (this.config.cameraMode === "third-person") {
-        this.state.inputDirection.sub(forward);
-      } else {
-        this.state.inputDirection.add(forward);
-      }
+      this.state.wishDirection.add(forward);
     }
     if (this.inputState.backward) {
-      if (this.config.cameraMode === "third-person") {
-        this.state.inputDirection.add(forward);
-      } else {
-        this.state.inputDirection.sub(forward);
-      }
+      this.state.wishDirection.sub(forward);
     }
     if (this.inputState.right) {
-      if (this.config.cameraMode === "third-person") {
-        this.state.inputDirection.sub(right);
-      } else {
-        this.state.inputDirection.add(right);
-
-      }
+      this.state.wishDirection.add(right);
     }
     if (this.inputState.left) {
-      if (this.config.cameraMode === "third-person") {
-        this.state.inputDirection.add(right);
-      } else {
-        this.state.inputDirection.sub(right);
-      }
+      this.state.wishDirection.sub(right);
     }
     
-    if (this.state.inputDirection.length() > 0) {
-      this.state.inputDirection.normalize();
-      
-      // In third-person mode, rotate character to face movement direction
-      if (this.config.cameraMode === "third-person") {
-        const movementYaw = Math.atan2(this.state.inputDirection.x, this.state.inputDirection.z);
-        this.character.setRotation(0, movementYaw, 0);
-      }
+    if (this.state.wishDirection.length() > 0) {
+      this.state.wishDirection.normalize();
     }
+    
+    // Legacy input direction for compatibility
+    this.state.inputDirection.copy(this.state.wishDirection);
     
     this.state.isSprinting = this.inputState.sprint;
-    this.state.isMoving = this.state.inputDirection.length() > 0;
+    this.state.isMoving = this.state.wishDirection.length() > 0;
   }
   
+  private updateGroundMovement(deltaTime: number): void {
+    const wishSpeed = this.config.maxSpeed * (this.state.isSprinting ? this.config.sprintMultiplier : 1.0);
+    
+    if (this.state.isMoving) {
+      // Ground acceleration
+      const acceleration = this.config.acceleration;
+      const currentSpeed = this.currentVelocity.length();
+      const addSpeed = wishSpeed - currentSpeed;
+      
+      if (addSpeed > 0) {
+        const accelSpeed = Math.min(acceleration * deltaTime, addSpeed);
+        this.currentVelocity.add(this.state.wishDirection.clone().multiplyScalar(accelSpeed));
+      }
+    }
+    
+    // Apply ground friction
+    this.applyFriction(this.config.groundFriction, deltaTime);
+  }
+
+  private updateAirMovement(deltaTime: number): void {
+    // Air strafing - the key to CS-like movement
+    this.applyAirAcceleration(deltaTime);
+    
+    // Air friction (much less than ground)
+    this.applyFriction(this.config.airFriction, deltaTime);
+  }
+  
+  private applyAirAcceleration(deltaTime: number): void {
+    if (!this.state.isMoving) return;
+    
+    const wishSpeed = this.config.airMaxSpeed;
+    const wishDirection = this.state.wishDirection.clone();
+    
+    // Add mouse influence to wish direction for air strafing
+    if (Math.abs(this.mouseVelocity.x) > 0.1) {
+      const mouseTurn = this.mouseVelocity.x * this.config.strafeResponseiveness * 0.001;
+      
+      // Create perpendicular direction for strafing
+      const currentVel = new THREE.Vector3(this.currentVelocity.x, 0, this.currentVelocity.z).normalize();
+      const perpendicular = new THREE.Vector3(-currentVel.z, 0, currentVel.x);
+      
+      // Add mouse turning influence
+      wishDirection.add(perpendicular.multiplyScalar(mouseTurn));
+      if (wishDirection.length() > 0) {
+        wishDirection.normalize();
+      }
+    }
+    
+    // Calculate current velocity in wish direction
+    const currentSpeed = this.currentVelocity.dot(wishDirection);
+    const addSpeed = wishSpeed - currentSpeed;
+    
+    if (addSpeed > 0) {
+      const accelSpeed = Math.min(this.config.airAcceleration * deltaTime, addSpeed);
+      this.currentVelocity.add(wishDirection.multiplyScalar(accelSpeed));
+    }
+  }
+  
+  private applyFriction(friction: number, deltaTime: number): void {
+    const speed = this.currentVelocity.length();
+    if (speed < 0.01) return;
+    
+    let control = Math.max(speed, this.config.stopSpeed);
+    let drop = control * friction * deltaTime;
+    
+    // Scale velocity to remove the drop amount
+    let newSpeed = Math.max(0, speed - drop);
+    if (newSpeed !== speed) {
+      newSpeed /= speed;
+      this.currentVelocity.multiplyScalar(newSpeed);
+    }
+  }
+  
+  private updateGroundDetection(correctedMovement: THREE.Vector3, deltaTime: number): void {
+    const wasGrounded = this.state.isGrounded;
+    const verticalMovement = correctedMovement.y;
+    
+    // Check surface normal and collision data
+    let groundCollision = false;
+    let surfaceNormal = new THREE.Vector3(0, 1, 0);
+    
+    for (let i = 0; i < this.rapierCharacterController!.numComputedCollisions(); i++) {
+      const collision = this.rapierCharacterController!.computedCollision(i);
+      if (collision && collision.normal2.y > 0.7) {
+        groundCollision = true;
+        surfaceNormal.set(collision.normal2.x, collision.normal2.y, collision.normal2.z);
+        break;
+      }
+    }
+    
+    // Update surface normal
+    this.state.surfaceNormal.copy(surfaceNormal);
+    
+    // Check if we're sliding on a slope
+    const slopeAngle = Math.acos(surfaceNormal.y);
+    this.state.isSliding = groundCollision && slopeAngle > this.config.slideThreshold;
+    
+    // Ground detection logic
+    const hitGround = this.verticalVelocity < -0.5 && Math.abs(verticalMovement) < 0.01;
+    const stayingGrounded = wasGrounded && Math.abs(verticalMovement) < 0.02 && this.verticalVelocity <= 0.1;
+    
+    this.state.isGrounded = groundCollision || hitGround || stayingGrounded;
+    
+    // Landing logic
+    if (this.state.isGrounded && !wasGrounded) {
+      this.verticalVelocity = 0;
+      if (this.state.isJumping) {
+        this.state.isJumping = false;
+      }
+      
+      // Preserve momentum when landing on slopes
+      if (this.state.isSliding) {
+        const horizontalVel = new THREE.Vector3(this.currentVelocity.x, 0, this.currentVelocity.z);
+        const speed = horizontalVel.length() * this.config.momentumPreservation;
+        if (speed > 0) {
+          horizontalVel.normalize().multiplyScalar(speed);
+          this.currentVelocity.x = horizontalVel.x;
+          this.currentVelocity.z = horizontalVel.z;
+        }
+      }
+    }
+  }
+  
+  private updateCollisionResponse(correctedMovement: THREE.Vector3, deltaTime: number): void {
+    // Handle velocity deflection on collision
+    const originalMovement = new THREE.Vector3(
+      this.currentVelocity.x * deltaTime,
+      this.verticalVelocity * deltaTime,
+      this.currentVelocity.z * deltaTime
+    );
+    
+    // If movement was blocked significantly, deflect velocity
+    const movementDiff = originalMovement.clone().sub(correctedMovement);
+    if (movementDiff.length() > 0.01) {
+      // Apply bounce/deflection
+      for (let i = 0; i < this.rapierCharacterController!.numComputedCollisions(); i++) {
+        const collision = this.rapierCharacterController!.computedCollision(i);
+        if (collision) {
+          const n = collision.normal2;
+          const normal = new THREE.Vector3(n.x as number, n.y as number, n.z as number);
+          
+          // Deflect velocity based on surface normal
+          const velocityLength = this.currentVelocity.length();
+          if (velocityLength > 0) {
+            const deflectedVel = this.currentVelocity.clone().reflect(normal);
+            deflectedVel.multiplyScalar(this.config.bounceVelocityRetention);
+            
+            // Only apply deflection if it maintains/increases speed (surfing!)
+            if (deflectedVel.length() >= velocityLength * 0.8) {
+              this.currentVelocity.copy(deflectedVel);
+            }
+          }
+        }
+      }
+    }
+  }
+
   public jump(): void {
     if (this.state.isGrounded && !this.state.isJumping) {
       this.verticalVelocity = this.config.jumpForce;
@@ -491,8 +724,13 @@ export class CharacterController {
       return;
     }
     
+    this.frameTime = deltaTime;
+    
+    // Update mouse velocity for air strafing
+    this.updateMouseVelocity(deltaTime);
+    
     this.updateInputState();
-    this.updateCharacterMovement(deltaTime);
+    this.updateAdvancedMovement(deltaTime);
     this.updateCameraRotation();
     
     // Update third-person camera lookAt after camera follow system has updated position
@@ -500,6 +738,9 @@ export class CharacterController {
     
     // Update animations based on character state
     this.updateAnimation();
+    
+    // Update state tracking
+    this.updateStateTracking(deltaTime);
   }
   
   private updateAnimation(): void {
@@ -538,7 +779,7 @@ export class CharacterController {
     }
   }
   
-  private updateCharacterMovement(deltaTime: number): void {
+  private updateAdvancedMovement(deltaTime: number): void {
     if (!this.rapierCharacterController) {
       console.warn("Rapier character controller not available");
       return;
@@ -564,13 +805,31 @@ export class CharacterController {
       this.coyoteTime -= deltaTime;
     }
 
-    // Handle jump input with buffering and coyote time
-    const canJump = (this.state.isGrounded || this.coyoteTime > 0) && !this.state.isJumping;
-    if (this.jumpBuffer > 0 && canJump) {
+    // CS-style jumping with pre-speed boost and sliding support
+    const canJump = this.state.isGrounded || this.coyoteTime > 0 || 
+                   (this.config.jumpWhileSliding && this.state.isSliding);
+    const shouldJump = this.jumpBuffer > 0 && canJump && !this.state.isJumping;
+    
+    if (shouldJump) {
+      // Apply pre-speed boost for better jumping
+      if (this.state.isMoving) {
+        const currentHorizontalSpeed = Math.sqrt(this.currentVelocity.x * this.currentVelocity.x + 
+                                                this.currentVelocity.z * this.currentVelocity.z);
+        const boostFactor = Math.max(1.0, this.config.preSpeedBoost);
+        const boostedSpeed = currentHorizontalSpeed * boostFactor;
+        
+        if (boostedSpeed > currentHorizontalSpeed) {
+          const horizontalDirection = new THREE.Vector3(this.currentVelocity.x, 0, this.currentVelocity.z).normalize();
+          this.currentVelocity.x = horizontalDirection.x * boostedSpeed;
+          this.currentVelocity.z = horizontalDirection.z * boostedSpeed;
+        }
+      }
+      
       this.verticalVelocity = this.config.jumpForce;
       this.state.isJumping = true;
-      this.jumpBuffer = 0; // Consume the jump buffer
-      this.coyoteTime = 0; // Consume coyote time
+      this.state.lastJumpTime = 0;
+      this.jumpBuffer = 0;
+      this.coyoteTime = 0;
     }
     this.previousInputState.jump = this.inputState.jump;
 
@@ -582,34 +841,27 @@ export class CharacterController {
       this.verticalVelocity = this.config.maxFallSpeed;
     }
 
-    // Calculate horizontal movement with improved responsiveness
-    const targetSpeed = this.config.maxSpeed * (this.state.isSprinting ? this.config.sprintMultiplier : 1.0);
-    const targetVelocity = this.state.inputDirection.clone().multiplyScalar(targetSpeed);
-    
-    if (this.state.isMoving) {
-      // Check if we're changing direction - use faster acceleration for direction changes
-      const currentDirection = this.desiredVelocity.clone().normalize();
-      const targetDirection = this.state.inputDirection.clone();
-      const directionAlignment = currentDirection.dot(targetDirection);
-      
-      // Use faster acceleration when changing direction or starting from rest
-      const accelerationMultiplier = (directionAlignment < 0.5 || this.desiredVelocity.length() < 0.1) ? 2.0 : 1.0;
-      const accelerationRate = Math.min(1.0, this.config.acceleration * accelerationMultiplier * deltaTime);
-      
-      this.desiredVelocity.lerp(targetVelocity, accelerationRate);
+    // Advanced movement mechanics
+    if (this.state.isGrounded) {
+      this.updateGroundMovement(deltaTime);
     } else {
-      // Faster deceleration for better stopping control
-      this.desiredVelocity.lerp(
-        new THREE.Vector3(0, 0, 0),
-        Math.min(1.0, this.config.acceleration * 3.0 * deltaTime)
-      );
+      this.updateAirMovement(deltaTime);
+    }
+
+    // Apply velocity damping
+    this.currentVelocity.multiplyScalar(this.config.velocityDamping);
+    
+    // Clamp maximum velocity
+    const currentSpeed = this.currentVelocity.length();
+    if (currentSpeed > this.config.maxVelocity) {
+      this.currentVelocity.normalize().multiplyScalar(this.config.maxVelocity);
     }
 
     // Combine horizontal and vertical movement
     const desiredTranslation = new THREE.Vector3(
-      this.desiredVelocity.x * deltaTime,
+      this.currentVelocity.x * deltaTime,
       this.verticalVelocity * deltaTime,
-      this.desiredVelocity.z * deltaTime
+      this.currentVelocity.z * deltaTime
     );
 
     // Use Rapier's character controller to compute movement
@@ -637,43 +889,18 @@ export class CharacterController {
           visualPosition.sub(this.config.colliderOffset);
         }
         
-        // IMPORTANT: We set the position directly on the THREE.Object3D,
-        // bypassing the Entity's setPosition method to avoid the feedback loop
-        // where updatePhysicsTransform would be called again.
         this.character.position.copy(visualPosition);
         (this.character as any).emitChange();
         
-        // More reliable grounded detection
-        const wasGrounded = this.state.isGrounded;
-        const verticalMovement = correctedMovement.y;
+        // Convert Rapier Vector to THREE.Vector3
+        const correctedMovementVec3 = new THREE.Vector3(
+          correctedMovement.x,
+          correctedMovement.y,
+          correctedMovement.z
+        );
         
-        // Check if we hit something below us
-        let groundCollision = false;
-        for (let i = 0; i < this.rapierCharacterController.numComputedCollisions(); i++) {
-          const collision = this.rapierCharacterController.computedCollision(i);
-          // Check if collision normal points upward (ground collision)
-          if (collision && collision.normal2.y > 0.7) { // 0.7 ~= cos(45°), reasonable slope threshold
-            groundCollision = true;
-            break;
-          }
-        }
-        
-        // We're grounded if:
-        // 1. We had downward velocity but didn't move down much (hit ground)
-        // 2. We have a ground collision
-        // 3. We were already grounded and have minimal vertical movement
-        const hitGround = this.verticalVelocity < -0.5 && Math.abs(verticalMovement) < 0.01;
-        const stayingGrounded = wasGrounded && Math.abs(verticalMovement) < 0.02 && this.verticalVelocity <= 0.1;
-        
-        this.state.isGrounded = groundCollision || hitGround || stayingGrounded;
-        
-        // If we just landed, reset vertical velocity and jumping state
-        if (this.state.isGrounded && (!wasGrounded || this.verticalVelocity < 0)) {
-          this.verticalVelocity = 0;
-          if (this.state.isJumping && this.verticalVelocity <= 0) {
-            this.state.isJumping = false;
-          }
-        }
+        this.updateGroundDetection(correctedMovementVec3, deltaTime);
+        this.updateCollisionResponse(correctedMovementVec3, deltaTime);
 
         // Update state velocity for external systems
         if (deltaTime > 0) {
@@ -683,14 +910,6 @@ export class CharacterController {
             correctedMovement.z / deltaTime
           );
         }
-
-        // Check for collisions with dynamic bodies
-        for (let i = 0; i < this.rapierCharacterController.numComputedCollisions(); i++) {
-          const collision = this.rapierCharacterController.computedCollision(i);
-          // Handle collision events if needed (e.g., sound effects, damage, etc.)
-          // console.log("Character collision detected:", collision);
-        }
-        
       }
     } catch (error) {
       console.error("Error in character controller movement:", error);
@@ -790,6 +1009,23 @@ export const FPS_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
   jumpForce: 15.0,
   cameraSensitivity: 0.002,
   snapToGroundDistance: 0.05,
+  
+  // CS-style movement for FPS
+  airAcceleration: 50.0,
+  airMaxSpeed: 35.0,
+  groundFriction: 6.0,
+  airFriction: 0.02,
+  stopSpeed: 1.0,
+  slopeFriction: 3.0,
+  slideThreshold: Math.PI / 6,
+  momentumPreservation: 0.98,
+  strafeResponseiveness: 1.2,
+  maxVelocity: 60.0,
+  velocityDamping: 0.995,
+  bounceVelocityRetention: 0.9,
+  preSpeedBoost: 1.3,
+  jumpWhileSliding: true,
+  bunnyHopTolerance: 0.15,
 };
 
 export const THIRD_PERSON_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
@@ -801,6 +1037,23 @@ export const THIRD_PERSON_CHARACTER_CONFIG: Partial<CharacterControllerConfig> =
   acceleration: 50.0,
   jumpForce: 12.0,
   cameraSensitivity: 0.002,
+  
+  // CS-style movement for third-person
+  airAcceleration: 40.0,
+  airMaxSpeed: 25.0,
+  groundFriction: 8.0,
+  airFriction: 0.05,
+  stopSpeed: 1.0,
+  slopeFriction: 2.5,
+  slideThreshold: Math.PI / 6,
+  momentumPreservation: 0.95,
+  strafeResponseiveness: 0.8,
+  maxVelocity: 45.0,
+  velocityDamping: 0.98,
+  bounceVelocityRetention: 0.85,
+  preSpeedBoost: 1.2,
+  jumpWhileSliding: true,
+  bunnyHopTolerance: 0.12,
 };
 
 export const PLATFORMER_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
@@ -814,4 +1067,50 @@ export const PLATFORMER_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
   cameraSensitivity: 0.0015,
   autoStepMaxHeight: 0.8,
   snapToGroundDistance: 0.5,
+  
+  // CS-style movement for platformer
+  airAcceleration: 45.0,
+  airMaxSpeed: 30.0,
+  groundFriction: 5.0,
+  airFriction: 0.01,
+  stopSpeed: 1.0,
+  slopeFriction: 1.5,
+  slideThreshold: Math.PI / 6,
+  momentumPreservation: 0.97,
+  strafeResponseiveness: 0.9,
+  maxVelocity: 50.0,
+  velocityDamping: 0.99,
+  bounceVelocityRetention: 0.9,
+  preSpeedBoost: 1.4,
+  jumpWhileSliding: true,
+  bunnyHopTolerance: 0.18,
+};
+
+export const CS_SURF_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
+  cameraMode: "first-person",
+  cameraDistance: 0,
+  cameraHeight: 1.7,
+  colliderOffset: new THREE.Vector3(0, 0, 0),
+  maxSpeed: 12.0,
+  acceleration: 60.0,
+  jumpForce: 18.0,
+  cameraSensitivity: 0.0025,
+  snapToGroundDistance: 0.02,
+  
+  // Optimized for surfing and air strafing
+  airAcceleration: 100.0,
+  airMaxSpeed: 80.0,
+  groundFriction: 4.0,
+  airFriction: 0.001,
+  stopSpeed: 0.5,
+  slopeFriction: 0.5, // Very low for smooth sliding
+  slideThreshold: Math.PI / 8, // 22.5 degrees - allows sliding on gentler slopes
+  momentumPreservation: 0.99,
+  strafeResponseiveness: 2.0, // High for precise air control
+  maxVelocity: 120.0,
+  velocityDamping: 0.998,
+  bounceVelocityRetention: 0.95,
+  preSpeedBoost: 1.5,
+  jumpWhileSliding: true,
+  bunnyHopTolerance: 0.2,
 };

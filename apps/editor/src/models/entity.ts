@@ -578,6 +578,28 @@ export abstract class Entity extends THREE.Object3D {
       acceleration: 50.0,
       jumpForce: 12.0,
       sprintMultiplier: 1.8,
+      
+      // Advanced movement mechanics (CS-like defaults)
+      airAcceleration: 40.0,
+      airMaxSpeed: 30.0,
+      groundFriction: 8.0,
+      airFriction: 0.1,
+      stopSpeed: 1.0,
+      slopeFriction: 2.0,
+      slideThreshold: Math.PI / 6,
+      momentumPreservation: 0.95,
+      strafeResponseiveness: 1.0,
+      
+      // Velocity and physics
+      maxVelocity: 50.0,
+      velocityDamping: 0.99,
+      bounceVelocityRetention: 0.8,
+      
+      // Jump mechanics
+      preSpeedBoost: 1.2,
+      jumpWhileSliding: true,
+      bunnyHopTolerance: 0.1,
+      
       offset: 0.01,
       maxSlopeClimbAngle: Math.PI / 4,
       minSlopeSlideAngle: Math.PI / 6,

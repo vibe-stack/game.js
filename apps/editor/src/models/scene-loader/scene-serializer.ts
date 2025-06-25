@@ -169,7 +169,80 @@ export class SceneSerializer {
     if ('shininess' in material) {
       properties.shininess = (material as any).shininess;
     }
+    if ('envMapIntensity' in material) {
+      properties.envMapIntensity = (material as any).envMapIntensity;
+    }
+
+    // Serialize texture references and UV properties
+    this.serializeTextureProperty(material, properties, 'map', 'mapProps');
+    this.serializeTextureProperty(material, properties, 'normalMap', 'normalMapProps');
+    this.serializeTextureProperty(material, properties, 'roughnessMap', 'roughnessMapProps');
+    this.serializeTextureProperty(material, properties, 'metalnessMap', 'metalnessMapProps');
+    this.serializeTextureProperty(material, properties, 'aoMap', 'aoMapProps');
+    this.serializeTextureProperty(material, properties, 'emissiveMap', 'emissiveMapProps');
+    this.serializeTextureProperty(material, properties, 'specularMap', 'specularMapProps');
+
+    // Normal scale
+    if ('normalScale' in material && (material as any).normalScale) {
+      properties.normalScale = (material as any).normalScale.x;
+    }
+
+    // AO Map intensity
+    if ('aoMapIntensity' in material) {
+      properties.aoMapIntensity = (material as any).aoMapIntensity;
+    }
+
+    // Physical material specific properties and textures
+    if (material instanceof THREE.MeshPhysicalMaterial) {
+      properties.clearcoat = material.clearcoat;
+      properties.clearcoatRoughness = material.clearcoatRoughness;
+      properties.ior = material.ior;
+      properties.transmission = material.transmission;
+      properties.thickness = material.thickness;
+      properties.iridescence = material.iridescence;
+      properties.iridescenceIOR = material.iridescenceIOR;
+      properties.sheen = material.sheen;
+      properties.sheenColor = '#' + material.sheenColor.getHexString();
+      properties.sheenRoughness = material.sheenRoughness;
+
+      // Physical material textures
+      this.serializeTextureProperty(material, properties, 'clearcoatMap', 'clearcoatMapProps');
+      this.serializeTextureProperty(material, properties, 'clearcoatRoughnessMap', 'clearcoatRoughnessMapProps');
+      this.serializeTextureProperty(material, properties, 'clearcoatNormalMap', 'clearcoatNormalMapProps');
+      this.serializeTextureProperty(material, properties, 'transmissionMap', 'transmissionMapProps');
+      this.serializeTextureProperty(material, properties, 'thicknessMap', 'thicknessMapProps');
+      this.serializeTextureProperty(material, properties, 'iridescenceMap', 'iridescenceMapProps');
+      this.serializeTextureProperty(material, properties, 'iridescenceThicknessMap', 'iridescenceThicknessMapProps');
+      this.serializeTextureProperty(material, properties, 'sheenColorMap', 'sheenColorMapProps');
+      this.serializeTextureProperty(material, properties, 'sheenRoughnessMap', 'sheenRoughnessMapProps');
+
+      // Clearcoat normal scale
+      if (material.clearcoatNormalScale) {
+        properties.clearcoatNormalScale = material.clearcoatNormalScale.x;
+      }
+    }
     
     return properties;
+  }
+
+  private serializeTextureProperty(material: THREE.Material, properties: Record<string, any>, textureProp: string, uvProp: string): void {
+    if (textureProp in material) {
+      const texture = (material as any)[textureProp] as THREE.Texture;
+      if (texture && texture.source && texture.source.data && texture.source.data.src) {
+        // Extract the asset path from the texture URL
+        const src = texture.source.data.src;
+        const assetMatch = src.match(/\/assets\/(.+)$/);
+        if (assetMatch) {
+          properties[textureProp] = `assets/${assetMatch[1]}`;
+          
+          // Save UV properties
+          properties[uvProp] = {
+            repeat: { x: texture.repeat.x, y: texture.repeat.y },
+            offset: { x: texture.offset.x, y: texture.offset.y },
+            rotation: texture.rotation
+          };
+        }
+      }
+    }
   }
 }
