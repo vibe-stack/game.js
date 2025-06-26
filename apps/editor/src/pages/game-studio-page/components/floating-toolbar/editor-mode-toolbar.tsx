@@ -53,6 +53,10 @@ export default function EditorModeToolbar() {
         return;
       }
 
+      if (gameState === 'playing') {
+        return;
+      }
+
       switch (event.key.toLowerCase()) {
         case 'q':
           event.preventDefault();
@@ -79,7 +83,7 @@ export default function EditorModeToolbar() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setEditorMode, viewportMode, setViewportMode]);
+  }, [setEditorMode, viewportMode, setViewportMode, gameState]);
 
   const handleUndo = () => {
     // TODO: Implement undo functionality 

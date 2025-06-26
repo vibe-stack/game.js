@@ -413,26 +413,32 @@ export class CharacterController {
     if (!camera) {
       return;
     }
-    
-    if (this.config.cameraMode === "first-person") {
+
+    if (this.config.cameraMode === 'first-person') {
       // For FPS mode, apply rotation directly to the camera
       camera.rotation.order = 'YXZ';
-      camera.rotation.z = 0;
       camera.rotation.y = this.state.cameraRotation.yaw;
       camera.rotation.x = this.state.cameraRotation.pitch;
-      
+
       // Update the camera follow offset for first-person (camera at character eye level)
       const followConfig = this.cameraManager.getCameraFollow(this.cameraId);
       if (followConfig) {
         followConfig.offset = new THREE.Vector3(0, this.config.cameraHeight, 0);
         this.cameraManager.setCameraFollow(this.cameraId, followConfig);
       }
-      
+
       // Also rotate the character body to match camera yaw for movement direction
       this.character.setRotation(0, this.state.cameraRotation.yaw, 0);
     } else {
-      // For third-person mode, don't rotate the character here - let movement handle it
-      
+      // For third-person mode, rotate the character to face the movement direction
+      if (this.state.isMoving && this.state.wishDirection.lengthSq() > 0.01) {
+        const targetYaw = Math.atan2(this.state.wishDirection.x, this.state.wishDirection.z);
+        // Use a small lerp factor for smooth rotation. Use frameTime for frame-rate independence.
+        const lerpFactor = Math.min(10 * this.frameTime, 1.0);
+        const newYaw = THREE.MathUtils.lerp(this.character.rotation.y, targetYaw, lerpFactor);
+        this.character.setRotation(this.character.rotation.x, newYaw, 0);
+      }
+
       // Update camera follow offset based on rotation
       const followConfig = this.cameraManager.getCameraFollow(this.cameraId);
       if (followConfig) {
@@ -440,19 +446,19 @@ export class CharacterController {
         const height = this.config.cameraHeight;
         const yaw = this.state.cameraRotation.yaw;
         const pitch = this.state.cameraRotation.pitch;
-        
+
         // Calculate camera offset to position it behind the character
         // Use negative distance values to position camera behind
         const offset = new THREE.Vector3(
           -Math.sin(yaw) * Math.cos(pitch) * distance,
           height + Math.sin(pitch) * distance,
-          -Math.cos(yaw) * Math.cos(pitch) * distance
+          -Math.cos(yaw) * Math.cos(pitch) * distance,
         );
-        
+
         followConfig.offset = offset;
         this.cameraManager.setCameraFollow(this.cameraId, followConfig);
       }
-      
+
       // Don't call lookAt here - let updateThirdPersonCameraLookAt handle it
       // after the camera follow system has updated
     }
@@ -514,10 +520,10 @@ export class CharacterController {
     const inputState = this.inputManager.getInputState();
     
     // Support multiple keys for movement (including arrow keys) to handle keyboard ghosting
-    this.inputState.forward = inputState.keyboard.get("KeyS") || inputState.keyboard.get("ArrowUp") || false;
-    this.inputState.backward = inputState.keyboard.get("KeyW") || inputState.keyboard.get("ArrowDown") || false;
-    this.inputState.left = inputState.keyboard.get("KeyD") || inputState.keyboard.get("ArrowLeft") || false;
-    this.inputState.right = inputState.keyboard.get("KeyA") || inputState.keyboard.get("ArrowRight") || false;
+    this.inputState.forward = inputState.keyboard.get("KeyW") || inputState.keyboard.get("ArrowUp") || false;
+    this.inputState.backward = inputState.keyboard.get("KeyS") || inputState.keyboard.get("ArrowDown") || false;
+    this.inputState.left = inputState.keyboard.get("KeyA") || inputState.keyboard.get("ArrowLeft") || false;
+    this.inputState.right = inputState.keyboard.get("KeyD") || inputState.keyboard.get("ArrowRight") || false;
     
     // Support multiple keys for jumping and sprinting
     this.inputState.jump = inputState.keyboard.get("Space") || inputState.keyboard.get("KeyJ") || false;
@@ -527,7 +533,7 @@ export class CharacterController {
     this.state.wishDirection.set(0, 0, 0);
     
     const yaw = this.state.cameraRotation.yaw;
-    const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
     
     if (this.inputState.forward) {
@@ -537,10 +543,10 @@ export class CharacterController {
       this.state.wishDirection.sub(forward);
     }
     if (this.inputState.right) {
-      this.state.wishDirection.add(right);
+      this.state.wishDirection.sub(right);
     }
     if (this.inputState.left) {
-      this.state.wishDirection.sub(right);
+      this.state.wishDirection.add(right);
     }
     
     if (this.state.wishDirection.length() > 0) {
@@ -730,8 +736,8 @@ export class CharacterController {
     this.updateMouseVelocity(deltaTime);
     
     this.updateInputState();
-    this.updateAdvancedMovement(deltaTime);
     this.updateCameraRotation();
+    this.updateAdvancedMovement(deltaTime);
     
     // Update third-person camera lookAt after camera follow system has updated position
     this.updateThirdPersonCameraLookAt();
