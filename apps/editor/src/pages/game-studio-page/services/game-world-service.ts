@@ -4,6 +4,7 @@ import { materialSystem } from "@/services/material-system";
 import { EditorCameraService } from "./editor-camera-service";
 import { SelectionManager } from "./selection-manager";
 import { TransformControlsManager } from "./transform-controls-manager";
+import { HelperManager } from "./helper-manager";
 
 export class GameWorldService {
   private gameWorld: GameWorld | null = null;
@@ -14,6 +15,7 @@ export class GameWorldService {
   private editorCameraService: EditorCameraService;
   private selectionManager: SelectionManager;
   private transformControlsManager: TransformControlsManager;
+  private helperManager: HelperManager;
   private characterControllers: Map<string, CharacterController> = new Map();
   private prePlaActiveCamera: string | null = null; // Store active camera before gameplay
 
@@ -24,6 +26,7 @@ export class GameWorldService {
     this.editorCameraService = new EditorCameraService();
     this.selectionManager = new SelectionManager();
     this.transformControlsManager = new TransformControlsManager();
+    this.helperManager = new HelperManager();
   }
 
   async initialize(canvas: HTMLCanvasElement): Promise<void> {
@@ -52,6 +55,9 @@ export class GameWorldService {
 
         // Initialize selection manager
         this.selectionManager.initialize(this.gameWorld);
+        
+        // Initialize helper manager
+        this.helperManager.initialize(this.gameWorld);
         
         // Initialize transform controls manager
         await this.transformControlsManager.initialize(this.gameWorld, canvas);
@@ -109,6 +115,9 @@ export class GameWorldService {
         
         // Reinitialize selection manager after scene reload
         this.selectionManager.initialize(this.gameWorld);
+        
+        // Reinitialize helper manager after scene reload
+        this.helperManager.initialize(this.gameWorld);
         
         // Reinitialize transform controls manager AFTER scene is loaded (so entities exist)
         await this.transformControlsManager.initialize(this.gameWorld, canvas);
@@ -237,6 +246,9 @@ export class GameWorldService {
       useGameStudioStore.getState().setGameState('playing');
       this.selectionManager.onGameStateChanged('playing');
       
+      // Hide helpers when playing
+      this.helperManager.setVisible(false);
+      
       // Enable character controllers
       this.enableCharacterControllers();
     }
@@ -247,6 +259,9 @@ export class GameWorldService {
       this.gameWorld.pause();
       useGameStudioStore.getState().setGameState('paused');
       this.selectionManager.onGameStateChanged('paused');
+      
+      // Show helpers when paused (not playing)
+      this.helperManager.setVisible(true);
     }
   }
 
@@ -255,6 +270,9 @@ export class GameWorldService {
       this.gameWorld.resume();
       useGameStudioStore.getState().setGameState('playing');
       this.selectionManager.onGameStateChanged('playing');
+      
+      // Hide helpers when playing
+      this.helperManager.setVisible(false);
     }
   }
 
@@ -263,6 +281,9 @@ export class GameWorldService {
       this.gameWorld.reset();
       useGameStudioStore.getState().setGameState('initial');
       this.selectionManager.onGameStateChanged('initial');
+      
+      // Show helpers when not playing
+      this.helperManager.setVisible(true);
       
       // Disable character controllers first (this removes their cameras)
       this.disableCharacterControllers();
@@ -282,6 +303,9 @@ export class GameWorldService {
       
       // Update available cameras to remove any runtime cameras
       this.updateAvailableCameras();
+      
+      // Refresh helpers after camera changes
+      this.helperManager.onCamerasChanged();
     }
   }
   
@@ -304,6 +328,7 @@ export class GameWorldService {
       this.editorCameraService.dispose();
       this.selectionManager.dispose();
       this.transformControlsManager.dispose();
+      this.helperManager.dispose();
       this.assetManager.dispose();
     } catch (error) {
       console.error("Failed to dispose game world:", error);
@@ -320,6 +345,10 @@ export class GameWorldService {
 
   getTransformControlsManager(): TransformControlsManager {
     return this.transformControlsManager;
+  }
+
+  getHelperManager(): HelperManager {
+    return this.helperManager;
   }
 
   // Camera Management Methods
@@ -347,6 +376,9 @@ export class GameWorldService {
     
     // Set editor camera as active by default
     setActiveCamera(this.editorCameraService.getEditorCameraId());
+    
+    // Update camera helpers when cameras change
+    this.helperManager.onCamerasChanged();
   }
 
   switchToCamera(cameraId: string): boolean {
@@ -449,6 +481,9 @@ export class GameWorldService {
     if (this.gameWorld) {
       this.editorCameraService.update();
       
+      // Update helpers
+      this.helperManager.update();
+      
       // Update character controllers during gameplay
       const { gameState } = useGameStudioStore.getState();
       if (gameState === 'playing') {
@@ -476,6 +511,9 @@ export class GameWorldService {
     
     // Remove from registry
     entitiesRegistry.remove(entityId);
+
+    // Notify helper manager about entity removal
+    this.helperManager.onEntityRemoved(entityId);
 
     // If this entity was selected, clear the selection
     const { selectedEntity, setSelectedEntity } = useGameStudioStore.getState();

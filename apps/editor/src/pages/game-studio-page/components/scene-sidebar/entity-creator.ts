@@ -192,8 +192,8 @@ export class EntityCreator {
           position: spawnPosition,
           color: 0xffffff,
           intensity: 1,
-          distance: 10,
-          castShadow: true,
+          distance: 0, // 0 means no distance limitation - light affects all objects
+          castShadow: false, // Disable shadows initially for WebGPU compatibility
         });
         break;
         
@@ -203,10 +203,10 @@ export class EntityCreator {
           position: new THREE.Vector3(0, 5, 0),
           color: 0xffffff,
           intensity: 1,
-          distance: 10,
+          distance: 0, // 0 means no distance limitation - light affects all objects
           angle: Math.PI / 4,
           penumbra: 0.1,
-          castShadow: true,
+          castShadow: false, // Disable shadows initially for WebGPU compatibility
         });
         break;
 
@@ -238,6 +238,10 @@ export class EntityCreator {
       // Notify selection manager about the new entity
       const selectionManager = gameWorldService.getSelectionManager();
       selectionManager.onEntityAdded(entity);
+      
+      // Notify helper manager about the new entity
+      const helperManager = gameWorldService.getHelperManager();
+      helperManager.onEntityAdded(entity);
       
       return entity;
     }

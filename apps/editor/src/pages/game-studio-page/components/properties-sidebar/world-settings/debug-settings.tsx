@@ -3,7 +3,7 @@ import { GameWorldService } from "../../../services/game-world-service";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bug } from "lucide-react";
+import { Bug, Eye } from "lucide-react";
 
 interface DebugSettingsProps {
   gameWorldService: React.RefObject<GameWorldService | null>;
@@ -11,12 +11,17 @@ interface DebugSettingsProps {
 
 export function DebugSettings({ gameWorldService }: DebugSettingsProps) {
   const [physicsDebugEnabled, setPhysicsDebugEnabled] = useState(false);
+  const [helpersEnabled, setHelpersEnabled] = useState(true);
 
   useEffect(() => {
     const updateDebugState = () => {
       const gameWorld = gameWorldService.current?.getGameWorld();
+      const helperManager = gameWorldService.current?.getHelperManager();
       if (gameWorld) {
         setPhysicsDebugEnabled(gameWorld.isPhysicsDebugRenderEnabled());
+      }
+      if (helperManager) {
+        setHelpersEnabled(helperManager.isHelpersEnabled());
       }
     };
 
@@ -41,6 +46,14 @@ export function DebugSettings({ gameWorldService }: DebugSettingsProps) {
     }
   };
 
+  const handleHelpersToggle = (enabled: boolean) => {
+    const helperManager = gameWorldService.current?.getHelperManager();
+    if (helperManager) {
+      helperManager.setEnabled(enabled);
+      setHelpersEnabled(enabled);
+    }
+  };
+
   return (
     <Card className="bg-white/5 border-white/10">
       <CardHeader className="pb-3">
@@ -50,6 +63,20 @@ export function DebugSettings({ gameWorldService }: DebugSettingsProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="object-helpers" className="text-white/80">
+            Show Object Helpers
+          </Label>
+          <Switch
+            id="object-helpers"
+            checked={helpersEnabled}
+            onCheckedChange={handleHelpersToggle}
+          />
+        </div>
+        <div className="text-xs text-white/60">
+          Shows camera and light helpers in the editor
+        </div>
+        
         <div className="flex items-center justify-between">
           <Label htmlFor="physics-debug" className="text-white/80">
             Physics Debug Rendering

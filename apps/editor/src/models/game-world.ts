@@ -58,7 +58,8 @@ export class GameWorld {
     
     if (config.shadowMapEnabled) {
       this.renderer.shadowMap.enabled = true;
-      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      // Use PCFShadowMap for better WebGPU compatibility
+      this.renderer.shadowMap.type = THREE.PCFShadowMap;
     }
 
     this.registryManager = new RegistryManager();

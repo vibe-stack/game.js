@@ -156,7 +156,7 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
         opacity: gameState === "playing" ? 0 : 1,
       }}
       transition={{ duration: 0.5 }}
-      className="fixed top-32 bottom-32 left-4 z-40 w-80 overflow-hidden rounded-lg border border-white/10 bg-black/60 backdrop-blur-md"
+      className="fixed top-32 bottom-32 left-4 z-40 w-80 rounded-lg border border-white/10 bg-black/60 backdrop-blur-md"
     >
       <Tabs
         value={activeTab}
@@ -186,7 +186,7 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
 
         <TabsContent
           value="scene"
-          className="m-2 flex flex-1 flex-col space-y-2"
+          className="m-2 flex flex-1 flex-col space-y-2 max-h-full overflow-hidden"
         >
           <div className="flex gap-2">
             <div className="relative flex-1">

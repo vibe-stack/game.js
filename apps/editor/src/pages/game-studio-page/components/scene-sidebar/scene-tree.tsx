@@ -150,7 +150,7 @@ export default function SceneTree({
   const totalItems = sceneEntities.length + sceneCameras.length;
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 min-h-0 overflow-y-auto">
       <div className="text-xs text-gray-400 px-2 py-1 border-b border-white/10">
         Scene Hierarchy ({totalItems} items)
       </div>
