@@ -120,8 +120,15 @@ export class DirectionalLight extends Light {
     this.add(this._target);
     this.directionalLight.target = this._target;
     
+    // Handle target from config (during deserialization)
     if (config.target) {
-      this.setTarget(config.target);
+      if (config.target instanceof THREE.Vector3) {
+        this.setTarget(config.target);
+      } else if (typeof config.target === 'object' && config.target !== null && 'x' in config.target && 'y' in config.target && 'z' in config.target) {
+        // Handle serialized target object
+        const targetObj = config.target as { x: number; y: number; z: number };
+        this.setTarget(new THREE.Vector3(targetObj.x, targetObj.y, targetObj.z));
+      }
     }
   }
   
@@ -174,6 +181,21 @@ export class DirectionalLight extends Light {
       camera.bottom = -size;
       camera.updateProjectionMatrix();
     }
+  }
+
+  serialize(): EntityData {
+    const baseData = super.serialize();
+    return {
+      ...baseData,
+      properties: {
+        ...baseData.properties,
+        target: {
+          x: this._target.position.x,
+          y: this._target.position.y,
+          z: this._target.position.z
+        }
+      }
+    };
   }
 }
 
@@ -239,6 +261,18 @@ export class PointLight extends Light {
   getDecay(): number {
     return this.pointLight.decay;
   }
+
+  serialize(): EntityData {
+    const baseData = super.serialize();
+    return {
+      ...baseData,
+      properties: {
+        ...baseData.properties,
+        distance: this.pointLight.distance,
+        decay: this.pointLight.decay
+      }
+    };
+  }
 }
 
 export class SpotLight extends Light {
@@ -252,8 +286,15 @@ export class SpotLight extends Light {
     this.add(this._target);
     this.spotLight.target = this._target;
     
+    // Handle target from config (during deserialization)
     if (config.target) {
-      this.setTarget(config.target);
+      if (config.target instanceof THREE.Vector3) {
+        this.setTarget(config.target);
+      } else if (typeof config.target === 'object' && config.target !== null && 'x' in config.target && 'y' in config.target && 'z' in config.target) {
+        // Handle serialized target object
+        const targetObj = config.target as { x: number; y: number; z: number };
+        this.setTarget(new THREE.Vector3(targetObj.x, targetObj.y, targetObj.z));
+      }
     }
   }
   
@@ -344,5 +385,24 @@ export class SpotLight extends Light {
   
   getDecay(): number {
     return this.spotLight.decay;
+  }
+
+  serialize(): EntityData {
+    const baseData = super.serialize();
+    return {
+      ...baseData,
+      properties: {
+        ...baseData.properties,
+        distance: this.spotLight.distance,
+        angle: this.spotLight.angle,
+        penumbra: this.spotLight.penumbra,
+        decay: this.spotLight.decay,
+        target: {
+          x: this._target.position.x,
+          y: this._target.position.y,
+          z: this._target.position.z
+        }
+      }
+    };
   }
 }

@@ -75,7 +75,7 @@ export class EntityLoader {
       case "plane": entity = new Plane(config); break;
       case "heightfield": entity = new Heightfield(config); break;
       case "mesh3d": entity = new Mesh3D(config); break;
-      case "light": entity = this.createLight(data); break;
+      case "light": entity = this.createLight(config); break;
       case "camera": this.createCamera(context, data); return null; // Cameras are not entities in the scene graph
       default: throw new Error(`Unsupported entity type: ${data.type}`);
     }
@@ -115,16 +115,15 @@ export class EntityLoader {
     return entity;
   }
 
-  private createLight(data: EntityData): Entity {
-    const props = data.properties || {};
-    const config = { ...data, lightType: props.type, ...props } as any;
+  private createLight(config: any): Entity {
+    const lightType = config.type || config.lightType;
 
-    switch (props.type) {
+    switch (lightType) {
       case "ambient": return new AmbientLight(config);
       case "directional": return new DirectionalLight(config);
       case "point": return new PointLight(config);
       case "spot": return new SpotLight(config);
-      default: throw new Error(`Unsupported light type: ${props.type}`);
+      default: throw new Error(`Unsupported light type: ${lightType}`);
     }
   }
 

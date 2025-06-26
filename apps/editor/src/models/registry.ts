@@ -6,7 +6,6 @@ export class Registry<T = any> {
   private tagIndex = new Map<string, Set<string>>();
 
   add(id: string, name: string, item: T, metadata?: Record<string, any>): void {
-    console.log("Adding item to registry", id, name, item, metadata);
     if (this.items.has(id)) {
       throw new Error(`Item with id '${id}' already exists in registry`);
     }
