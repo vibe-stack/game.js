@@ -14,6 +14,7 @@ export const PROJECT_SAVE_SCENE_CHANNEL = "project:save-scene";
 export const PROJECT_CREATE_SCENE_CHANNEL = "project:create-scene";
 export const PROJECT_DELETE_SCENE_CHANNEL = "project:delete-scene";
 export const PROJECT_SWITCH_SCENE_CHANNEL = "project:switch-scene";
+export const PROJECT_GET_ACTIVE_SCENE_CHANNEL = "project:get-active-scene";
 
 // Asset Management Channels
 export const PROJECT_SELECT_ASSET_FILES_CHANNEL = "project:select-asset-files";

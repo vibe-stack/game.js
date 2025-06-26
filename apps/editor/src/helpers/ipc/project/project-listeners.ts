@@ -13,6 +13,7 @@ import {
   PROJECT_CREATE_SCENE_CHANNEL,
   PROJECT_DELETE_SCENE_CHANNEL,
   PROJECT_SWITCH_SCENE_CHANNEL,
+  PROJECT_GET_ACTIVE_SCENE_CHANNEL,
   PROJECT_SELECT_ASSET_FILES_CHANNEL,
   PROJECT_IMPORT_ASSET_FROM_DATA_CHANNEL,
   PROJECT_IMPORT_ASSET_CHANNEL,
@@ -65,6 +66,8 @@ export function addProjectEventListeners() {
     ProjectService.deleteScene(...args));
   ipcMain.handle(PROJECT_SWITCH_SCENE_CHANNEL, (_, ...args: [string, string]) => 
     ProjectService.switchScene(...args));
+  ipcMain.handle(PROJECT_GET_ACTIVE_SCENE_CHANNEL, (_, ...args: [string]) => 
+    ProjectService.getActiveScene(...args));
 
   // Asset Management
   ipcMain.handle(PROJECT_SELECT_ASSET_FILES_CHANNEL, () => 

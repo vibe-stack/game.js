@@ -47,9 +47,18 @@ export default function ProjectInfoToolbar({
       const scenes = await window.projectAPI.listScenes(currentProject.path);
       setAvailableScenes(scenes);
 
-      // If no current scene is selected but scenes exist, select the first one
+      // If no current scene is selected but scenes exist, load the last active scene or first one
       if (!currentScene && scenes.length > 0) {
-        await handleSceneChange(scenes[0]);
+        // Try to get the last active scene from project configuration
+        const activeScene = await window.projectAPI.getActiveScene(currentProject.path);
+        
+        if (activeScene && scenes.includes(activeScene)) {
+          // Load the last active scene if it exists
+          await handleSceneChange(activeScene);
+        } else {
+          // Fallback to the first scene
+          await handleSceneChange(scenes[0]);
+        }
       }
     } catch (error) {
       console.error('Failed to load scenes:', error);
@@ -121,8 +130,10 @@ export default function ProjectInfoToolbar({
         id: sceneName
       };
       setCurrentScene(sceneWithMetadata);
-      // Switch scene in the project
+      
+      // Switch scene in the project (this persists the active scene)
       await window.projectAPI.switchScene(currentProject.path, sceneName);
+      
       // Load scene in the game world with filename tracking
       if (gameWorldService) {
         await gameWorldService.loadSceneFromFile(sceneData, sceneName);

@@ -458,4 +458,31 @@ export class GameWorldService {
       }
     }
   }
+
+  /**
+   * Delete an entity by ID with proper cleanup
+   */
+  deleteEntity(entityId: string): boolean {
+    if (!this.gameWorld) return false;
+
+    const entitiesRegistry = this.gameWorld.getRegistryManager().getRegistry<Entity>("entities");
+    if (!entitiesRegistry) return false;
+
+    const entity = entitiesRegistry.get(entityId);
+    if (!entity) return false;
+
+    // Destroy the entity (this handles physics, scripts, and other cleanup)
+    entity.destroy();
+    
+    // Remove from registry
+    entitiesRegistry.remove(entityId);
+
+    // If this entity was selected, clear the selection
+    const { selectedEntity, setSelectedEntity } = useGameStudioStore.getState();
+    if (selectedEntity === entityId) {
+      setSelectedEntity(null);
+    }
+
+    return true;
+  }
 }

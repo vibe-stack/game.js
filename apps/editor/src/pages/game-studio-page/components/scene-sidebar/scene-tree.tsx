@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { Entity } from "@/models";
 import { GameWorldService } from "../../services/game-world-service";
 import EntityItem from "./entity-item";
+import type { CameraItem } from "./index";
 
 export interface SceneTreeNode {
   entity: Entity;
@@ -9,8 +10,14 @@ export interface SceneTreeNode {
   depth: number;
 }
 
+export interface CameraTreeNode {
+  camera: CameraItem;
+  depth: number;
+}
+
 interface SceneTreeProps {
   sceneEntities: Entity[];
+  sceneCameras: CameraItem[];
   gameWorldService: React.RefObject<GameWorldService | null>;
   selectedEntity: string | null;
   expandedNodes: Set<string>;
@@ -21,6 +28,7 @@ interface SceneTreeProps {
 
 export default function SceneTree({
   sceneEntities,
+  sceneCameras,
   gameWorldService,
   selectedEntity,
   expandedNodes,
@@ -69,6 +77,14 @@ export default function SceneTree({
     return rootNodes;
   }, [sceneEntities, gameWorldService]);
 
+  // Build camera nodes
+  const cameraNodes = useMemo(() => {
+    return sceneCameras.map(camera => ({
+      camera,
+      depth: 0,
+    }));
+  }, [sceneCameras]);
+
   // Filter tree based on search query
   const filteredTree = useMemo(() => {
     if (!searchQuery.trim()) return sceneTree;
@@ -89,6 +105,15 @@ export default function SceneTree({
     return sceneTree.map(filterNode).filter(Boolean) as SceneTreeNode[];
   }, [sceneTree, searchQuery]);
 
+  // Filter cameras based on search query
+  const filteredCameras = useMemo(() => {
+    if (!searchQuery.trim()) return cameraNodes;
+    
+    return cameraNodes.filter(node => 
+      node.camera.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [cameraNodes, searchQuery]);
+
   const renderTreeNodes = (nodes: SceneTreeNode[]): React.ReactNode => {
     return nodes.map((node) => (
       <EntityItem
@@ -104,18 +129,49 @@ export default function SceneTree({
     ));
   };
 
+  const renderCameraNodes = (nodes: CameraTreeNode[]): React.ReactNode => {
+    return nodes.map((node) => (
+      <div
+        key={node.camera.id}
+        className={`flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-white/10 rounded ${
+          selectedEntity === node.camera.id ? "bg-white/20" : ""
+        }`}
+        onClick={() => onSelect(node.camera.id)}
+      >
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="text-blue-400">📷</div>
+          <span className="text-sm text-white truncate">{node.camera.name}</span>
+          <span className="text-xs text-gray-400">camera</span>
+        </div>
+      </div>
+    ));
+  };
+
+  const totalItems = sceneEntities.length + sceneCameras.length;
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="text-xs text-gray-400 px-2 py-1 border-b border-white/10">
-        Scene Hierarchy ({sceneEntities.length} entities)
+        Scene Hierarchy ({totalItems} items)
       </div>
-      {filteredTree.length > 0 ? (
+      {(filteredTree.length > 0 || filteredCameras.length > 0) ? (
         <div className="py-1">
-          {renderTreeNodes(filteredTree)}
+          {filteredCameras.length > 0 && (
+            <div className="mb-2">
+              <div className="text-xs text-gray-400 px-2 py-1 font-medium">Cameras</div>
+              {renderCameraNodes(filteredCameras)}
+            </div>
+          )}
+          {filteredTree.length > 0 && (
+            <div>
+              <div className="text-xs text-gray-400 px-2 py-1 font-medium">Entities</div>
+              {renderTreeNodes(filteredTree)}
+            </div>
+          )}
         </div>
       ) : (
         <div className="p-4 text-center text-gray-400 text-sm">
-          {searchQuery ? "No entities match your search" : "No entities in scene"}
+          {searchQuery ? "No items match your search" : "No items in scene"}
         </div>
       )}
     </div>

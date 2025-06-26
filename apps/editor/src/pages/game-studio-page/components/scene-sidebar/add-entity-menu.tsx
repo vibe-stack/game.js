@@ -9,7 +9,8 @@ import {
   Lightbulb,
   Shapes,
   ChevronRight,
-  Package
+  Package,
+  Camera
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -166,6 +167,25 @@ const ENTITY_CATEGORIES: EntityCategory[] = [
         name: "Custom Heightfield",
         icon: <Mountain className="h-4 w-4" />,
         description: "A customizable terrain heightfield",
+      },
+    ],
+  },
+  {
+    id: "cameras",
+    name: "Cameras",
+    icon: <Camera className="h-4 w-4" />,
+    entities: [
+      {
+        id: "perspective-camera",
+        name: "Perspective Camera",
+        icon: <Camera className="h-4 w-4" />,
+        description: "A perspective camera with field of view",
+      },
+      {
+        id: "orthographic-camera",
+        name: "Orthographic Camera",
+        icon: <Camera className="h-4 w-4" />,
+        description: "An orthographic camera with parallel projection",
       },
     ],
   },

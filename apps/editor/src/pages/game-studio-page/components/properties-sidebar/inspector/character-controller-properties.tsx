@@ -636,7 +636,7 @@ export function CharacterControllerProperties({
             step={0.01}
             precision={2}
             min={0.05}
-            max={0.3}
+            max={2}
             suffix="s"
             compact
             className="text-xs"

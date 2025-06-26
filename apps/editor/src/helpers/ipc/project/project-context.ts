@@ -33,6 +33,8 @@ export function exposeProjectContext() {
       ipcRenderer.invoke("project:delete-scene", projectPath, sceneName),
     switchScene: (projectPath: string, sceneName: string) => 
       ipcRenderer.invoke("project:switch-scene", projectPath, sceneName),
+    getActiveScene: (projectPath: string) => 
+      ipcRenderer.invoke("project:get-active-scene", projectPath),
     
     // Asset Management
     selectAssetFiles: () => 

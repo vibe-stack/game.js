@@ -16,7 +16,7 @@ export default function BaseLayout({
   return (
     <>
       <main className={showNavigation ? "h-screen pb-10 p-2" : "h-screen"}>{children}</main>
-      <Toaster position="top-right" richColors closeButton theme="dark" />
+      <Toaster position="bottom-center" richColors closeButton theme="dark" />
     </>
   );
 }

@@ -181,6 +181,22 @@ export class ProjectService {
     }
   }
 
+  static async getActiveScene(projectPath: string): Promise<string | null> {
+    const projectConfigPath = path.join(projectPath, "game.config.json");
+    
+    try {
+      if (await FileSystemManager.fileExists(projectConfigPath)) {
+        const configContent = await FileSystemManager.readFile(projectConfigPath);
+        const projectConfig = JSON.parse(configContent);
+        return projectConfig.activeScene || null;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to get active scene:', error);
+      return null;
+    }
+  }
+
   // Asset Management
   static async selectAssetFiles(): Promise<string[]> {
     return AssetManager.selectAssetFiles();

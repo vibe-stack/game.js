@@ -148,6 +148,7 @@ interface ProjectAPI {
   createScene: (projectPath: string, sceneName: string, sceneData?: any) => Promise<void>;
   deleteScene: (projectPath: string, sceneName: string) => Promise<void>;
   switchScene: (projectPath: string, sceneName: string) => Promise<void>;
+  getActiveScene: (projectPath: string) => Promise<string | null>;
 
   // Asset Management
   selectAssetFiles: () => Promise<string[]>;

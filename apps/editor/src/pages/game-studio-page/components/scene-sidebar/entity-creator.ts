@@ -219,6 +219,13 @@ export class EntityCreator {
           receiveShadow: true,
         });
         break;
+
+      // Cameras
+      case "perspective-camera":
+        return this.createCamera("perspective", gameWorldService);
+        
+      case "orthographic-camera":
+        return this.createCamera("orthographic", gameWorldService);
       
       default:
         throw new Error(`Unknown entity type: ${entityType}`);
@@ -235,6 +242,40 @@ export class EntityCreator {
       return entity;
     }
 
+    return null;
+  }
+
+  static createCamera(type: "perspective" | "orthographic", gameWorldService: GameWorldService): Entity | null {
+    const gameWorld = gameWorldService.getGameWorld();
+    if (!gameWorld) {
+      throw new Error("Game world not initialized");
+    }
+
+    const cameraManager = gameWorld.getCameraManager();
+    const cameraId = `camera-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const cameraName = `${type === "perspective" ? "Perspective" : "Orthographic"} Camera ${this.entityCounter++}`;
+
+    if (type === "perspective") {
+      cameraManager.createPerspectiveCamera(cameraId, cameraName, {
+        position: new THREE.Vector3(5, 5, 10),
+        target: new THREE.Vector3(0, 0, 0),
+        fov: 75,
+        near: 0.1,
+        far: 1000
+      });
+    } else {
+      cameraManager.createOrthographicCamera(cameraId, cameraName, -10, 10, 10, -10, 0.1, 1000);
+      const camera = cameraManager.getCamera(cameraId);
+      if (camera) {
+        camera.position.set(5, 5, 10);
+        camera.lookAt(0, 0, 0);
+      }
+    }
+
+    // Update available cameras in the game studio
+    gameWorldService.updateAvailableCameras();
+
+    // Return null since cameras are not entities
     return null;
   }
 
@@ -353,8 +394,32 @@ export class EntityCreator {
           newEntity.hasCharacterController = sourceEntity.hasCharacterController;
         }
 
-        // Use GameWorld.createEntity to ensure proper setup
+        // Use GameWorld.createEntity to ensure proper setup (physics manager, script manager, etc.)
         gameWorld.createEntity(newEntity);
+
+        // CRITICAL FIX: Explicitly enable physics after entity is added to game world
+        // This ensures physics properties are properly copied from the source entity
+        if (sourceEntity.physicsConfig && sourceEntity.hasPhysics()) {
+          const physicsConfig = sourceEntity.physicsConfig;
+          switch (physicsConfig.type) {
+            case 'dynamic':
+              newEntity.enableDynamicPhysics(
+                physicsConfig.mass || 1,
+                physicsConfig.restitution || 0.5,
+                physicsConfig.friction || 0.7
+              );
+              break;
+            case 'static':
+              newEntity.enableStaticPhysics(
+                physicsConfig.restitution || 0.5,
+                physicsConfig.friction || 0.7
+              );
+              break;
+            case 'kinematic':
+              newEntity.enableKinematicPhysics();
+              break;
+          }
+        }
 
         // If the source entity has a parent (and it's not the scene), add the new entity to the same parent
         if (sourceEntity.parent && sourceEntity.parent !== gameWorld.getScene()) {
