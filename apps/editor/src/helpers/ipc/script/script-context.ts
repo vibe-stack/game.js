@@ -5,7 +5,8 @@ import {
   SCRIPT_COMPILE_CHANNEL,
   SCRIPT_GET_COMPILED_SCRIPTS_CHANNEL,
   SCRIPT_COMPILATION_STATUS_CHANNEL,
-  SCRIPT_GET_IMPORT_MAP_CHANNEL
+  SCRIPT_GET_IMPORT_MAP_CHANNEL,
+  SCRIPT_READ_COMPILED_CHANNEL
 } from "./script-channels";
 
 export function exposeScriptContext() {
@@ -22,5 +23,7 @@ export function exposeScriptContext() {
       ipcRenderer.invoke(SCRIPT_COMPILATION_STATUS_CHANNEL, projectPath),
     getImportMap: (projectPath: string) => 
       ipcRenderer.invoke(SCRIPT_GET_IMPORT_MAP_CHANNEL, projectPath),
+    readCompiledScript: (projectPath: string, scriptPath: string) => 
+      ipcRenderer.invoke(SCRIPT_READ_COMPILED_CHANNEL, projectPath, scriptPath),
   });
 } 

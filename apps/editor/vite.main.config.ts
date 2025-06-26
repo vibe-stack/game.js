@@ -12,7 +12,7 @@ export default defineConfig({
     rollupOptions: {
       // Add 'chokidar' and other Node.js specific modules to external
       // This prevents Vite from trying to bundle them for the browser environment.
-      external: ["chokidar", "electron", "fs", "path", "os", "child_process"],
+      external: ["chokidar", "electron", "fs", "path", "os", "child_process", "esbuild"],
     },
   },
 });

@@ -16,6 +16,12 @@ export interface ScriptContext {
   // Entity reference
   entity: Entity;
   
+  // Script identification
+  scriptId: string;
+  
+  // Script parameters for this entity/script combination
+  parameters: EntityScriptParameters;
+  
   // Game world access
   gameWorld: GameWorld;
   scene: THREE.Scene;
@@ -106,6 +112,9 @@ export class ScriptManager {
   // Parameter storage
   private entityScriptParameters = new Map<string, Map<string, EntityScriptParameters>>(); // entityId -> scriptId -> parameters
   
+  // Track initialization status per entity-script combination
+  private initializedScripts = new Map<string, Set<string>>(); // entityId -> initialized scriptIds
+  
   // Change listeners for React synchronization
   private changeListeners: Set<() => void> = new Set();
   
@@ -158,7 +167,7 @@ export class ScriptManager {
    */
   private transformScriptCode(code: string): string {
     // Transform export function statements to regular function declarations
-    return code
+    let transformedCode = code
       // Transform export function name(...) { ... } to name = function(...) { ... }
       .replace(/export\s+function\s+(\w+)\s*\(/g, '$1 = function(')
       // Remove any standalone export statements like export { ... }
@@ -166,62 +175,151 @@ export class ScriptManager {
       // Remove any export default statements
       .replace(/export\s+default\s+/g, '')
       // Remove export keyword from variable declarations
-      .replace(/export\s+(const|let|var)\s+/g, '$1 ');
+      .replace(/export\s+(const|let|var)\s+/g, '$1 ')
+      // Remove import statements as they can't be used in the Function context
+      .replace(/import\s+(?:(?:\{[^}]*\})|(?:[^,\s]+))\s+from\s+['"][^'"]+['"];?\s*/g, '');
+    
+    return transformedCode;
   }
 
   /**
    * Compile a script from string code
    */
   public compileScript(config: ScriptConfig): CompiledScript {
+    console.log(`Compiling script ${config.id}...`);
+    
     try {
-      // Transform ES6 export syntax to function declarations
-      const transformedCode = this.transformScriptCode(config.code);
-      
-      // Create a sandboxed function that returns the script lifecycle
-      const scriptFunction = new Function('THREE', `
-        // Lifecycle functions
-        let init, update, fixedUpdate, destroy;
-        
-        // Execute the script code
-        ${transformedCode}
-        
-        // Return the lifecycle object
-        return {
-          init: typeof init === 'function' ? init : undefined,
-          update: typeof update === 'function' ? update : undefined,
-          fixedUpdate: typeof fixedUpdate === 'function' ? fixedUpdate : undefined,
-          destroy: typeof destroy === 'function' ? destroy : undefined
-        };
-      `);
+      // Check if script already exists and remove it first to prevent conflicts
+      if (this.compiledScripts.has(config.id)) {
+        this.removeScript(config.id);
+      }
 
-      const lifecycle = scriptFunction(THREE) as ScriptLifecycle;
+      // Check if this is already compiled JavaScript code
+      const isAlreadyCompiled = config.code.includes('var parameters = [') || 
+                                config.code.includes('export {') ||
+                                config.code.includes('//# sourceMappingURL=');
+
+      let functionStr: string;
+      let extractedParameters: any[] = [];
+
+      if (isAlreadyCompiled) {
+        console.log(`Script ${config.id} appears to be already compiled JavaScript`);
+        
+        // Extract parameters from the compiled code if they exist
+        const parametersMatch = config.code.match(/var parameters = (\[[\s\S]*?\]);/);
+        if (parametersMatch) {
+          try {
+            extractedParameters = eval(parametersMatch[1]);
+            console.log(`Extracted parameters from compiled code:`, extractedParameters);
+          } catch (error) {
+            console.warn(`Failed to extract parameters from compiled code:`, error);
+          }
+        }
+
+        // Remove export statements and sourcemap comments for function execution
+        const cleanedCode = config.code
+          .replace(/export\s*\{[^}]*\};\s*/g, '') // Remove export statements
+          .replace(/\/\/# sourceMappingURL=.*$/m, ''); // Remove source map comments
+
+        // For compiled code, we need to execute it directly and extract exports
+        functionStr = `
+          // Execute the compiled script code
+          ${cleanedCode}
+          
+          // Return the lifecycle object and parameters
+          return {
+            init: typeof init === 'function' ? init : undefined,
+            update: typeof update === 'function' ? update : undefined,
+            fixedUpdate: typeof fixedUpdate === 'function' ? fixedUpdate : undefined,
+            destroy: typeof destroy === 'function' ? destroy : undefined,
+            parameters: typeof parameters !== 'undefined' ? parameters : []
+          };
+        `;
+      } else {
+        console.log(`Script ${config.id} appears to be TypeScript source code`);
+        
+        // Transform ES6 export syntax to function declarations for TypeScript source
+        const transformedCode = this.transformScriptCode(config.code);
+        
+        functionStr = `
+          // Lifecycle functions
+          let init, update, fixedUpdate, destroy;
+          
+          // Parameters array
+          let parameters;
+          
+          // Execute the script code in a try-catch to provide better error context
+          try {
+            ${transformedCode}
+          } catch (error) {
+            throw new Error('Script execution error: ' + error.message);
+          }
+          
+          // Return the lifecycle object and parameters
+          return {
+            init: typeof init === 'function' ? init : undefined,
+            update: typeof update === 'function' ? update : undefined,
+            fixedUpdate: typeof fixedUpdate === 'function' ? fixedUpdate : undefined,
+            destroy: typeof destroy === 'function' ? destroy : undefined,
+            parameters: Array.isArray(parameters) ? parameters : []
+          };
+        `;
+      }
+      
+      console.log(`Transformed code for ${config.id}:`, functionStr.substring(0, 200) + '...');
+      
+      const scriptFunction = new Function('THREE', functionStr);
+
+      const result = scriptFunction(THREE);
+      
+      console.log(`Script ${config.id} compilation result:`, {
+        hasInit: !!result.init,
+        hasUpdate: !!result.update,
+        hasFixedUpdate: !!result.fixedUpdate,
+        hasDestroy: !!result.destroy,
+        parametersFromCode: result.parameters,
+        parametersFromConfig: config.parameters,
+        extractedParameters: extractedParameters
+      });
 
       const compiledScript: CompiledScript = {
         id: config.id,
         config: { ...config },
-        lifecycle,
+        lifecycle: {
+          init: result.init,
+          update: result.update,
+          fixedUpdate: result.fixedUpdate,
+          destroy: result.destroy
+        },
         isInitialized: false,
         hasErrors: false,
-        parameters: config.parameters || [],
+        parameters: result.parameters || extractedParameters || config.parameters || [],
       };
 
       this.compiledScripts.set(config.id, compiledScript);
       this.emitChange();
+      
+      console.log(`Script ${config.id} compiled successfully with ${compiledScript.parameters?.length || 0} parameters`);
+      
       return compiledScript;
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const detailedError = `Failed to compile script ${config.name || config.id}: ${errorMessage}`;
+      
       const compiledScript: CompiledScript = {
         id: config.id,
         config: { ...config },
         lifecycle: {},
         isInitialized: false,
         hasErrors: true,
-        lastError: error instanceof Error ? error.message : String(error),
+        lastError: detailedError,
         parameters: config.parameters || [],
       };
 
       this.compiledScripts.set(config.id, compiledScript);
-      console.error(`Failed to compile script ${config.id}:`, error);
+      console.error(detailedError);
+      console.error('Script code that failed to compile:', config.code);
       this.emitChange();
       return compiledScript;
     }
@@ -231,6 +329,8 @@ export class ScriptManager {
    * Attach a script to an entity
    */
   public attachScript(entityId: string, scriptId: string): boolean {
+    console.log(`Attaching script ${scriptId} to entity ${entityId}`);
+    
     const script = this.compiledScripts.get(scriptId);
     if (!script) {
       console.error(`Script ${scriptId} not found`);
@@ -248,9 +348,18 @@ export class ScriptManager {
     this.entityScripts.get(entityId)!.add(scriptId);
     this.scriptEntities.get(scriptId)!.add(entityId);
 
+    console.log(`Script ${scriptId} attached. Config:`, {
+      enabled: script.config.enabled,
+      hasInit: !!script.lifecycle.init,
+      parametersCount: script.parameters?.length || 0
+    });
+
     // Initialize script for this entity if it has an init function
-    if (script.lifecycle.init && script.config.enabled) {
+    if (script.lifecycle.init) {
+      console.log(`Initializing script ${scriptId} for entity ${entityId}`);
       this.initializeScriptForEntity(scriptId, entityId);
+    } else {
+      console.log(`Script ${scriptId} has no init function`);
     }
 
     this.emitChange();
@@ -266,7 +375,7 @@ export class ScriptManager {
 
     // Call destroy if the script has it
     if (script.lifecycle.destroy) {
-      const context = this.createScriptContext(entityId, 0, 0);
+      const context = this.createScriptContext(entityId, scriptId, 0, 0);
       if (context) {
         try {
           script.lifecycle.destroy!(context);
@@ -279,6 +388,9 @@ export class ScriptManager {
     // Remove from mappings
     this.entityScripts.get(entityId)?.delete(scriptId);
     this.scriptEntities.get(scriptId)?.delete(entityId);
+    
+    // Remove from initialization tracking
+    this.initializedScripts.get(entityId)?.delete(scriptId);
 
     // Clean up empty sets
     if (this.entityScripts.get(entityId)?.size === 0) {
@@ -286,6 +398,9 @@ export class ScriptManager {
     }
     if (this.scriptEntities.get(scriptId)?.size === 0) {
       this.scriptEntities.delete(scriptId);
+    }
+    if (this.initializedScripts.get(entityId)?.size === 0) {
+      this.initializedScripts.delete(entityId);
     }
 
     this.emitChange();
@@ -313,11 +428,26 @@ export class ScriptManager {
     const script = this.compiledScripts.get(scriptId);
     if (!script || !script.lifecycle.init) return;
 
-    const context = this.createScriptContext(entityId, 0, 0);
+    // Check if already initialized for this entity
+    const entityInitializedScripts = this.initializedScripts.get(entityId);
+    if (entityInitializedScripts?.has(scriptId)) {
+      console.log(`Script ${scriptId} already initialized for entity ${entityId}`);
+      return;
+    }
+
+    const context = this.createScriptContext(entityId, scriptId, 0, 0);
     if (!context) return;
 
     try {
       await script.lifecycle.init(context);
+      
+      // Mark as initialized for this entity
+      if (!this.initializedScripts.has(entityId)) {
+        this.initializedScripts.set(entityId, new Set());
+      }
+      this.initializedScripts.get(entityId)!.add(scriptId);
+      
+      console.log(`Script ${scriptId} initialized successfully for entity ${entityId}`);
     } catch (error) {
       script.hasErrors = true;
       script.lastError = error instanceof Error ? error.message : String(error);
@@ -355,7 +485,12 @@ export class ScriptManager {
     
     for (const [scriptId, entityIds] of this.scriptEntities) {
       const script = this.compiledScripts.get(scriptId);
-      if (!script || !script.config.enabled || script.hasErrors) continue;
+      if (!script || !script.config.enabled || script.hasErrors) {
+        if (script?.hasErrors) {
+          console.warn(`Script ${scriptId} has errors, skipping execution`);
+        }
+        continue;
+      }
       
       const lifecycleFunction = script.lifecycle[lifecycleMethod];
       if (!lifecycleFunction) continue;
@@ -393,7 +528,7 @@ export class ScriptManager {
     const lifecycleFunction = script.lifecycle[lifecycleMethod];
     if (!lifecycleFunction) return;
 
-    const context = this.createScriptContext(entityId, deltaTime, this.fixedTimestep);
+    const context = this.createScriptContext(entityId, scriptId, deltaTime, this.fixedTimestep);
     if (!context) return;
 
     const startTime = performance.now();
@@ -422,6 +557,7 @@ export class ScriptManager {
    */
   private createScriptContext(
     entityId: string,
+    scriptId: string,
     deltaTime: number,
     fixedDeltaTime: number
   ): ScriptContext | null {
@@ -435,8 +571,13 @@ export class ScriptManager {
       return null;
     }
 
+    // Get script parameters with defaults
+    const parameters = this.getScriptParametersWithDefaults(entityId, scriptId);
+
     const context: ScriptContext = {
       entity,
+      scriptId,
+      parameters,
       gameWorld: this.gameWorld,
       scene: this.gameWorld.getScene(),
       physicsManager: this.gameWorld.getPhysicsManager(),
@@ -599,6 +740,9 @@ export class ScriptManager {
     for (const scriptId of scriptIds) {
       this.detachScript(entityId, scriptId);
     }
+    
+    // Clean up initialization tracking
+    this.initializedScripts.delete(entityId);
   }
 
   /**
@@ -610,7 +754,7 @@ export class ScriptManager {
       const script = this.compiledScripts.get(scriptId);
       if (script?.lifecycle.destroy) {
         for (const entityId of entityIds) {
-          const context = this.createScriptContext(entityId, 0, 0);
+          const context = this.createScriptContext(entityId, scriptId, 0, 0);
           if (context) {
             try {
               script.lifecycle.destroy(context);
@@ -627,6 +771,9 @@ export class ScriptManager {
     this.entityScripts.clear();
     this.scriptEntities.clear();
     this.scriptPerformance.clear();
+    this.entityScriptParameters.clear();
+    this.initializedScripts.clear();
+    this.changeListeners.clear();
   }
 
   // Parameter management methods

@@ -31,7 +31,9 @@ import {
   PROJECT_CREATE_DIRECTORY_CHANNEL,
   PROJECT_DELETE_FILE_CHANNEL,
   PROJECT_DELETE_DIRECTORY_CHANNEL,
-  PROJECT_RENAME_ITEM_CHANNEL
+  PROJECT_RENAME_ITEM_CHANNEL,
+  PROJECT_SAVE_SCRIPT_FILE_CHANNEL,
+  PROJECT_OPEN_SCRIPT_IN_EDITOR_CHANNEL
 } from "./project-channels";
 import { ProjectService } from "../../../services/project-service";
 
@@ -108,6 +110,12 @@ export function addProjectEventListeners() {
     ProjectService.deleteDirectory(...args));
   ipcMain.handle(PROJECT_RENAME_ITEM_CHANNEL, (_, ...args: [string, string]) => 
     ProjectService.renameItem(...args));
+
+  // Script Management
+  ipcMain.handle(PROJECT_SAVE_SCRIPT_FILE_CHANNEL, (_, ...args: [string, string, string]) => 
+    ProjectService.saveScriptFile(...args));
+  ipcMain.handle(PROJECT_OPEN_SCRIPT_IN_EDITOR_CHANNEL, (_, ...args: [string, string]) => 
+    ProjectService.openScriptInEditor(...args));
 
   console.log("Project event listeners added successfully");
 } 

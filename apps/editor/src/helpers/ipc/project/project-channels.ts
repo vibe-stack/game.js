@@ -36,4 +36,8 @@ export const PROJECT_CREATE_FILE_CHANNEL = "project:create-file";
 export const PROJECT_CREATE_DIRECTORY_CHANNEL = "project:create-directory";
 export const PROJECT_DELETE_FILE_CHANNEL = "project:delete-file";
 export const PROJECT_DELETE_DIRECTORY_CHANNEL = "project:delete-directory";
-export const PROJECT_RENAME_ITEM_CHANNEL = "project:rename-item"; 
+export const PROJECT_RENAME_ITEM_CHANNEL = "project:rename-item";
+
+// Script Management Channels
+export const PROJECT_SAVE_SCRIPT_FILE_CHANNEL = "project:save-script-file";
+export const PROJECT_OPEN_SCRIPT_IN_EDITOR_CHANNEL = "project:open-script-in-editor"; 

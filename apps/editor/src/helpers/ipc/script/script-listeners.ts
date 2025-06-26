@@ -5,7 +5,8 @@ import {
   SCRIPT_COMPILE_CHANNEL,
   SCRIPT_GET_COMPILED_SCRIPTS_CHANNEL,
   SCRIPT_COMPILATION_STATUS_CHANNEL,
-  SCRIPT_GET_IMPORT_MAP_CHANNEL
+  SCRIPT_GET_IMPORT_MAP_CHANNEL,
+  SCRIPT_READ_COMPILED_CHANNEL
 } from "./script-channels";
 import * as fs from "fs";
 import * as path from "path";
@@ -98,23 +99,10 @@ class ScriptCompilationManager {
       const scriptWatcher = this.watchers.get(projectPath);
       if (!scriptWatcher) return;
 
-      const packageJsonPath = path.join(projectPath, "package.json");
-      if (!fs.existsSync(packageJsonPath)) {
-        console.log(`No package.json found for ${projectPath}, skipping vendor setup`);
-        return;
-      }
-
-      const packageJson = JSON.parse(await fs.promises.readFile(packageJsonPath, "utf-8"));
-      const allDependencies = [
-        ...Object.keys(packageJson.dependencies || {}),
-        ...Object.keys(packageJson.devDependencies || {})
-      ];
+      // Analyze all scripts to find actually imported npm packages
+      const usedDependencies = await this.analyzeImports(projectPath);
       
-      // Filter out @types/* packages - they're just TypeScript types, not runtime code
-      const dependencies = allDependencies.filter(dep => !dep.startsWith('@types/'));
-      
-      if (dependencies.length === 0) {
-        console.log(`No runtime dependencies found for ${projectPath}, skipping vendor setup`);
+      if (usedDependencies.size === 0) {
         return;
       }
 
@@ -128,15 +116,27 @@ class ScriptCompilationManager {
       let needsUpdate = true;
       if (fs.existsSync(vendorBundlePath)) {
         const bundleStat = await fs.promises.stat(vendorBundlePath);
-        const packageStat = await fs.promises.stat(packageJsonPath);
-        needsUpdate = packageStat.mtime > bundleStat.mtime;
+        // Check if any script files are newer than the vendor bundle
+        const scriptsDir = path.join(projectPath, "scripts");
+        const scriptFiles = await fg("**/*.ts", { cwd: scriptsDir, absolute: true });
+        
+        needsUpdate = false;
+        for (const scriptFile of scriptFiles) {
+          const scriptStat = await fs.promises.stat(scriptFile);
+          if (scriptStat.mtime > bundleStat.mtime) {
+            needsUpdate = true;
+            break;
+          }
+        }
       }
 
       if (!needsUpdate && scriptWatcher.vendorBundle) {
         return;
       }
 
-      // Create vendor bundle - bundle all dependencies into one file
+      const dependencies = Array.from(usedDependencies);
+
+      // Create vendor bundle with only the dependencies that are actually used
       const tempVendorEntry = path.join(vendorDir, "vendor-entry.js");
       const vendorExports = dependencies.map(dep => 
         `export * as ${dep.replace(/[^a-zA-Z0-9_$]/g, '_')} from '${dep}';`
@@ -164,31 +164,19 @@ class ScriptCompilationManager {
       await build(buildOptions);
       await fs.promises.unlink(tempVendorEntry);
 
-      // Create import map with correct format
+      // Create import map
       const importMap = {
         imports: {} as Record<string, string>
       };
 
-      // We need to use the asset server to serve vendor files
-      // The asset server will be started when assets are loaded
-      // For now, we'll use a predictable URL structure that the asset server provides
-      
-      // Map each dependency to the vendor bundle - but we need a different approach
-      // Import maps can't directly map to named exports in a bundle
-      // We need to create individual proxy modules for each dependency
-      dependencies.forEach(dep => {
-        const proxyFileName = `${dep.replace(/[^a-zA-Z0-9_-]/g, '_')}.js`;
-        // Use absolute path from project root that will be served by asset server
-        importMap.imports[dep] = `/.gamejs/scripts/vendor/${proxyFileName}`;
-      });
-
-      // Create proxy modules for each dependency
+      // Create proxy modules for each used dependency
       for (const dep of dependencies) {
         const safeName = dep.replace(/[^a-zA-Z0-9_$]/g, '_');
-        const proxyPath = path.join(vendorDir, `${dep.replace(/[^a-zA-Z0-9_-]/g, '_')}.js`);
+        const proxyFileName = `${dep.replace(/[^a-zA-Z0-9_-]/g, '_')}.js`;
+        const proxyPath = path.join(vendorDir, proxyFileName);
         const relativePath = path.relative(path.dirname(proxyPath), vendorBundlePath).replace(/\\/g, '/');
-        // Ensure relative path starts with './' for proper ES module resolution
         const importPath = relativePath.startsWith('./') || relativePath.startsWith('../') ? relativePath : `./${relativePath}`;
+        
         const proxyContent = `
 // Proxy module for ${dep}
 import { ${safeName} } from '${importPath}';
@@ -197,6 +185,9 @@ export default ${safeName};
         `.trim();
         
         await fs.promises.writeFile(proxyPath, proxyContent);
+        
+        // Map dependency to proxy module
+        importMap.imports[dep] = `/.gamejs/scripts/vendor/${proxyFileName}`;
       }
 
       await fs.promises.writeFile(importMapPath, JSON.stringify(importMap, null, 2));
@@ -208,11 +199,76 @@ export default ${safeName};
 
       scriptWatcher.vendorBundle = vendorBundlePath;
       scriptWatcher.vendorBundleTime = new Date();
-
-      console.log(`Created vendor bundle for ${projectPath} with import map for: ${dependencies.join(', ')}`);
     } catch (error) {
       console.error(`Failed to create vendor bundle for ${projectPath}:`, error);
     }
+  }
+
+  private async analyzeImports(projectPath: string): Promise<Set<string>> {
+    const usedDependencies = new Set<string>();
+    const scriptsDir = path.join(projectPath, "scripts");
+    
+    try {
+      // Find all TypeScript files
+      const scriptFiles = await fg("**/*.ts", {
+        cwd: scriptsDir,
+        absolute: true,
+        dot: false,
+        onlyFiles: true
+      });
+
+      // Read package.json to know what are valid npm packages
+      const packageJsonPath = path.join(projectPath, "package.json");
+      let availablePackages = new Set<string>();
+      
+      if (fs.existsSync(packageJsonPath)) {
+        const packageJson = JSON.parse(await fs.promises.readFile(packageJsonPath, "utf-8"));
+        availablePackages = new Set([
+          ...Object.keys(packageJson.dependencies || {}),
+          ...Object.keys(packageJson.devDependencies || {})
+        ]);
+      }
+
+      // Analyze each script file for imports
+      for (const scriptFile of scriptFiles) {
+        const content = await fs.promises.readFile(scriptFile, "utf-8");
+        
+        // Match import statements (both import and from clauses)
+        const importRegex = /(?:import\s+.*?\s+from\s+['"`]([^'"`]+)['"`]|import\s*\(\s*['"`]([^'"`]+)['"`]\s*\))/g;
+        let match;
+        
+        while ((match = importRegex.exec(content)) !== null) {
+          const importPath = match[1] || match[2];
+          
+          // Skip relative imports (local files)
+          if (importPath.startsWith('.') || importPath.startsWith('/')) {
+            continue;
+          }
+          
+          // Extract package name (handle scoped packages like @scope/package)
+          let packageName = importPath;
+          if (importPath.startsWith('@')) {
+            // Scoped package: @scope/package or @scope/package/subpath
+            const parts = importPath.split('/');
+            if (parts.length >= 2) {
+              packageName = `${parts[0]}/${parts[1]}`;
+            }
+          } else {
+            // Regular package: package or package/subpath
+            packageName = importPath.split('/')[0];
+          }
+          
+          // Only include if it's actually in package.json and not a @types package
+          if (availablePackages.has(packageName) && !packageName.startsWith('@types/')) {
+            usedDependencies.add(packageName);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to analyze imports for ${projectPath}:`, error);
+    }
+    
+    return usedDependencies;
   }
 
   private async scanForChanges(projectPath: string): Promise<void> {
@@ -286,21 +342,9 @@ export default ${safeName};
         return; // Skip compilation if file hasn't changed
       }
 
-      // Get list of npm dependencies to mark as external
-      const packageJsonPath = path.join(projectPath, "package.json");
-      let externalDependencies: string[] = [];
-      
-      if (fs.existsSync(packageJsonPath)) {
-        try {
-          const packageJson = JSON.parse(await fs.promises.readFile(packageJsonPath, "utf-8"));
-          externalDependencies = [
-            ...Object.keys(packageJson.dependencies || {}),
-            ...Object.keys(packageJson.devDependencies || {})
-          ];
-        } catch (error) {
-          console.warn(`Failed to read package.json for externals: ${error}`);
-        }
-      }
+      // Get list of npm dependencies that are actually used in scripts
+      const usedDependencies = await this.analyzeImports(projectPath);
+      const externalDependencies = Array.from(usedDependencies);
 
       // Build configuration with external dependencies
       const buildOptions: BuildOptions = {
@@ -384,8 +428,6 @@ const GameEngine = {
 
       scriptWatcher.compiledScripts.delete(relativePath);
       scriptWatcher.lastCompilation.delete(relativePath);
-
-      console.log(`Removed compiled script: ${relativePath}`);
     } catch (error) {
       console.error(`Failed to remove compiled script ${relativePath}:`, error);
     }
@@ -458,6 +500,22 @@ const GameEngine = {
     
     return null;
   }
+
+  async readCompiledScript(projectPath: string, scriptPath: string): Promise<string> {
+    try {
+      const compiledFileName = scriptPath.replace(/\.ts$/, '.js');
+      const compiledPath = path.join(projectPath, ".gamejs", "scripts", "compiled-scripts", compiledFileName);
+      
+      if (!fs.existsSync(compiledPath)) {
+        throw new Error(`Compiled script not found: ${compiledPath}`);
+      }
+      
+      return await fs.promises.readFile(compiledPath, "utf-8");
+    } catch (error) {
+      console.error(`Failed to read compiled script ${scriptPath}:`, error);
+      throw error;
+    }
+  }
 }
 
 const scriptManager = new ScriptCompilationManager();
@@ -485,6 +543,10 @@ export function addScriptEventListeners() {
 
   ipcMain.handle(SCRIPT_GET_IMPORT_MAP_CHANNEL, async (_, projectPath: string) => {
     return await scriptManager.getImportMap(projectPath);
+  });
+
+  ipcMain.handle(SCRIPT_READ_COMPILED_CHANNEL, async (_, projectPath: string, scriptPath: string) => {
+    return await scriptManager.readCompiledScript(projectPath, scriptPath);
   });
 }
 

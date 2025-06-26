@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { 
   Plus, 
   Search, 
@@ -14,9 +15,14 @@ import {
   Bot,
   Package,
   Sun,
-  CheckCircle
+  CheckCircle,
+  File,
+  FileCode,
+  FolderOpen
 } from "lucide-react";
 import { ScriptManager, EXAMPLE_SCRIPTS, getExampleScriptIds } from "@/models";
+import { ScriptLoaderService } from "@/services/script-loader-service";
+import useGameStudioStore from "@/stores/game-studio-store";
 
 interface ScriptLibraryProps {
   scriptManager: ScriptManager;
@@ -26,6 +32,10 @@ interface ScriptLibraryProps {
 
 // Icon mapping for different script types
 const getScriptIcon = (scriptId: string) => {
+  // File-based scripts use file icon
+  if (scriptId.startsWith('file:')) return FileCode;
+  
+  // Example scripts
   if (scriptId.includes('rotation')) return Play;
   if (scriptId.includes('movement') || scriptId.includes('input')) return GamepadIcon;
   if (scriptId.includes('health')) return Heart;
@@ -42,12 +52,34 @@ export function ScriptLibrary({
   onAttachScript
 }: ScriptLibraryProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const { currentProject } = useGameStudioStore();
+  const scriptLoaderService = ScriptLoaderService.getInstance();
+  
+  // Poll for script updates every 2 seconds
+  useEffect(() => {
+    if (!currentProject) return;
+    
+    const interval = setInterval(() => {
+      setRefreshTrigger(prev => prev + 1);
+    }, 2000);
+    
+    return () => clearInterval(interval);
+  }, [currentProject]);
+  
+  // Get file-based scripts (refresh when trigger changes)
+  const fileScripts = useMemo(() => {
+    if (!currentProject) return [];
+    // Force refresh by including refreshTrigger in dependency
+    return scriptLoaderService.getLoadedScripts(currentProject.path);
+  }, [currentProject, refreshTrigger]);
   
   // Get all available example scripts
   const exampleScriptIds = getExampleScriptIds();
   
   // Helper function to get category from script name/id
   const getScriptCategory = (script: any) => {
+    if (script.id?.startsWith('file:')) return 'Project Scripts';
     if (script.id.includes('movement') || script.id.includes('physics')) return 'Movement';
     if (script.id.includes('health') || script.id.includes('damage')) return 'Combat';
     if (script.id.includes('ai') || script.id.includes('behavior')) return 'AI';
@@ -59,6 +91,7 @@ export function ScriptLibrary({
 
   // Helper function to get description from script name/id
   const getScriptDescription = (script: any) => {
+    if (script.path) return `Located at: ${script.path}`;
     if (script.id.includes('rotation')) return 'Continuously rotates the entity around its Y axis';
     if (script.id.includes('movement')) return 'Physics-based movement with keyboard input';
     if (script.id.includes('health')) return 'Health system with damage and healing capabilities';
@@ -69,9 +102,17 @@ export function ScriptLibrary({
     return 'Custom behavior script';
   };
 
+  // Combine file scripts and example scripts for filtering
+  const allScripts = [
+    ...fileScripts.map(fs => ({ ...fs.config, path: fs.path })),
+    ...exampleScriptIds.map(scriptKey => {
+      const script = EXAMPLE_SCRIPTS[scriptKey as keyof typeof EXAMPLE_SCRIPTS];
+      return { ...script, path: undefined };
+    })
+  ];
+
   // Filter scripts based on search query
-  const filteredScripts = exampleScriptIds.filter(scriptKey => {
-    const script = EXAMPLE_SCRIPTS[scriptKey as keyof typeof EXAMPLE_SCRIPTS];
+  const filteredScripts = allScripts.filter(script => {
     const query = searchQuery.toLowerCase();
     const category = getScriptCategory(script);
     const description = getScriptDescription(script);
@@ -79,20 +120,27 @@ export function ScriptLibrary({
     return (
       script.name.toLowerCase().includes(query) ||
       description.toLowerCase().includes(query) ||
-      category.toLowerCase().includes(query)
+      category.toLowerCase().includes(query) ||
+      (script.path && script.path.toLowerCase().includes(query))
     );
   });
 
   // Group scripts by category
-  const scriptsByCategory = filteredScripts.reduce((acc, scriptKey) => {
-    const script = EXAMPLE_SCRIPTS[scriptKey as keyof typeof EXAMPLE_SCRIPTS];
+  const scriptsByCategory = filteredScripts.reduce((acc, script) => {
     const category = getScriptCategory(script);
     if (!acc[category]) {
       acc[category] = [];
     }
-    acc[category].push(scriptKey);
+    acc[category].push(script);
     return acc;
-  }, {} as Record<string, string[]>);
+  }, {} as Record<string, any[]>);
+
+  // Sort categories to show Project Scripts first
+  const sortedCategories = Object.entries(scriptsByCategory).sort(([a], [b]) => {
+    if (a === 'Project Scripts') return -1;
+    if (b === 'Project Scripts') return 1;
+    return a.localeCompare(b);
+  });
 
   return (
     <div className="space-y-4">
@@ -108,15 +156,22 @@ export function ScriptLibrary({
       </div>
 
       {/* Scripts by category */}
-      {Object.entries(scriptsByCategory).map(([category, scriptKeys]) => (
+      {sortedCategories.map(([category, scripts], index) => (
         <div key={category} className="space-y-2">
-          <h4 className="text-sm font-medium text-lime-300 uppercase tracking-wide">
-            {category}
-          </h4>
+          {index > 0 && <Separator className="bg-white/10" />}
+          
+          <div className="flex items-center gap-2">
+            {category === 'Project Scripts' && <FolderOpen className="h-4 w-4 text-lime-300" />}
+            <h4 className="text-sm font-medium text-lime-300 uppercase tracking-wide">
+              {category}
+            </h4>
+            <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-lime-500/20 text-lime-300">
+              {scripts.length}
+            </Badge>
+          </div>
           
           <div className="space-y-2">
-            {scriptKeys.map((scriptKey) => {
-              const script = EXAMPLE_SCRIPTS[scriptKey as keyof typeof EXAMPLE_SCRIPTS];
+            {scripts.map((script) => {
               const isAttached = attachedScripts.includes(script.id);
               const IconComponent = getScriptIcon(script.id);
               
@@ -127,6 +182,8 @@ export function ScriptLibrary({
                   description={getScriptDescription(script)}
                   icon={IconComponent}
                   isAttached={isAttached}
+                  isFileScript={script.id?.startsWith('file:')}
+                  scriptPath={script.path}
                   onAttach={() => onAttachScript(script.id)}
                 />
               );
@@ -151,6 +208,8 @@ interface ScriptLibraryCardProps {
   description: string;
   icon: React.ComponentType<any>;
   isAttached: boolean;
+  isFileScript?: boolean;
+  scriptPath?: string;
   onAttach: () => void;
 }
 
@@ -158,7 +217,9 @@ function ScriptLibraryCard({
   script, 
   description,
   icon: IconComponent, 
-  isAttached, 
+  isAttached,
+  isFileScript,
+  scriptPath,
   onAttach 
 }: ScriptLibraryCardProps) {
   
@@ -167,8 +228,12 @@ function ScriptLibraryCard({
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-lime-500/20 flex items-center justify-center">
-              <IconComponent className="h-4 w-4 text-lime-400" />
+            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+              isFileScript ? 'bg-blue-500/20' : 'bg-lime-500/20'
+            }`}>
+              <IconComponent className={`h-4 w-4 ${
+                isFileScript ? 'text-blue-400' : 'text-lime-400'
+              }`} />
             </div>
             
             <div className="flex-1 min-w-0">
@@ -176,7 +241,7 @@ function ScriptLibraryCard({
                 {script.name}
               </CardTitle>
               <CardDescription className="text-xs text-gray-400">
-                Priority: {script.priority}
+                {isFileScript ? 'File Script' : `Priority: ${script.priority}`}
               </CardDescription>
             </div>
           </div>
@@ -197,29 +262,45 @@ function ScriptLibraryCard({
           {description}
         </p>
         
-        {/* Lifecycle badges */}
-        <div className="mb-3 flex flex-wrap gap-1">
-          {script.lifecycle?.init && (
-            <Badge variant="outline" className="text-xs px-1 py-0 border-blue-400/30 text-blue-300">
-              init
-            </Badge>
-          )}
-          {script.lifecycle?.update && (
-            <Badge variant="outline" className="text-xs px-1 py-0 border-green-400/30 text-green-300">
-              update
-            </Badge>
-          )}
-          {script.lifecycle?.fixedUpdate && (
-            <Badge variant="outline" className="text-xs px-1 py-0 border-yellow-400/30 text-yellow-300">
-              fixedUpdate
-            </Badge>
-          )}
-          {script.lifecycle?.destroy && (
-            <Badge variant="outline" className="text-xs px-1 py-0 border-red-400/30 text-red-300">
-              destroy
-            </Badge>
-          )}
-        </div>
+        {!isFileScript && (
+          /* Lifecycle badges for example scripts */
+          <div className="mb-3 flex flex-wrap gap-1">
+            {script.lifecycle?.init && (
+              <Badge variant="outline" className="text-xs px-1 py-0 border-blue-400/30 text-blue-300">
+                init
+              </Badge>
+            )}
+            {script.lifecycle?.update && (
+              <Badge variant="outline" className="text-xs px-1 py-0 border-green-400/30 text-green-300">
+                update
+              </Badge>
+            )}
+            {script.lifecycle?.fixedUpdate && (
+              <Badge variant="outline" className="text-xs px-1 py-0 border-yellow-400/30 text-yellow-300">
+                fixedUpdate
+              </Badge>
+            )}
+            {script.lifecycle?.destroy && (
+              <Badge variant="outline" className="text-xs px-1 py-0 border-red-400/30 text-red-300">
+                destroy
+              </Badge>
+            )}
+          </div>
+        )}
+        
+        {/* Script parameters */}
+        {script.parameters && script.parameters.length > 0 && (
+          <div className="mb-3">
+            <p className="text-xs text-gray-400 mb-1">Parameters:</p>
+            <div className="flex flex-wrap gap-1">
+              {script.parameters.map((param: any, idx: number) => (
+                <Badge key={idx} variant="outline" className="text-xs px-1 py-0 border-purple-400/30 text-purple-300">
+                  {param.name}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
         
         {/* Attach button */}
         <Button
@@ -229,7 +310,9 @@ function ScriptLibraryCard({
           className={`w-full text-xs ${
             isAttached 
               ? 'bg-green-500/20 text-green-300 cursor-not-allowed' 
-              : 'bg-lime-500/20 text-lime-300 hover:bg-lime-500/30'
+              : isFileScript
+                ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
+                : 'bg-lime-500/20 text-lime-300 hover:bg-lime-500/30'
           }`}
         >
           {isAttached ? (

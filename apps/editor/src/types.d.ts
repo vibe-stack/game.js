@@ -98,6 +98,7 @@ interface ScriptAPI {
   getCompiledScripts: (projectPath: string) => Promise<Record<string, string>>;
   getCompilationStatus: (projectPath: string) => Promise<{ isWatching: boolean; compiledCount: number; lastCompilation?: Date }>;
   getImportMap: (projectPath: string) => Promise<Record<string, any> | null>;
+  readCompiledScript: (projectPath: string, scriptPath: string) => Promise<string>;
 }
 
 interface ThemeModeContext {
@@ -186,6 +187,10 @@ interface ProjectAPI {
   deleteFile: (filePath: string) => Promise<void>;
   deleteDirectory: (dirPath: string) => Promise<void>;
   renameItem: (oldPath: string, newPath: string) => Promise<void>;
+
+  // Script Management
+  saveScriptFile: (projectPath: string, scriptPath: string, content: string) => Promise<void>;
+  openScriptInEditor: (projectPath: string, scriptPath: string) => Promise<void>;
 
   // Legacy - keeping for backward compatibility
   installPackages: (projectName: string) => Promise<void>;

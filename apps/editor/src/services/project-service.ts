@@ -4,6 +4,7 @@ import { AssetManager } from "./asset-manager";
 import { FileSystemManager } from "./file-system-manager";
 import type { GameProject, AssetReference, SceneData } from "../types/project";
 import * as path from "path";
+import { shell } from "electron";
 
 export class ProjectService {
   private constructor() {} // Prevent instantiation
@@ -242,6 +243,43 @@ export class ProjectService {
   static async deleteDirectory(dirPath: string): Promise<void> { return FileSystemManager.deleteDirectory(dirPath); }
   static async renameItem(oldPath: string, newPath: string): Promise<void> { return FileSystemManager.renameItem(oldPath, newPath); }
 
+  // Script Management
+  static async saveScriptFile(projectPath: string, scriptPath: string, content: string): Promise<void> {
+    const scriptsDir = path.join(projectPath, "scripts");
+    const fullScriptPath = path.join(scriptsDir, scriptPath);
+    
+    try {
+      // Ensure scripts directory exists
+      if (!(await FileSystemManager.fileExists(scriptsDir))) {
+        await FileSystemManager.createDirectory(scriptsDir);
+      }
+      
+      // Ensure subdirectories exist if the script path contains them
+      const scriptDir = path.dirname(fullScriptPath);
+      if (scriptDir !== scriptsDir && !(await FileSystemManager.fileExists(scriptDir))) {
+        await FileSystemManager.createDirectory(scriptDir);
+      }
+      
+      // Write the script file
+      await FileSystemManager.writeFile(fullScriptPath, content);
+    } catch (error) {
+      console.error(`Failed to save script ${scriptPath}:`, error);
+      throw error;
+    }
+  }
+
+  static async openScriptInEditor(projectPath: string, scriptPath: string): Promise<void> {
+    const fullScriptPath = path.join(projectPath, "scripts", scriptPath);
+    
+    try {
+      // Open the file in the system's default editor
+      await shell.openPath(fullScriptPath);
+    } catch (error) {
+      console.error(`Failed to open script ${scriptPath}:`, error);
+      throw error;
+    }
+  }
+
   static registerIpcHandlers() {
     console.log("Registering project IPC handlers...");
     
@@ -282,6 +320,10 @@ export class ProjectService {
     ipcMain.handle("project:delete-file", (_, ...args: [string]) => ProjectService.deleteFile(...args));
     ipcMain.handle("project:delete-directory", (_, ...args: [string]) => ProjectService.deleteDirectory(...args));
     ipcMain.handle("project:rename-item", (_, ...args: [string, string]) => ProjectService.renameItem(...args));
+    
+    // Script Management
+    ipcMain.handle("project:save-script-file", (_, ...args: [string, string, string]) => ProjectService.saveScriptFile(...args));
+    ipcMain.handle("project:open-script-in-editor", (_, ...args: [string, string]) => ProjectService.openScriptInEditor(...args));
     
     console.log("Project IPC handlers registered successfully");
   }

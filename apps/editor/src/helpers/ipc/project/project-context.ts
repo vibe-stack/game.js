@@ -1,5 +1,9 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { GameProject, AssetReference, SceneData } from "@/types/project";
+import { 
+  PROJECT_SAVE_SCRIPT_FILE_CHANNEL, 
+  PROJECT_OPEN_SCRIPT_IN_EDITOR_CHANNEL 
+} from "./project-channels";
 
 export function exposeProjectContext() {
   console.log("Exposing project context...");
@@ -76,6 +80,12 @@ export function exposeProjectContext() {
       ipcRenderer.invoke("project:delete-directory", dirPath),
     renameItem: (oldPath: string, newPath: string) => 
       ipcRenderer.invoke("project:rename-item", oldPath, newPath),
+    
+    // Script Management
+    saveScriptFile: (projectPath: string, scriptPath: string, content: string) =>
+      ipcRenderer.invoke(PROJECT_SAVE_SCRIPT_FILE_CHANNEL, projectPath, scriptPath, content),
+    openScriptInEditor: (projectPath: string, scriptPath: string) =>
+      ipcRenderer.invoke(PROJECT_OPEN_SCRIPT_IN_EDITOR_CHANNEL, projectPath, scriptPath),
     
     // Legacy - keeping for backward compatibility but may be removed later
     installPackages: (projectName: string) => {
