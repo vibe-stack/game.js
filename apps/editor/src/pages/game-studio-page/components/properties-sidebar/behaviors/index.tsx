@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { GameWorldService } from "../../../services/game-world-service";
 import useGameStudioStore from "@/stores/game-studio-store";
-import { useEntityProperties } from "@/hooks/use-entity-state";
+import { useEntityProperties, useEntityScriptState } from "@/hooks/use-entity-state";
 import { useScriptManagerState } from "@/hooks/use-script-manager-state";
 import { Entity, EXAMPLE_SCRIPTS, getExampleScriptIds } from "@/models";
 import { Button } from "@/components/ui/button";
@@ -45,8 +45,9 @@ export function Behaviors({ gameWorldService }: BehaviorsProps) {
     return entitiesRegistry.get(selectedEntityId) || null;
   }, [selectedEntityId, gameWorldService]);
 
-  // Use the hook to subscribe to entity changes
+  // Use the hooks to subscribe to entity and script manager changes
   const properties = useEntityProperties(selectedEntity);
+  const scriptState = useEntityScriptState(selectedEntity);
 
   // Get script manager
   const scriptManager = useMemo(() => {
@@ -58,11 +59,10 @@ export function Behaviors({ gameWorldService }: BehaviorsProps) {
   // Use the script manager state hook for React synchronization
   useScriptManagerState(scriptManager);
 
-  // Get attached scripts
+  // Get attached scripts - now using the dedicated script state hook
   const attachedScripts = useMemo(() => {
-    if (!selectedEntity || !scriptManager) return [];
-    return selectedEntity.getAttachedScripts();
-  }, [selectedEntity, scriptManager, properties]); // Include properties to trigger re-render
+    return scriptState.attachedScripts;
+  }, [scriptState.attachedScripts, scriptState._scriptStateCounter]); // Include counter for force dependency
 
   // Load example scripts if not loaded
   React.useEffect(() => {

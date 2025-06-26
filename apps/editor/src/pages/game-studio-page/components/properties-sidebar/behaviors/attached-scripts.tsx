@@ -53,7 +53,7 @@ export function AttachedScripts({
         
         return (
           <ScriptCard
-            key={scriptId}
+            key={`${scriptId}-${script.config.enabled}-${JSON.stringify(scriptManager.getScriptParameters(entityId, scriptId))}`}
             script={script}
             scriptManager={scriptManager}
             isSelected={selectedScript === scriptId}

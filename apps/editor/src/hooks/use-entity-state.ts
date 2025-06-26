@@ -65,5 +65,49 @@ export function useEntityProperties(entity: Entity | null) {
     physicsMass: entity.physicsMass,
     physicsRestitution: entity.physicsRestitution,
     physicsFriction: entity.physicsFriction,
+    // Add script-related properties
+    attachedScripts: entity.getAttachedScripts(),
+    hasCharacterController: entity.hasCharacterController,
+  };
+}
+
+/**
+ * Hook specifically for tracking entity script state changes.
+ * This hook ensures React rerenders when scripts are attached, detached, or modified.
+ */
+export function useEntityScriptState(entity: Entity | null) {
+  const [scriptStateCounter, setScriptStateCounter] = useState(0);
+  
+  // Function to force a re-render when script state changes
+  const triggerScriptUpdate = useCallback(() => {
+    setScriptStateCounter(prev => prev + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!entity) return;
+
+    // Subscribe to entity changes (includes script attachment/detachment)
+    entity.addChangeListener(triggerScriptUpdate);
+
+    // Cleanup subscription on unmount or entity change
+    return () => {
+      entity.removeChangeListener(triggerScriptUpdate);
+    };
+  }, [entity, triggerScriptUpdate]);
+
+  if (!entity) {
+    return {
+      attachedScripts: [],
+      scriptCount: 0,
+    };
+  }
+
+  const attachedScripts = entity.getAttachedScripts();
+  
+  return {
+    attachedScripts,
+    scriptCount: attachedScripts.length,
+    // Force dependency on the counter to ensure rerenders
+    _scriptStateCounter: scriptStateCounter,
   };
 } 

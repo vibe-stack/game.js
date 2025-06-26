@@ -27,12 +27,25 @@ export function ScriptParameters({
     scriptManager.setScriptParameters(entityId, scriptId, newParams);
   };
 
+  // Prevent event bubbling to avoid interfering with script card clicks
+  const handleContainerClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
+  const handleMouseInteraction = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
+  const handleFocusInteraction = (e: React.FocusEvent) => {
+    e.stopPropagation();
+  };
+
   if (!parameters || parameters.length === 0) {
     return null;
   }
 
   return (
-    <Card className="bg-white/5 border-white/10">
+    <Card className="bg-white/5 border-white/10" onClick={handleContainerClick}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm text-white flex items-center gap-2">
           <Settings className="h-4 w-4" />
@@ -50,14 +63,16 @@ export function ScriptParameters({
             </Label>
             
             {param.type === 'number' && (
-              <DragInput
-                value={currentParams[param.name] || param.defaultValue}
-                onChange={(value) => handleParameterChange(param.name, value)}
-                min={param.min}
-                max={param.max}
-                step={param.step || 0.1}
-                className="bg-white/5 border-white/20 text-white h-7"
-              />
+              <div onMouseDown={handleMouseInteraction} onFocus={handleFocusInteraction}>
+                <DragInput
+                  value={currentParams[param.name] || param.defaultValue}
+                  onChange={(value) => handleParameterChange(param.name, value)}
+                  min={param.min}
+                  max={param.max}
+                  step={param.step || 0.1}
+                  className="bg-white/5 border-white/20 text-white h-7"
+                />
+              </div>
             )}
             
             {param.type === 'string' && (
@@ -65,51 +80,58 @@ export function ScriptParameters({
                 type="text"
                 value={currentParams[param.name] || param.defaultValue}
                 onChange={(e) => handleParameterChange(param.name, e.target.value)}
+                onMouseDown={handleMouseInteraction}
+                onFocus={handleFocusInteraction}
                 className="w-full bg-white/5 border-white/20 text-white text-sm h-7 px-2 rounded"
               />
             )}
             
             {param.type === 'boolean' && (
-              <Switch
-                checked={currentParams[param.name] !== undefined ? currentParams[param.name] : param.defaultValue}
-                onCheckedChange={(checked) => handleParameterChange(param.name, checked)}
-                className="data-[state=checked]:bg-lime-500"
-              />
+              <div onClick={handleContainerClick}>
+                <Switch
+                  checked={currentParams[param.name] !== undefined ? currentParams[param.name] : param.defaultValue}
+                  onCheckedChange={(checked) => handleParameterChange(param.name, checked)}
+                  className="data-[state=checked]:bg-lime-500"
+                />
+              </div>
             )}
             
             {param.type === 'select' && param.options && (
-              <Select
-                value={currentParams[param.name] || param.defaultValue}
-                onValueChange={(value) => handleParameterChange(param.name, value)}
-              >
-                <SelectTrigger className="w-full bg-white/5 border-white/20 text-white h-7">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {param.options.map((option: string) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div onClick={handleContainerClick}>
+                <Select
+                  value={currentParams[param.name] || param.defaultValue}
+                  onValueChange={(value) => handleParameterChange(param.name, value)}
+                >
+                  <SelectTrigger className="w-full bg-white/5 border-white/20 text-white h-7">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {param.options.map((option: string) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
             
             {param.type === 'vector3' && (
-              <div className="grid grid-cols-3 gap-1">
+              <div className="grid grid-cols-3 gap-1" onClick={handleContainerClick}>
                 {['x', 'y', 'z'].map((axis) => (
-                  <DragInput
-                    key={axis}
-                    value={currentParams[param.name]?.[axis] || param.defaultValue?.[axis] || 0}
-                    onChange={(value) => {
-                      const currentVec = currentParams[param.name] || param.defaultValue || { x: 0, y: 0, z: 0 };
-                      handleParameterChange(param.name, { ...currentVec, [axis]: value });
-                    }}
-                    min={param.min}
-                    max={param.max}
-                    step={param.step || 0.1}
-                    className="bg-white/5 border-white/20 text-white h-7"
-                  />
+                  <div key={axis} onMouseDown={handleMouseInteraction} onFocus={handleFocusInteraction}>
+                    <DragInput
+                      value={currentParams[param.name]?.[axis] || param.defaultValue?.[axis] || 0}
+                      onChange={(value) => {
+                        const currentVec = currentParams[param.name] || param.defaultValue || { x: 0, y: 0, z: 0 };
+                        handleParameterChange(param.name, { ...currentVec, [axis]: value });
+                      }}
+                      min={param.min}
+                      max={param.max}
+                      step={param.step || 0.1}
+                      className="bg-white/5 border-white/20 text-white h-7"
+                    />
+                  </div>
                 ))}
               </div>
             )}
