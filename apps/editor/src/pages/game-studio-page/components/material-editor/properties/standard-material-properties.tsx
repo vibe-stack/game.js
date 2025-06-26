@@ -3,7 +3,8 @@ import { DragInput } from "@/components/ui/drag-input";
 import { TextureInput } from "../texture-input";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronRight, ChevronDown, Link, Unlink, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/tailwind";
 
 interface StandardMaterialPropertiesProps {
@@ -19,6 +20,8 @@ export function StandardMaterialProperties({ properties, onChange }: StandardMat
     effects: false,
     advanced: false
   });
+
+  const [globalUVLocked, setGlobalUVLocked] = React.useState(false);
 
   const handlePropertyChange = (key: string, value: any) => {
     onChange({
@@ -47,6 +50,66 @@ export function StandardMaterialProperties({ properties, onChange }: StandardMat
     });
   };
 
+  // Global UV scale functionality
+  const getGlobalUVScale = () => {
+    // Get scale from first available texture, default to 1,1
+    const textureTypes = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap'];
+    for (const type of textureTypes) {
+      const propsKey = `${type}Props`;
+      if (properties[propsKey]?.scale) {
+        return properties[propsKey].scale;
+      }
+    }
+    return { x: 1, y: 1 };
+  };
+
+  const handleGlobalUVScaleChange = (axis: 'x' | 'y', value: number) => {
+    const textureTypes = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap'];
+    const newProps = { ...properties };
+    
+    textureTypes.forEach(type => {
+      if (newProps[type]) { // Only update if texture exists
+        const propsKey = `${type}Props`;
+        const currentProps = newProps[propsKey] || {};
+        
+        if (globalUVLocked) {
+          // Update both X and Y
+          newProps[propsKey] = {
+            ...currentProps,
+            scale: { x: value, y: value }
+          };
+        } else {
+          // Update only the specified axis
+          const currentScale = currentProps.scale || { x: 1, y: 1 };
+          newProps[propsKey] = {
+            ...currentProps,
+            scale: { ...currentScale, [axis]: value }
+          };
+        }
+      }
+    });
+    
+    onChange(newProps);
+  };
+
+  const resetGlobalUVScale = () => {
+    const textureTypes = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap'];
+    const newProps = { ...properties };
+    
+    textureTypes.forEach(type => {
+      if (newProps[type]) { // Only update if texture exists
+        const propsKey = `${type}Props`;
+        const currentProps = newProps[propsKey] || {};
+        newProps[propsKey] = {
+          ...currentProps,
+          scale: { x: 1, y: 1 }
+        };
+      }
+    });
+    
+    onChange(newProps);
+  };
+
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
@@ -60,6 +123,8 @@ export function StandardMaterialProperties({ properties, onChange }: StandardMat
       {expandedSections[section] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
     </button>
   );
+
+  const globalUVScale = getGlobalUVScale();
 
   return (
     <div className="space-y-1">
@@ -127,10 +192,61 @@ export function StandardMaterialProperties({ properties, onChange }: StandardMat
         <SectionHeader title="Textures" section="textures" />
         {expandedSections.textures && (
           <div className="space-y-4 px-2 pb-3">
+            {/* Global UV Scale Controls */}
+            <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-gray-300">Global UV Scale</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setGlobalUVLocked(!globalUVLocked)}
+                    className="h-6 w-6 p-0 hover:bg-gray-700"
+                  >
+                    {globalUVLocked ? <Link className="w-3 h-3" /> : <Unlink className="w-3 h-3" />}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={resetGlobalUVScale}
+                    className="h-6 w-6 p-0 hover:bg-gray-700"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <DragInput
+                  label="X"
+                  value={globalUVScale.x}
+                  onChange={(v) => handleGlobalUVScaleChange('x', v)}
+                  step={0.01}
+                  precision={2}
+                  min={0.01}
+                  max={10}
+                  compact
+                />
+                <DragInput
+                  label="Y"
+                  value={globalUVScale.y}
+                  onChange={(v) => handleGlobalUVScaleChange('y', v)}
+                  step={0.01}
+                  precision={2}
+                  min={0.01}
+                  max={10}
+                  compact
+                  disabled={globalUVLocked}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                {globalUVLocked ? "Locked: Both axes scale together" : "Unlocked: Scale each axis independently"}
+              </p>
+            </div>
+
             <TextureInput
               label="Base Color"
               value={properties.map}
-              uvScale={properties.mapProps?.repeat || { x: 1, y: 1 }}
+              uvScale={properties.mapProps?.scale || { x: 1, y: 1 }}
               uvOffset={properties.mapProps?.offset || { x: 0, y: 0 }}
               uvRotation={properties.mapProps?.rotation || 0}
               onChange={(path) => handleTextureChange("map", path)}
@@ -140,7 +256,7 @@ export function StandardMaterialProperties({ properties, onChange }: StandardMat
             <TextureInput
               label="Normal Map"
               value={properties.normalMap}
-              uvScale={properties.normalMapProps?.repeat || { x: 1, y: 1 }}
+              uvScale={properties.normalMapProps?.scale || { x: 1, y: 1 }}
               uvOffset={properties.normalMapProps?.offset || { x: 0, y: 0 }}
               uvRotation={properties.normalMapProps?.rotation || 0}
               onChange={(path) => handleTextureChange("normalMap", path)}
@@ -163,7 +279,7 @@ export function StandardMaterialProperties({ properties, onChange }: StandardMat
             <TextureInput
               label="Roughness Map"
               value={properties.roughnessMap}
-              uvScale={properties.roughnessMapProps?.repeat || { x: 1, y: 1 }}
+              uvScale={properties.roughnessMapProps?.scale || { x: 1, y: 1 }}
               uvOffset={properties.roughnessMapProps?.offset || { x: 0, y: 0 }}
               uvRotation={properties.roughnessMapProps?.rotation || 0}
               onChange={(path) => handleTextureChange("roughnessMap", path)}
@@ -173,7 +289,7 @@ export function StandardMaterialProperties({ properties, onChange }: StandardMat
             <TextureInput
               label="Metalness Map"
               value={properties.metalnessMap}
-              uvScale={properties.metalnessMapProps?.repeat || { x: 1, y: 1 }}
+              uvScale={properties.metalnessMapProps?.scale || { x: 1, y: 1 }}
               uvOffset={properties.metalnessMapProps?.offset || { x: 0, y: 0 }}
               uvRotation={properties.metalnessMapProps?.rotation || 0}
               onChange={(path) => handleTextureChange("metalnessMap", path)}
@@ -183,7 +299,7 @@ export function StandardMaterialProperties({ properties, onChange }: StandardMat
             <TextureInput
               label="AO Map"
               value={properties.aoMap}
-              uvScale={properties.aoMapProps?.repeat || { x: 1, y: 1 }}
+              uvScale={properties.aoMapProps?.scale || { x: 1, y: 1 }}
               uvOffset={properties.aoMapProps?.offset || { x: 0, y: 0 }}
               uvRotation={properties.aoMapProps?.rotation || 0}
               onChange={(path) => handleTextureChange("aoMap", path)}
@@ -289,7 +405,7 @@ export function StandardMaterialProperties({ properties, onChange }: StandardMat
             <TextureInput
               label="Emissive Map"
               value={properties.emissiveMap}
-              uvScale={properties.emissiveMapProps?.repeat || { x: 1, y: 1 }}
+              uvScale={properties.emissiveMapProps?.scale || { x: 1, y: 1 }}
               uvOffset={properties.emissiveMapProps?.offset || { x: 0, y: 0 }}
               uvRotation={properties.emissiveMapProps?.rotation || 0}
               onChange={(path) => handleTextureChange("emissiveMap", path)}

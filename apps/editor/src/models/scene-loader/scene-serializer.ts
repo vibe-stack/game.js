@@ -235,9 +235,9 @@ export class SceneSerializer {
         if (assetMatch) {
           properties[textureProp] = `assets/${assetMatch[1]}`;
           
-          // Save UV properties
+          // Save UV properties (using 'scale' as the new standard)
           properties[uvProp] = {
-            repeat: { x: texture.repeat.x, y: texture.repeat.y },
+            scale: { x: texture.repeat.x, y: texture.repeat.y },
             offset: { x: texture.offset.x, y: texture.offset.y },
             rotation: texture.rotation
           };

@@ -138,23 +138,30 @@ export class Mesh3D extends Entity {
 
     this.modelPath = modelPath;
     
-    // Get the asset URL using the project service
+    // Get the asset data URL using the project service to avoid CORS issues
     let modelUrl: string;
     
     try {
       // Use window.projectAPI if available (in renderer context)
       if (typeof window !== 'undefined' && (window as any).projectAPI) {
-        const url = await (window as any).projectAPI.getAssetUrl(projectPath, modelPath);
-        if (!url) {
-          throw new Error(`Failed to get asset URL for ${modelPath}`);
+        const dataUrl = await (window as any).projectAPI.getAssetDataUrl(projectPath, modelPath);
+        if (!dataUrl) {
+          throw new Error(`Failed to get asset data for ${modelPath}`);
         }
-        modelUrl = url;
+        
+        // Convert data URL to blob URL for GLTFLoader
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        modelUrl = URL.createObjectURL(blob);
+        
+        // Store the blob URL for cleanup later
+        this.modelUrl = modelUrl;
       } else {
         // Fallback for other contexts
         throw new Error("Project API not available");
       }
     } catch (error) {
-      console.error("Failed to get asset URL:", error);
+      console.error("Failed to get asset data:", error);
       throw new Error(`Cannot load model from path: ${modelPath}`);
     }
 
@@ -710,6 +717,12 @@ export class Mesh3D extends Entity {
        this.animationClips = [];
        this.animationMixer = undefined;
        this.currentAnimation = undefined;
+     }
+     
+     // Clean up blob URLs
+     if (this.modelUrl && this.modelUrl.startsWith('blob:')) {
+       URL.revokeObjectURL(this.modelUrl);
+       this.modelUrl = undefined;
      }
      
      if (this.loadedGLTF) {

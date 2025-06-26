@@ -327,21 +327,36 @@ export class MaterialApplicationService {
    */
   private static async loadTexture(projectPath: string, texturePath: string, textureProps?: any): Promise<THREE.Texture | null> {
     try {
-      const textureUrl = await window.projectAPI.getAssetUrl(projectPath, texturePath);
-      if (!textureUrl) {
-        console.warn(`Could not get URL for texture: ${texturePath}`);
+      const textureDataUrl = await window.projectAPI.getAssetDataUrl(projectPath, texturePath);
+      if (!textureDataUrl) {
+        console.warn(`Could not get data for texture: ${texturePath}`);
         return null;
       }
 
+      // Convert data URL to blob URL for TextureLoader
+      const response = await fetch(textureDataUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
       const loader = new THREE.TextureLoader();
       const texture = await new Promise<THREE.Texture>((resolve, reject) => {
-        loader.load(textureUrl, resolve, undefined, reject);
+        loader.load(blobUrl, (loadedTexture) => {
+          // Clean up blob URL after loading
+          URL.revokeObjectURL(blobUrl);
+          resolve(loadedTexture);
+        }, undefined, (error) => {
+          // Clean up blob URL on error
+          URL.revokeObjectURL(blobUrl);
+          reject(error);
+        });
       });
 
       // Apply texture properties
       if (textureProps) {
-        if (textureProps.repeat) {
-          texture.repeat.set(textureProps.repeat.x, textureProps.repeat.y);
+        // Handle both 'scale' and 'repeat' for UV scaling (scale is the new standard)
+        const uvScale = textureProps.scale || textureProps.repeat;
+        if (uvScale) {
+          texture.repeat.set(uvScale.x, uvScale.y);
         }
         if (textureProps.offset) {
           texture.offset.set(textureProps.offset.x, textureProps.offset.y);
@@ -349,6 +364,9 @@ export class MaterialApplicationService {
         if (textureProps.rotation !== undefined) {
           texture.rotation = textureProps.rotation;
         }
+        // Set wrapping mode for UV scaling to work properly
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
         texture.needsUpdate = true;
       }
 
@@ -690,9 +708,9 @@ export class MaterialApplicationService {
         if (assetMatch) {
           properties[textureProp] = `assets/${assetMatch[1]}`;
           
-          // Save UV properties
+          // Save UV properties (using 'scale' as the new standard)
           properties[uvProp] = {
-            repeat: { x: texture.repeat.x, y: texture.repeat.y },
+            scale: { x: texture.repeat.x, y: texture.repeat.y },
             offset: { x: texture.offset.x, y: texture.offset.y },
             rotation: texture.rotation
           };

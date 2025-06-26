@@ -379,17 +379,25 @@ export default function FileBrowser({ gameWorldService }: FileBrowserProps) {
         throw new Error("Game world not initialized");
       }
 
-      // Get the asset URL from the project API
-      const assetUrl = await window.projectAPI.getAssetUrl(currentProject.path, node.path);
-      if (!assetUrl) {
-        throw new Error("Failed to get asset URL");
+      // Get the asset as data URL instead of HTTP URL to avoid CORS issues
+      const assetDataUrl = await window.projectAPI.getAssetDataUrl(currentProject.path, node.path);
+      if (!assetDataUrl) {
+        throw new Error("Failed to get asset data");
       }
 
-      // Load the GLB file using the URL
+      // Convert data URL to blob URL for GLTFLoader
+      const response = await fetch(assetDataUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Load the GLB file using the blob URL
       const loader = new GLTFLoader();
       const gltf = await new Promise<GLTF>((resolve, reject) => {
-        loader.load(assetUrl, resolve, undefined, reject);
+        loader.load(blobUrl, resolve, undefined, reject);
       });
+
+      // Clean up the blob URL
+      URL.revokeObjectURL(blobUrl);
 
       // Find the first mesh in the loaded model
       let meshFound = false;
@@ -406,7 +414,7 @@ export default function FileBrowser({ gameWorldService }: FileBrowserProps) {
             castShadow: true,
             receiveShadow: true,
             modelPath: node.path,
-            modelUrl: assetUrl,
+            modelUrl: assetDataUrl,
           });
 
           // Add physics configuration

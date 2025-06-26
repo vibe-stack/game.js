@@ -237,13 +237,26 @@ export class MaterialSystem {
   // Load texture from project path
   async loadTextureFromPath(projectPath: string, texturePath: string, textureProps?: any): Promise<THREE.Texture | null> {
     try {
-      // Get asset server URL for the texture
-      const textureUrl = await window.projectAPI.getAssetUrl(projectPath, texturePath);
-      if (!textureUrl) return null;
+      // Get asset data URL for the texture to avoid CORS issues
+      const textureDataUrl = await window.projectAPI.getAssetDataUrl(projectPath, texturePath);
+      if (!textureDataUrl) return null;
+
+      // Convert data URL to blob URL for TextureLoader
+      const response = await fetch(textureDataUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
 
       const loader = new THREE.TextureLoader();
       const texture = await new Promise<THREE.Texture>((resolve, reject) => {
-        loader.load(textureUrl, resolve, undefined, reject);
+        loader.load(blobUrl, (loadedTexture) => {
+          // Clean up blob URL after loading
+          URL.revokeObjectURL(blobUrl);
+          resolve(loadedTexture);
+        }, undefined, (error) => {
+          // Clean up blob URL on error
+          URL.revokeObjectURL(blobUrl);
+          reject(error);
+        });
       });
 
       // Apply texture properties

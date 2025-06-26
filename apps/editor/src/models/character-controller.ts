@@ -19,6 +19,14 @@ export interface CharacterControllerConfig {
   jumpForce: number;
   sprintMultiplier: number;
   
+  // Crouch and Slide mechanics
+  crouchSpeedMultiplier: number; // Speed reduction when crouching (0-1)
+  slideSpeedMultiplier: number; // Speed boost when sliding (usually > 1)
+  slideDuration: number; // Max time for sliding in seconds
+  slideDeceleration: number; // How quickly slide speed decreases
+  crouchHeightReduction: number; // How much to reduce capsule height when crouching (0-1)
+  slideMinSpeed: number; // Minimum speed required to start sliding
+  
   // Advanced movement mechanics (CS-like)
   airAcceleration: number; // Air strafe acceleration
   airMaxSpeed: number; // Maximum air strafe speed
@@ -69,6 +77,8 @@ export interface CharacterControllerConfig {
   sprintAnimation?: string;
   jumpAnimation?: string;
   fallAnimation?: string;
+  crouchAnimation?: string;
+  slideAnimation?: string;
 }
 
 export interface CharacterState {
@@ -76,13 +86,15 @@ export interface CharacterState {
   isJumping: boolean;
   isSprinting: boolean;
   isMoving: boolean;
+  isCrouching: boolean;
+  isSliding: boolean;
+  slideTimer: number; // Time remaining for current slide
   velocity: THREE.Vector3;
   inputDirection: THREE.Vector3;
   cameraRotation: { pitch: number; yaw: number };
   currentAnimation?: string;
   
   // Advanced movement state
-  isSliding: boolean;
   surfaceNormal: THREE.Vector3;
   lastGroundedTime: number;
   currentSpeed: number;
@@ -104,6 +116,9 @@ export class CharacterController {
   // State
   private state: CharacterState;
   
+  // Track current collider height for position adjustments
+  private currentColliderHalfHeight: number;
+  
   // Input tracking
   private inputState: {
     forward: boolean;
@@ -112,6 +127,7 @@ export class CharacterController {
     right: boolean;
     jump: boolean;
     sprint: boolean;
+    crouch: boolean;
   };
   
   private previousInputState: {
@@ -164,6 +180,14 @@ export class CharacterController {
       jumpForce: 12.0,
       sprintMultiplier: 1.8,
       
+      // Crouch and Slide mechanics
+      crouchSpeedMultiplier: 0.5,
+      slideSpeedMultiplier: 1.5,
+      slideDuration: 1.0,
+      slideDeceleration: 0.5,
+      crouchHeightReduction: 0.2,
+      slideMinSpeed: 5.0,
+      
       // Advanced movement mechanics (CS-like defaults)
       airAcceleration: 40.0,
       airMaxSpeed: 30.0,
@@ -211,12 +235,14 @@ export class CharacterController {
       isJumping: false,
       isSprinting: false,
       isMoving: false,
+      isCrouching: false,
+      isSliding: false,
+      slideTimer: 0,
       velocity: new THREE.Vector3(0, 0, 0),
       inputDirection: new THREE.Vector3(),
       cameraRotation: { pitch: 0, yaw: 0 },
       
       // Advanced movement state
-      isSliding: false,
       surfaceNormal: new THREE.Vector3(0, 1, 0),
       lastGroundedTime: 0,
       currentSpeed: 0,
@@ -231,12 +257,16 @@ export class CharacterController {
       left: false,
       right: false,
       jump: false,
-      sprint: false
+      sprint: false,
+      crouch: false
     };
     
     this.previousInputState = {
       jump: false
     };
+    
+    // Initialize current collider height
+    this.currentColliderHalfHeight = this.config.capsuleHalfHeight;
     
     // Generate unique camera ID for this controller instance
     this.cameraId = `character-camera-${character.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -516,6 +546,158 @@ export class CharacterController {
     this.state.currentSpeed = this.currentVelocity.length();
   }
 
+  private updateCrouchAndSlide(deltaTime: number): void {
+    const wasSliding = this.state.isSliding;
+    const wasCrouching = this.state.isCrouching;
+    
+    // Handle slide timer
+    if (this.state.isSliding) {
+      this.state.slideTimer -= deltaTime;
+      if (this.state.slideTimer <= 0) {
+        this.state.isSliding = false;
+        this.state.slideTimer = 0;
+      }
+      
+      // Apply slide deceleration
+      const slideDecel = this.config.slideDeceleration * deltaTime;
+      const currentSpeed = this.currentVelocity.length();
+      if (currentSpeed > slideDecel) {
+        this.currentVelocity.multiplyScalar(1 - (slideDecel / currentSpeed));
+      }
+    }
+    
+    // Check for slide start conditions
+    if (!this.state.isSliding && this.inputState.crouch && this.state.isGrounded && 
+        this.state.isMoving && this.state.currentSpeed >= this.config.slideMinSpeed) {
+      // Start sliding
+      this.state.isSliding = true;
+      this.state.isCrouching = false;
+      this.state.slideTimer = this.config.slideDuration;
+    } 
+    // Check for crouch
+    else if (!this.state.isSliding && this.inputState.crouch && this.state.isGrounded) {
+      this.state.isCrouching = true;
+    } 
+    // Stop crouching
+    else if (!this.inputState.crouch && !this.state.isSliding) {
+      this.state.isCrouching = false;
+    }
+    
+    // Update camera height based on crouch/slide state
+    this.updateCameraHeight(wasCrouching, wasSliding);
+    
+    // Update collider height if crouching state changed
+    if (wasCrouching !== this.state.isCrouching || wasSliding !== this.state.isSliding) {
+      this.updateColliderHeight();
+    }
+  }
+  
+  private updateCameraHeight(wasCrouching: boolean, wasSliding: boolean): void {
+    const normalHeight = this.config.cameraHeight;
+    let targetHeight = normalHeight;
+    
+    if (this.state.isCrouching || this.state.isSliding) {
+      // Reduce camera height when crouching or sliding
+      targetHeight = normalHeight * (1 - this.config.crouchHeightReduction);
+    }
+    
+    // Smoothly interpolate camera height
+    const followConfig = this.cameraManager.getCameraFollow(this.cameraId);
+    if (followConfig && followConfig.offset) {
+      const currentHeight = this.config.cameraMode === "first-person" ? 
+        this.config.cameraHeight : followConfig.offset.y;
+      const lerpFactor = Math.min(10 * this.frameTime, 1.0);
+      const newHeight = THREE.MathUtils.lerp(currentHeight, targetHeight, lerpFactor);
+      
+      if (this.config.cameraMode === "first-person") {
+        this.config.cameraHeight = newHeight;
+      } else if (followConfig.offset) {
+        followConfig.offset.y = newHeight;
+        this.cameraManager.setCameraFollow(this.cameraId, followConfig);
+      }
+    }
+  }
+  
+  private updateColliderHeight(): void {
+    // Update the character controller's collider height
+    const rigidBody = this.getCharacterRigidBody();
+    const collider = this.getCharacterCollider();
+    const world = this.physicsManager.getWorld();
+    
+    const colliderId = this.character["colliderId"];
+    const rigidBodyId = this.character["rigidBodyId"];
+    
+    if (rigidBody && collider && world && colliderId && rigidBodyId) {
+      const baseHalfHeight = this.config.capsuleHalfHeight;
+      const oldHalfHeight = this.currentColliderHalfHeight; // Use tracked previous height
+      let newHalfHeight = baseHalfHeight;
+      
+      if (this.state.isCrouching || this.state.isSliding) {
+        newHalfHeight = baseHalfHeight * (1 - this.config.crouchHeightReduction);
+      }
+      
+      // Only update if height actually changed
+      if (Math.abs(newHalfHeight - oldHalfHeight) < 0.001) {
+        return; // No meaningful change, skip update
+      }
+      
+      // Calculate the height difference to adjust character position
+      const heightDifference = oldHalfHeight - newHalfHeight;
+      
+      // Remove the old collider
+      this.physicsManager.removeCollider(colliderId);
+      
+      // Create new capsule collider with updated height
+      const updatedDimensions = new THREE.Vector3(
+        this.config.capsuleRadius * 2, // Width (diameter)
+        newHalfHeight * 2, // Height (full height, not half-height)
+        this.config.capsuleRadius * 2  // Depth (diameter)
+      );
+      
+      // Apply character scale to the collider dimensions
+      if (this.character.scale) {
+        updatedDimensions.x *= Math.max(this.character.scale.x, this.character.scale.z);
+        updatedDimensions.y *= this.character.scale.y;
+        updatedDimensions.z *= Math.max(this.character.scale.x, this.character.scale.z);
+      }
+      
+      // Create the new collider with updated dimensions
+      this.physicsManager.createCollider(
+        colliderId,
+        rigidBodyId,
+        "capsule",
+        updatedDimensions
+      );
+      
+      // Adjust character position to keep the bottom of the capsule at ground level
+      // When crouching (newHalfHeight < oldHalfHeight), heightDifference is positive, so we move down
+      // When standing up (newHalfHeight > oldHalfHeight), heightDifference is negative, so we move up
+      const currentTranslation = rigidBody.translation();
+      const positionAdjustment = -heightDifference; // Negative because we want to keep bottom at same level
+      
+      const newTranslation = {
+        x: currentTranslation.x,
+        y: currentTranslation.y + positionAdjustment,
+        z: currentTranslation.z
+      };
+      
+      // Update the physics body position
+      rigidBody.setNextKinematicTranslation(newTranslation);
+      
+      // Update the character visual position
+      const visualPosition = new THREE.Vector3(newTranslation.x, newTranslation.y, newTranslation.z);
+      if (this.config.colliderOffset) {
+        visualPosition.sub(this.config.colliderOffset);
+      }
+      
+      this.character.position.copy(visualPosition);
+      (this.character as any).emitChange();
+      
+      // Update tracked height for next time
+      this.currentColliderHalfHeight = newHalfHeight;
+    }
+  }
+
   private updateInputState(): void {
     const inputState = this.inputManager.getInputState();
     
@@ -525,9 +707,10 @@ export class CharacterController {
     this.inputState.left = inputState.keyboard.get("KeyA") || inputState.keyboard.get("ArrowLeft") || false;
     this.inputState.right = inputState.keyboard.get("KeyD") || inputState.keyboard.get("ArrowRight") || false;
     
-    // Support multiple keys for jumping and sprinting
+    // Support multiple keys for jumping, sprinting, and crouching
     this.inputState.jump = inputState.keyboard.get("Space") || inputState.keyboard.get("KeyJ") || false;
     this.inputState.sprint = inputState.keyboard.get("ShiftLeft") || inputState.keyboard.get("ShiftRight") || inputState.keyboard.get("KeyX") || false;
+    this.inputState.crouch = inputState.keyboard.get("ControlLeft") || inputState.keyboard.get("ControlRight") || inputState.keyboard.get("KeyC") || false;
     
     // Calculate wish direction (what the player wants to do)
     this.state.wishDirection.set(0, 0, 0);
@@ -556,27 +739,66 @@ export class CharacterController {
     // Legacy input direction for compatibility
     this.state.inputDirection.copy(this.state.wishDirection);
     
-    this.state.isSprinting = this.inputState.sprint;
+    this.state.isSprinting = this.inputState.sprint && !this.state.isCrouching && !this.state.isSliding;
     this.state.isMoving = this.state.wishDirection.length() > 0;
   }
   
   private updateGroundMovement(deltaTime: number): void {
-    const wishSpeed = this.config.maxSpeed * (this.state.isSprinting ? this.config.sprintMultiplier : 1.0);
+    // Calculate base speed based on movement state
+    let baseSpeed = this.config.maxSpeed;
+    
+    if (this.state.isSliding) {
+      baseSpeed *= this.config.slideSpeedMultiplier;
+    } else if (this.state.isCrouching) {
+      baseSpeed *= this.config.crouchSpeedMultiplier;
+    } else if (this.state.isSprinting) {
+      baseSpeed *= this.config.sprintMultiplier;
+    }
+    
+    const wishSpeed = baseSpeed;
     
     if (this.state.isMoving) {
-      // Ground acceleration
-      const acceleration = this.config.acceleration;
-      const currentSpeed = this.currentVelocity.length();
+      // CS-style ground acceleration - only apply friction to velocity components not in wish direction
+      const currentSpeed = this.currentVelocity.dot(this.state.wishDirection);
       const addSpeed = wishSpeed - currentSpeed;
       
       if (addSpeed > 0) {
-        const accelSpeed = Math.min(acceleration * deltaTime, addSpeed);
+        const accelSpeed = Math.min(this.config.acceleration * deltaTime, addSpeed);
         this.currentVelocity.add(this.state.wishDirection.clone().multiplyScalar(accelSpeed));
+      }
+      
+      // Apply friction only to velocity perpendicular to wish direction
+      this.applyGroundFriction(deltaTime, this.state.wishDirection);
+    } else {
+      // Apply full friction when not trying to move
+      this.applyFriction(this.config.groundFriction, deltaTime);
+    }
+  }
+  
+  private applyGroundFriction(deltaTime: number, wishDirection: THREE.Vector3): void {
+    if (this.config.groundFriction <= 0) return;
+    
+    const speed = this.currentVelocity.length();
+    if (speed < 0.01) return;
+    
+    // Decompose velocity into parallel and perpendicular components to wish direction
+    const parallel = wishDirection.clone().multiplyScalar(this.currentVelocity.dot(wishDirection));
+    const perpendicular = this.currentVelocity.clone().sub(parallel);
+    
+    // Apply friction only to perpendicular component (allows smooth direction changes)
+    const perpSpeed = perpendicular.length();
+    if (perpSpeed > 0.01) {
+      let control = Math.max(perpSpeed, this.config.stopSpeed);
+      let drop = control * this.config.groundFriction * deltaTime;
+      
+      let newPerpSpeed = Math.max(0, perpSpeed - drop);
+      if (newPerpSpeed !== perpSpeed) {
+        perpendicular.multiplyScalar(newPerpSpeed / perpSpeed);
       }
     }
     
-    // Apply ground friction
-    this.applyFriction(this.config.groundFriction, deltaTime);
+    // Recombine velocity components
+    this.currentVelocity.copy(parallel.add(perpendicular));
   }
 
   private updateAirMovement(deltaTime: number): void {
@@ -653,10 +875,6 @@ export class CharacterController {
     // Update surface normal
     this.state.surfaceNormal.copy(surfaceNormal);
     
-    // Check if we're sliding on a slope
-    const slopeAngle = Math.acos(surfaceNormal.y);
-    this.state.isSliding = groundCollision && slopeAngle > this.config.slideThreshold;
-    
     // Ground detection logic
     const hitGround = this.verticalVelocity < -0.5 && Math.abs(verticalMovement) < 0.01;
     const stayingGrounded = wasGrounded && Math.abs(verticalMovement) < 0.02 && this.verticalVelocity <= 0.1;
@@ -670,8 +888,11 @@ export class CharacterController {
         this.state.isJumping = false;
       }
       
-      // Preserve momentum when landing on slopes
-      if (this.state.isSliding) {
+      // Preserve momentum when landing on slopes (automatic slope slide)
+      const slopeAngle = Math.acos(surfaceNormal.y);
+      const isOnSlope = slopeAngle > this.config.slideThreshold;
+      
+      if (isOnSlope) {
         const horizontalVel = new THREE.Vector3(this.currentVelocity.x, 0, this.currentVelocity.z);
         const speed = horizontalVel.length() * this.config.momentumPreservation;
         if (speed > 0) {
@@ -736,6 +957,7 @@ export class CharacterController {
     this.updateMouseVelocity(deltaTime);
     
     this.updateInputState();
+    this.updateCrouchAndSlide(deltaTime);
     this.updateCameraRotation();
     this.updateAdvancedMovement(deltaTime);
     
@@ -759,13 +981,20 @@ export class CharacterController {
     // Determine which animation should be playing based on state
     let targetAnimation: string | undefined;
     
-    if (!this.state.isGrounded && this.verticalVelocity < -2) {
+    // Priority order: slide > crouch > air states > ground movement > idle
+    if (this.state.isSliding && this.config.slideAnimation) {
+      // Sliding
+      targetAnimation = this.config.slideAnimation;
+    } else if (this.state.isCrouching && this.config.crouchAnimation) {
+      // Crouching (stationary or moving)
+      targetAnimation = this.config.crouchAnimation;
+    } else if (!this.state.isGrounded && this.verticalVelocity < -2) {
       // Falling
       targetAnimation = this.config.fallAnimation;
     } else if (this.state.isJumping && this.verticalVelocity > 0) {
       // Jumping (going up)
       targetAnimation = this.config.jumpAnimation;
-    } else if (this.state.isMoving) {
+    } else if (this.state.isMoving && this.state.isGrounded) {
       // Moving on ground
       if (this.state.isSprinting && this.config.sprintAnimation) {
         targetAnimation = this.config.sprintAnimation;
@@ -1016,6 +1245,14 @@ export const FPS_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
   cameraSensitivity: 0.002,
   snapToGroundDistance: 0.05,
   
+  // Crouch and Slide mechanics for FPS
+  crouchSpeedMultiplier: 0.4,
+  slideSpeedMultiplier: 1.8,
+  slideDuration: 1.2,
+  slideDeceleration: 0.8,
+  crouchHeightReduction: 0.4,
+  slideMinSpeed: 6.0,
+  
   // CS-style movement for FPS
   airAcceleration: 50.0,
   airMaxSpeed: 35.0,
@@ -1043,6 +1280,14 @@ export const THIRD_PERSON_CHARACTER_CONFIG: Partial<CharacterControllerConfig> =
   acceleration: 50.0,
   jumpForce: 12.0,
   cameraSensitivity: 0.002,
+  
+  // Crouch and Slide mechanics for third-person
+  crouchSpeedMultiplier: 0.5,
+  slideSpeedMultiplier: 1.5,
+  slideDuration: 1.0,
+  slideDeceleration: 0.6,
+  crouchHeightReduction: 0.3,
+  slideMinSpeed: 4.0,
   
   // CS-style movement for third-person
   airAcceleration: 40.0,

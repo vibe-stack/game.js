@@ -444,6 +444,48 @@ export function CharacterControllerProperties({
                     </SelectContent>
                   </Select>
                 </div>
+                
+                {/* Crouch Animation */}
+                <div className="flex items-center gap-2">
+                  <span className="min-w-[60px] text-xs text-gray-400">Crouch</span>
+                  <Select
+                    value={config.crouchAnimation || "-"}
+                    onValueChange={(value) => handleConfigChange("crouchAnimation", value || undefined)}
+                  >
+                    <SelectTrigger className="h-6 flex-1 border-gray-700 bg-gray-800 text-xs">
+                      <SelectValue placeholder="Select crouch animation..." />
+                    </SelectTrigger>
+                    <SelectContent className="border-gray-700 bg-gray-800">
+                      <SelectItem value="0" className="text-xs">None</SelectItem>
+                      {animations.map((anim: string) => (
+                        <SelectItem key={anim} value={anim} className="text-xs">
+                          {anim}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Slide Animation */}
+                <div className="flex items-center gap-2">
+                  <span className="min-w-[60px] text-xs text-gray-400">Slide</span>
+                  <Select
+                    value={config.slideAnimation || "-"}
+                    onValueChange={(value) => handleConfigChange("slideAnimation", value || undefined)}
+                  >
+                    <SelectTrigger className="h-6 flex-1 border-gray-700 bg-gray-800 text-xs">
+                      <SelectValue placeholder="Select slide animation..." />
+                    </SelectTrigger>
+                    <SelectContent className="border-gray-700 bg-gray-800">
+                      <SelectItem value="0" className="text-xs">None</SelectItem>
+                      {animations.map((anim: string) => (
+                        <SelectItem key={anim} value={anim} className="text-xs">
+                          {anim}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </>
             );
           })()}
@@ -606,6 +648,82 @@ export function CharacterControllerProperties({
             precision={2}
             min={0}
             max={1}
+            compact
+            className="text-xs"
+          />
+        </div>
+      </div>
+
+      <Separator className="bg-white/10" />
+
+      {/* Crouch & Slide Mechanics */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-green-300">Crouch & Slide</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <DragInput
+            label="Crouch Speed"
+            value={config.crouchSpeedMultiplier}
+            onChange={(value) => handleConfigChange("crouchSpeedMultiplier", value)}
+            step={0.05}
+            precision={2}
+            min={0.1}
+            max={1}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Slide Speed"
+            value={config.slideSpeedMultiplier}
+            onChange={(value) => handleConfigChange("slideSpeedMultiplier", value)}
+            step={0.1}
+            precision={1}
+            min={1}
+            max={3}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Slide Duration"
+            value={config.slideDuration}
+            onChange={(value) => handleConfigChange("slideDuration", value)}
+            step={0.1}
+            precision={1}
+            min={0.5}
+            max={3}
+            suffix="s"
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Slide Decel"
+            value={config.slideDeceleration}
+            onChange={(value) => handleConfigChange("slideDeceleration", value)}
+            step={0.1}
+            precision={1}
+            min={0.1}
+            max={2}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Height Reduction"
+            value={config.crouchHeightReduction}
+            onChange={(value) => handleConfigChange("crouchHeightReduction", value)}
+            step={0.05}
+            precision={2}
+            min={0.1}
+            max={0.8}
+            compact
+            className="text-xs"
+          />
+          <DragInput
+            label="Slide Min Speed"
+            value={config.slideMinSpeed}
+            onChange={(value) => handleConfigChange("slideMinSpeed", value)}
+            step={0.5}
+            precision={1}
+            min={1}
+            max={15}
             compact
             className="text-xs"
           />
