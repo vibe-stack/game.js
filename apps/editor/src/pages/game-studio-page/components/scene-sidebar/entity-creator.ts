@@ -22,6 +22,7 @@ import {
   Mesh3D
 } from "@/models";
 import { GameWorldService } from "../../services/game-world-service";
+import useGameStudioStore from "@/stores/game-studio-store";
 
 export class EntityCreator {
   private static entityCounter = 1;
@@ -296,99 +297,115 @@ export class EntityCreator {
         throw new Error("Entity serialization failed");
       }
 
-      // Create new entity with duplicated data but new IDs
-      const duplicatedConfig: any = {
+      // Create a modified EntityData with new ID and offset position
+      const duplicatedEntityData: any = {
+        ...serializedData,
+        id: `${serializedData.type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         name: `${sourceEntity.entityName} Copy`,
-        position: new THREE.Vector3().copy(sourceEntity.position).add(new THREE.Vector3(1, 0, 1)), // Offset slightly
-        rotation: new THREE.Euler().copy(sourceEntity.rotation),
-        scale: new THREE.Vector3().copy(sourceEntity.scale),
-        castShadow: serializedData.castShadow,
-        receiveShadow: serializedData.receiveShadow,
-        // Copy physics config if present
-        physics: sourceEntity.physicsConfig ? { ...sourceEntity.physicsConfig } : undefined,
-        // Copy properties from serialized data
-        ...serializedData.properties,
-        // Copy geometry parameters if present
-        ...(serializedData.geometry?.parameters || {})
+        transform: {
+          position: {
+            x: sourceEntity.position.x + 1,
+            y: sourceEntity.position.y,
+            z: sourceEntity.position.z + 1
+          },
+          rotation: {
+            x: sourceEntity.rotation.x,
+            y: sourceEntity.rotation.y,
+            z: sourceEntity.rotation.z
+          },
+          scale: {
+            x: sourceEntity.scale.x,
+            y: sourceEntity.scale.y,
+            z: sourceEntity.scale.z
+          }
+        }
       };
 
-      let newEntity: Entity | null = null;
+      // Handle material references - create a proper material clone
+      let material: THREE.Material | undefined = undefined;
+      if ('getMaterial' in sourceEntity && typeof sourceEntity.getMaterial === 'function') {
+        const sourceMaterial = sourceEntity.getMaterial();
+        if (sourceMaterial) {
+          material = await this.deepCloneMaterialWithTextures(sourceMaterial);
+        }
+      }
+      
+      // CRITICAL FIX: Ensure proper segment defaults for geometries during duplication
+      const baseConfig: any = {
+        name: duplicatedEntityData.name,
+        position: new THREE.Vector3(
+          duplicatedEntityData.transform.position.x,
+          duplicatedEntityData.transform.position.y,
+          duplicatedEntityData.transform.position.z
+        ),
+        rotation: new THREE.Euler(
+          duplicatedEntityData.transform.rotation.x,
+          duplicatedEntityData.transform.rotation.y,
+          duplicatedEntityData.transform.rotation.z
+        ),
+        scale: new THREE.Vector3(
+          duplicatedEntityData.transform.scale.x,
+          duplicatedEntityData.transform.scale.y,
+          duplicatedEntityData.transform.scale.z
+        ),
+        material: material,
+        castShadow: duplicatedEntityData.castShadow,
+        receiveShadow: duplicatedEntityData.receiveShadow,
+        ...duplicatedEntityData.properties
+      };
 
-      // Create the appropriate entity type based on the serialized data type
-      const entityType = serializedData.type;
+      // Apply geometry parameters with proper defaults based on entity type
+      const geometryParams = duplicatedEntityData.geometry?.parameters || {};
+      let config: any = { ...baseConfig };
+
+      // Add geometry-specific parameters with proper defaults
+      if (duplicatedEntityData.type === 'box') {
+        config = {
+          ...baseConfig,
+          width: geometryParams.width || 1,
+          height: geometryParams.height || 1,
+          depth: geometryParams.depth || 1,
+          widthSegments: geometryParams.widthSegments || 1,
+          heightSegments: geometryParams.heightSegments || 1,
+          depthSegments: geometryParams.depthSegments || 1
+        };
+      } else if (duplicatedEntityData.type === 'sphere') {
+        config = {
+          ...baseConfig,
+          radius: geometryParams.radius || 1,
+          widthSegments: geometryParams.widthSegments || 32,
+          heightSegments: geometryParams.heightSegments || 16
+        };
+      } else {
+        // For other geometries, use the original approach but ensure we have geometry params
+        config = {
+          ...baseConfig,
+          ...geometryParams
+        };
+      }
+
+      // Create the appropriate entity type using the same switch as EntityLoader
+      const entityType = duplicatedEntityData.type;
+      let newEntity: Entity | null = null;
       switch (entityType) {
-        case "sphere":
-          newEntity = new Sphere(duplicatedConfig);
-          break;
-        case "box":
-          newEntity = new Box(duplicatedConfig);
-          break;
-        case "plane":
-          newEntity = new Plane(duplicatedConfig);
-          break;
-        case "cylinder":
-          newEntity = new Cylinder(duplicatedConfig);
-          break;
-        case "cone":
-          newEntity = new Cone(duplicatedConfig);
-          break;
-        case "torus":
-          newEntity = new Torus(duplicatedConfig);
-          break;
-        case "capsule":
-          newEntity = new Capsule(duplicatedConfig);
-          break;
-        case "ring":
-          newEntity = new Ring(duplicatedConfig);
-          break;
-        case "tetrahedron":
-          newEntity = new Tetrahedron(duplicatedConfig);
-          break;
-        case "octahedron":
-          newEntity = new Octahedron(duplicatedConfig);
-          break;
-        case "dodecahedron":
-          newEntity = new Dodecahedron(duplicatedConfig);
-          break;
-        case "icosahedron":
-          newEntity = new Icosahedron(duplicatedConfig);
-          break;
-        case "heightfield":
-          newEntity = new Heightfield(duplicatedConfig);
-          break;
-        case "custom-heightfield":
-          newEntity = new CustomHeightfield(duplicatedConfig);
-          break;
-        case "ambient-light":
-          newEntity = new AmbientLight(duplicatedConfig);
-          break;
-        case "directional-light":
-          newEntity = new DirectionalLight(duplicatedConfig);
-          break;
-        case "point-light":
-          newEntity = new PointLight(duplicatedConfig);
-          break;
-        case "spot-light":
-          newEntity = new SpotLight(duplicatedConfig);
-          break;
-        case "mesh-3d":
-          newEntity = new Mesh3D(duplicatedConfig);
-          break;
-        default:
-          throw new Error(`Unsupported entity type for duplication: ${entityType}`);
+        case "box": newEntity = new Box(config); break;
+        case "sphere": newEntity = new Sphere(config); break;
+        case "cylinder": newEntity = new Cylinder(config); break;
+        case "cone": newEntity = new Cone(config); break;
+        case "torus": newEntity = new Torus(config); break;
+        case "capsule": newEntity = new Capsule(config); break;
+        case "ring": newEntity = new Ring(config); break;
+        case "plane": newEntity = new Plane(config); break;
+        case "heightfield": newEntity = new Heightfield(config); break;
+        case "mesh3d": newEntity = new Mesh3D(config); break;
+        case "ambient-light": newEntity = new AmbientLight(config); break;
+        case "directional-light": newEntity = new DirectionalLight(config); break;
+        case "point-light": newEntity = new PointLight(config); break;
+        case "spot-light": newEntity = new SpotLight(config); break;
+        default: throw new Error(`Unsupported entity type for duplication: ${entityType}`);
       }
 
       if (newEntity) {
-        // Copy material if the source entity has one
-        if ('getMaterial' in sourceEntity && typeof sourceEntity.getMaterial === 'function') {
-          const sourceMaterial = sourceEntity.getMaterial();
-          if (sourceMaterial && 'setMaterial' in newEntity && typeof newEntity.setMaterial === 'function') {
-            // Clone the material to avoid sharing the same instance
-            const clonedMaterial = sourceMaterial.clone();
-            newEntity.setMaterial(clonedMaterial);
-          }
-        }
-
         // Copy tags
         newEntity.metadata.tags = [...sourceEntity.metadata.tags];
 
@@ -401,8 +418,7 @@ export class EntityCreator {
         // Use GameWorld.createEntity to ensure proper setup (physics manager, script manager, etc.)
         gameWorld.createEntity(newEntity);
 
-        // CRITICAL FIX: Explicitly enable physics after entity is added to game world
-        // This ensures physics properties are properly copied from the source entity
+        // CRITICAL FIX: Apply physics after entity is added to game world (like EntityLoader does)
         if (sourceEntity.physicsConfig && sourceEntity.hasPhysics()) {
           const physicsConfig = sourceEntity.physicsConfig;
           switch (physicsConfig.type) {
@@ -422,6 +438,46 @@ export class EntityCreator {
             case 'kinematic':
               newEntity.enableKinematicPhysics();
               break;
+          }
+        }
+
+        // Apply character controller if present in serialized data
+        if (duplicatedEntityData.characterController) {
+          const characterControllerConfig = { ...duplicatedEntityData.characterController } as any;
+          if (characterControllerConfig.colliderOffset) {
+            characterControllerConfig.colliderOffset = new THREE.Vector3(
+              characterControllerConfig.colliderOffset.x,
+              characterControllerConfig.colliderOffset.y,
+              characterControllerConfig.colliderOffset.z
+            );
+          } else {
+            characterControllerConfig.colliderOffset = new THREE.Vector3(0, 0, 0);
+          }
+          newEntity.enableCharacterController(characterControllerConfig);
+        }
+
+        // CRITICAL FIX: Handle Mesh3D model loading like EntityLoader does
+        if (entityType === 'mesh3d' && duplicatedEntityData.properties?.modelPath) {
+          const currentProject = useGameStudioStore.getState().currentProject;
+          if (currentProject) {
+            try {
+                             // Set the AssetManager on the entity before loading (like EntityLoader)
+               if ('setAssetManager' in newEntity && typeof newEntity.setAssetManager === 'function') {
+                 // Access the assetManager from the GameWorldService instance
+                 const assetManager = (gameWorldService as any).assetManager;
+                 if (assetManager) {
+                   newEntity.setAssetManager(assetManager);
+                 }
+               }
+              
+              // Load the model using the same approach as EntityLoader
+              if ('loadFromPath' in newEntity && typeof newEntity.loadFromPath === 'function') {
+                await newEntity.loadFromPath(currentProject.path, duplicatedEntityData.properties.modelPath);
+              }
+            } catch (error) {
+              console.error(`Failed to load model for duplicated entity ${newEntity.entityId}:`, error);
+              // Don't throw here - the entity should still be created even if model loading fails
+            }
           }
         }
 
@@ -451,6 +507,75 @@ export class EntityCreator {
     }
 
     return null;
+  }
+
+  /**
+   * Deep clone a material including all textures to avoid WebGPU buffer conflicts
+   */
+  private static async deepCloneMaterialWithTextures(sourceMaterial: THREE.Material): Promise<THREE.Material> {
+    try {
+      // Standard clone first
+      const clonedMaterial = sourceMaterial.clone();
+
+      // List of texture properties that commonly exist on materials
+      const textureProperties = [
+        'map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap',
+        'envMap', 'displacementMap', 'alphaMap', 'bumpMap', 'specularMap',
+        // Physical material textures
+        'clearcoatMap', 'clearcoatRoughnessMap', 'clearcoatNormalMap',
+        'transmissionMap', 'thicknessMap', 'sheenColorMap', 'sheenRoughnessMap',
+        'iridescenceMap', 'iridescenceThicknessMap'
+      ];
+
+      // Clone all textures to avoid sharing GPU resources
+      for (const propName of textureProperties) {
+        if (propName in clonedMaterial) {
+          const texture = (clonedMaterial as any)[propName] as THREE.Texture;
+          if (texture && texture.isTexture) {
+            try {
+              // Create a new texture instance to avoid sharing WebGPU buffers
+              const clonedTexture = texture.clone();
+              
+              // Force WebGPU to treat this as a new texture resource
+              clonedTexture.needsUpdate = true;
+              clonedTexture.version = texture.version + 1; // Force version increment
+              
+              // Copy texture properties to ensure consistency
+              clonedTexture.wrapS = texture.wrapS;
+              clonedTexture.wrapT = texture.wrapT;
+              clonedTexture.magFilter = texture.magFilter;
+              clonedTexture.minFilter = texture.minFilter;
+              clonedTexture.anisotropy = texture.anisotropy;
+              clonedTexture.format = texture.format;
+              clonedTexture.type = texture.type;
+              clonedTexture.colorSpace = texture.colorSpace;
+              
+              (clonedMaterial as any)[propName] = clonedTexture;
+            } catch (error) {
+              console.warn(`Failed to clone texture ${propName}:`, error);
+              // If texture cloning fails, at least ensure the material has a fresh reference
+              (clonedMaterial as any)[propName] = texture;
+            }
+          }
+        }
+      }
+
+      // Ensure material needs update for WebGPU
+      clonedMaterial.needsUpdate = true;
+      
+      // Force material version increment to ensure WebGPU treats it as new
+      if ('version' in clonedMaterial) {
+        (clonedMaterial as any).version = (sourceMaterial as any).version + 1;
+      }
+
+      return clonedMaterial;
+    } catch (error) {
+      console.error("Failed to deep clone material with textures:", error);
+      // Fallback to standard clone if deep cloning fails
+      const fallbackMaterial = sourceMaterial.clone();
+      fallbackMaterial.needsUpdate = true;
+      return fallbackMaterial;
+    }
   }
 
   static resetCounter(): void {

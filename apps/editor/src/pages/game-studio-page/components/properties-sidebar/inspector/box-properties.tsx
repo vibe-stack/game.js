@@ -1,5 +1,7 @@
 import React from "react";
 import { DragInput } from "@/components/ui/drag-input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Box } from "@/models/primitives/box";
 import { useEntityState } from "@/hooks/use-entity-state";
 
@@ -48,6 +50,15 @@ export function BoxProperties({ entity }: BoxPropertiesProps) {
 
     if (!success) {
       console.warn(`Failed to update ${segmentType} segments to ${segments}`);
+    }
+  };
+
+  const handleShadowChange = (field: 'cast' | 'receive', checked: string | boolean) => {
+    const boolValue = typeof checked === 'boolean' ? checked : checked === 'true';
+    if (field === 'cast') {
+      entity.setShadowSettings(boolValue, entity.getMesh().receiveShadow);
+    } else {
+      entity.setShadowSettings(entity.getMesh().castShadow, boolValue);
     }
   };
 
@@ -127,6 +138,29 @@ export function BoxProperties({ entity }: BoxPropertiesProps) {
               compact
               className="text-xs"
             />
+          </div>
+        </div>
+
+        {/* Shadow Settings */}
+        <div className="space-y-3">
+          <h4 className="text-xs text-gray-300 font-medium">Shadows</h4>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="box-cast-shadow"
+                checked={entity.getMesh().castShadow}
+                onCheckedChange={(checked) => handleShadowChange('cast', checked as boolean)}
+              />
+              <Label htmlFor="box-cast-shadow" className="text-xs text-gray-400">Cast Shadow</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="box-receive-shadow"
+                checked={entity.getMesh().receiveShadow}
+                onCheckedChange={(checked) => handleShadowChange('receive', checked as boolean)}
+              />
+              <Label htmlFor="box-receive-shadow" className="text-xs text-gray-400">Receive Shadow</Label>
+            </div>
           </div>
         </div>
       </div>

@@ -124,4 +124,11 @@ export class Sphere extends Entity {
     this.mesh.material = material;
     this.emitChange(); // Trigger change event for UI updates
   }
+
+  setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
+    this.mesh.castShadow = castShadow;
+    this.mesh.receiveShadow = receiveShadow;
+    this.emitChange(); // Trigger change event for UI updates
+    return this;
+  }
 }
