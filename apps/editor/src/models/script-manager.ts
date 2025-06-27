@@ -22,6 +22,9 @@ export interface ScriptContext {
   // Script parameters for this entity/script combination
   parameters: EntityScriptParameters;
   
+  // Script instance state - isolated per entity-script combination
+  state: Record<string, any>;
+  
   // Game world access
   gameWorld: GameWorld;
   scene: THREE.Scene;
@@ -85,10 +88,21 @@ export interface CompiledScript {
   id: string;
   config: ScriptConfig;
   lifecycle: ScriptLifecycle;
-  isInitialized: boolean;
   hasErrors: boolean;
   lastError?: string;
   parameters?: ScriptParameter[];
+}
+
+// NEW: Script instance that maintains per-entity state
+export interface ScriptInstance {
+  entityId: string;
+  scriptId: string;
+  lifecycle: ScriptLifecycle;
+  isInitialized: boolean;
+  hasErrors: boolean;
+  lastError?: string;
+  state: Record<string, any>; // Isolated state per instance
+  parameters: EntityScriptParameters;
 }
 
 export interface EntityScriptBinding {
@@ -104,16 +118,15 @@ export class ScriptManager {
   private soundManager?: SoundManager;
   private assetManager?: AssetManager;
   
-  // Script storage and management
+  // Script compilation storage
   private compiledScripts = new Map<string, CompiledScript>();
+  
+  // NEW: Script instances per entity-script combination
+  private scriptInstances = new Map<string, ScriptInstance>(); // `entityId:scriptId` -> ScriptInstance
+  
+  // Entity-script mappings
   private entityScripts = new Map<string, Set<string>>(); // entityId -> scriptIds
   private scriptEntities = new Map<string, Set<string>>(); // scriptId -> entityIds
-  
-  // Parameter storage
-  private entityScriptParameters = new Map<string, Map<string, EntityScriptParameters>>(); // entityId -> scriptId -> parameters
-  
-  // Track initialization status per entity-script combination
-  private initializedScripts = new Map<string, Set<string>>(); // entityId -> initialized scriptIds
   
   // Change listeners for React synchronization
   private changeListeners: Set<() => void> = new Set();
@@ -166,8 +179,7 @@ export class ScriptManager {
    * Transform ES6 export syntax to function declarations
    */
   private transformScriptCode(code: string): string {
-    // Transform export function statements to regular function declarations
-    let transformedCode = code
+    const transformedCode = code
       // Transform export function name(...) { ... } to name = function(...) { ... }
       .replace(/export\s+function\s+(\w+)\s*\(/g, '$1 = function(')
       // Remove any standalone export statements like export { ... }
@@ -268,9 +280,10 @@ export class ScriptManager {
       
       console.log(`Transformed code for ${config.id}:`, functionStr.substring(0, 200) + '...');
       
-      const scriptFunction = new Function('THREE', functionStr);
+      // NEW: Create a factory function that returns fresh instances
+      const scriptFactory = new Function('THREE', functionStr);
 
-      const result = scriptFunction(THREE);
+      const result = scriptFactory(THREE);
       
       console.log(`Script ${config.id} compilation result:`, {
         hasInit: !!result.init,
@@ -289,29 +302,24 @@ export class ScriptManager {
           init: result.init,
           update: result.update,
           fixedUpdate: result.fixedUpdate,
-          destroy: result.destroy
+          destroy: result.destroy,
         },
-        isInitialized: false,
         hasErrors: false,
-        parameters: result.parameters || extractedParameters || config.parameters || [],
+        parameters: result.parameters?.length ? result.parameters : (config.parameters || []),
       };
 
       this.compiledScripts.set(config.id, compiledScript);
+      console.log(`Script ${config.id} compiled successfully`);
       this.emitChange();
-      
-      console.log(`Script ${config.id} compiled successfully with ${compiledScript.parameters?.length || 0} parameters`);
-      
       return compiledScript;
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const detailedError = `Failed to compile script ${config.name || config.id}: ${errorMessage}`;
+      const detailedError = `Script compilation failed for ${config.id}: ${error instanceof Error ? error.message : String(error)}`;
       
       const compiledScript: CompiledScript = {
         id: config.id,
         config: { ...config },
         lifecycle: {},
-        isInitialized: false,
         hasErrors: true,
         lastError: detailedError,
         parameters: config.parameters || [],
@@ -322,6 +330,84 @@ export class ScriptManager {
       console.error('Script code that failed to compile:', config.code);
       this.emitChange();
       return compiledScript;
+    }
+  }
+
+  /**
+   * NEW: Create a script instance for an entity-script combination
+   */
+  private createScriptInstance(entityId: string, scriptId: string): ScriptInstance | null {
+    const script = this.compiledScripts.get(scriptId);
+    if (!script) return null;
+
+    const instanceKey = `${entityId}:${scriptId}`;
+    
+    // Create fresh lifecycle functions for this instance
+    const scriptFactory = new Function('THREE', this.getScriptFactoryCode(script.config));
+    const freshLifecycle = scriptFactory(THREE);
+
+    const instance: ScriptInstance = {
+      entityId,
+      scriptId,
+      lifecycle: {
+        init: freshLifecycle.init,
+        update: freshLifecycle.update,
+        fixedUpdate: freshLifecycle.fixedUpdate,
+        destroy: freshLifecycle.destroy,
+      },
+      isInitialized: false,
+      hasErrors: false,
+      state: {}, // Fresh state object for this instance
+      parameters: this.getScriptParametersWithDefaults(entityId, scriptId),
+    };
+
+    this.scriptInstances.set(instanceKey, instance);
+    return instance;
+  }
+
+  /**
+   * NEW: Get the factory code for creating fresh script instances
+   */
+  private getScriptFactoryCode(config: ScriptConfig): string {
+    const isAlreadyCompiled = config.code.includes('var parameters = [') || 
+                              config.code.includes('export {') ||
+                              config.code.includes('//# sourceMappingURL=');
+
+    if (isAlreadyCompiled) {
+      const cleanedCode = config.code
+        .replace(/export\s*\{[^}]*\};\s*/g, '')
+        .replace(/\/\/# sourceMappingURL=.*$/m, '');
+
+      return `
+        ${cleanedCode}
+        return {
+          init: typeof init === 'function' ? init : undefined,
+          update: typeof update === 'function' ? update : undefined,
+          fixedUpdate: typeof fixedUpdate === 'function' ? fixedUpdate : undefined,
+          destroy: typeof destroy === 'function' ? destroy : undefined,
+          parameters: typeof parameters !== 'undefined' ? parameters : []
+        };
+      `;
+    } else {
+      const transformedCode = this.transformScriptCode(config.code);
+      return `
+        let init, update, fixedUpdate, destroy;
+        let parameters;
+        
+        try {
+          ${transformedCode}
+        } catch (error) {
+          throw new Error('Script execution error: ' + error.message);
+        }
+        
+        return {
+          init: typeof init === 'function' ? init : undefined,
+          update: typeof update === 'function' ? update : undefined,
+          fixedUpdate: typeof fixedUpdate === 'function' ? fixedUpdate : undefined,
+          destroy: typeof destroy === 'function' ? destroy : undefined,
+          parameters: Array.isArray(parameters) ? parameters : []
+        };
+      `;
     }
   }
 
@@ -337,6 +423,14 @@ export class ScriptManager {
       return false;
     }
 
+    const instanceKey = `${entityId}:${scriptId}`;
+    
+    // Check if instance already exists
+    if (this.scriptInstances.has(instanceKey)) {
+      console.warn(`Script ${scriptId} already attached to entity ${entityId}`);
+      return false;
+    }
+
     // Add to entity-script mappings
     if (!this.entityScripts.has(entityId)) {
       this.entityScripts.set(entityId, new Set());
@@ -348,16 +442,23 @@ export class ScriptManager {
     this.entityScripts.get(entityId)!.add(scriptId);
     this.scriptEntities.get(scriptId)!.add(entityId);
 
+    // Create script instance
+    const instance = this.createScriptInstance(entityId, scriptId);
+    if (!instance) {
+      console.error(`Failed to create script instance for ${scriptId} on entity ${entityId}`);
+      return false;
+    }
+
     console.log(`Script ${scriptId} attached. Config:`, {
       enabled: script.config.enabled,
-      hasInit: !!script.lifecycle.init,
+      hasInit: !!instance.lifecycle.init,
       parametersCount: script.parameters?.length || 0
     });
 
-    // Initialize script for this entity if it has an init function
-    if (script.lifecycle.init) {
+    // Initialize script instance if it has an init function
+    if (instance.lifecycle.init) {
       console.log(`Initializing script ${scriptId} for entity ${entityId}`);
-      this.initializeScriptForEntity(scriptId, entityId);
+      this.initializeScriptInstance(instance);
     } else {
       console.log(`Script ${scriptId} has no init function`);
     }
@@ -370,27 +471,29 @@ export class ScriptManager {
    * Detach a script from an entity
    */
   public detachScript(entityId: string, scriptId: string): boolean {
-    const script = this.compiledScripts.get(scriptId);
-    if (!script) return false;
+    const instanceKey = `${entityId}:${scriptId}`;
+    const instance = this.scriptInstances.get(instanceKey);
+    
+    if (!instance) return false;
 
     // Call destroy if the script has it
-    if (script.lifecycle.destroy) {
-      const context = this.createScriptContext(entityId, scriptId, 0, 0);
+    if (instance.lifecycle.destroy) {
+      const context = this.createScriptContext(instance, 0, 0);
       if (context) {
         try {
-          script.lifecycle.destroy!(context);
+          instance.lifecycle.destroy!(context);
         } catch (error) {
           console.error(`Error in script ${scriptId} destroy:`, error);
         }
       }
     }
 
+    // Remove instance
+    this.scriptInstances.delete(instanceKey);
+
     // Remove from mappings
     this.entityScripts.get(entityId)?.delete(scriptId);
     this.scriptEntities.get(scriptId)?.delete(entityId);
-    
-    // Remove from initialization tracking
-    this.initializedScripts.get(entityId)?.delete(scriptId);
 
     // Clean up empty sets
     if (this.entityScripts.get(entityId)?.size === 0) {
@@ -398,9 +501,6 @@ export class ScriptManager {
     }
     if (this.scriptEntities.get(scriptId)?.size === 0) {
       this.scriptEntities.delete(scriptId);
-    }
-    if (this.initializedScripts.get(entityId)?.size === 0) {
-      this.initializedScripts.delete(entityId);
     }
 
     this.emitChange();
@@ -415,58 +515,44 @@ export class ScriptManager {
   }
 
   /**
-   * Get all entities that have a specific script attached
+   * Get all entities using a script
    */
   public getScriptEntities(scriptId: string): string[] {
     return Array.from(this.scriptEntities.get(scriptId) || []);
   }
 
   /**
-   * Initialize a script for a specific entity
+   * NEW: Initialize a script instance
    */
-  private async initializeScriptForEntity(scriptId: string, entityId: string): Promise<void> {
-    const script = this.compiledScripts.get(scriptId);
-    if (!script || !script.lifecycle.init) return;
+  private async initializeScriptInstance(instance: ScriptInstance): Promise<void> {
+    if (!instance.lifecycle.init || instance.isInitialized) return;
 
-    // Check if already initialized for this entity
-    const entityInitializedScripts = this.initializedScripts.get(entityId);
-    if (entityInitializedScripts?.has(scriptId)) {
-      console.log(`Script ${scriptId} already initialized for entity ${entityId}`);
-      return;
-    }
-
-    const context = this.createScriptContext(entityId, scriptId, 0, 0);
+    const context = this.createScriptContext(instance, 0, 0);
     if (!context) return;
 
     try {
-      await script.lifecycle.init(context);
-      
-      // Mark as initialized for this entity
-      if (!this.initializedScripts.has(entityId)) {
-        this.initializedScripts.set(entityId, new Set());
-      }
-      this.initializedScripts.get(entityId)!.add(scriptId);
-      
-      console.log(`Script ${scriptId} initialized successfully for entity ${entityId}`);
+      await instance.lifecycle.init(context);
+      instance.isInitialized = true;
+      console.log(`Script ${instance.scriptId} initialized successfully for entity ${instance.entityId}`);
     } catch (error) {
-      script.hasErrors = true;
-      script.lastError = error instanceof Error ? error.message : String(error);
-      console.error(`Error initializing script ${scriptId} for entity ${entityId}:`, error);
+      instance.hasErrors = true;
+      instance.lastError = error instanceof Error ? error.message : String(error);
+      console.error(`Error initializing script ${instance.scriptId} for entity ${instance.entityId}:`, error);
     }
   }
 
   /**
-   * Update all scripts (called every frame)
+   * Update scripts
    */
   public update(deltaTime: number): void {
     this.currentTime += deltaTime;
     this.frameCount++;
-
-    // Handle fixed update timing
-    this.fixedAccumulator += deltaTime;
     
     // Regular update
     this.executeScriptLifecycle('update', deltaTime);
+    
+    // Fixed update accumulator
+    this.fixedAccumulator += deltaTime;
     
     // Fixed update (multiple times if needed to catch up)
     while (this.fixedAccumulator >= this.fixedTimestep) {
@@ -477,58 +563,51 @@ export class ScriptManager {
   }
 
   /**
-   * Execute a specific lifecycle method for all scripts
+   * Execute a specific lifecycle method for all script instances
    */
   private executeScriptLifecycle(lifecycleMethod: 'update' | 'fixedUpdate', deltaTime: number): void {
-    // Get all unique script-entity combinations and sort by priority
-    const executions: Array<{ scriptId: string; entityId: string; priority: number }> = [];
+    // Get all script instances and sort by priority
+    const executions: Array<{ instance: ScriptInstance; priority: number }> = [];
     
-    for (const [scriptId, entityIds] of this.scriptEntities) {
-      const script = this.compiledScripts.get(scriptId);
-      if (!script || !script.config.enabled || script.hasErrors) {
-        if (script?.hasErrors) {
-          console.warn(`Script ${scriptId} has errors, skipping execution`);
+    for (const [instanceKey, instance] of this.scriptInstances) {
+      const script = this.compiledScripts.get(instance.scriptId);
+      if (!script || !script.config.enabled || script.hasErrors || instance.hasErrors) {
+        if (script?.hasErrors || instance.hasErrors) {
+          console.warn(`Script ${instance.scriptId} has errors, skipping execution`);
         }
         continue;
       }
       
-      const lifecycleFunction = script.lifecycle[lifecycleMethod];
+      const lifecycleFunction = instance.lifecycle[lifecycleMethod];
       if (!lifecycleFunction) continue;
 
-      for (const entityId of entityIds) {
-        executions.push({
-          scriptId,
-          entityId,
-          priority: script.config.priority,
-        });
-      }
+      executions.push({
+        instance,
+        priority: script.config.priority,
+      });
     }
 
     // Sort by priority (lower numbers first)
     executions.sort((a, b) => a.priority - b.priority);
 
-    // Execute all scripts
+    // Execute all script instances
     for (const execution of executions) {
-      this.executeScript(execution.scriptId, execution.entityId, lifecycleMethod, deltaTime);
+      this.executeScriptInstance(execution.instance, lifecycleMethod, deltaTime);
     }
   }
 
   /**
-   * Execute a specific script for a specific entity
+   * Execute a specific script instance
    */
-  private executeScript(
-    scriptId: string,
-    entityId: string,
+  private executeScriptInstance(
+    instance: ScriptInstance,
     lifecycleMethod: 'update' | 'fixedUpdate',
     deltaTime: number
   ): void {
-    const script = this.compiledScripts.get(scriptId);
-    if (!script) return;
-
-    const lifecycleFunction = script.lifecycle[lifecycleMethod];
+    const lifecycleFunction = instance.lifecycle[lifecycleMethod];
     if (!lifecycleFunction) return;
 
-    const context = this.createScriptContext(entityId, scriptId, deltaTime, this.fixedTimestep);
+    const context = this.createScriptContext(instance, deltaTime, this.fixedTimestep);
     if (!context) return;
 
     const startTime = performance.now();
@@ -537,47 +616,42 @@ export class ScriptManager {
       lifecycleFunction(context, deltaTime);
       
       // Sync physics transform after script execution
-      // This ensures that if scripts modify position/rotation directly,
-      // the physics body stays in sync with the visual mesh
       context.entity.syncPhysicsFromTransform();
       
       // Update performance metrics
       const executionTime = performance.now() - startTime;
-      this.updatePerformanceMetrics(scriptId, executionTime);
+      this.updatePerformanceMetrics(instance.scriptId, executionTime);
       
     } catch (error) {
-      script.hasErrors = true;
-      script.lastError = error instanceof Error ? error.message : String(error);
-      console.error(`Error executing script ${scriptId} ${lifecycleMethod} for entity ${entityId}:`, error);
+      instance.hasErrors = true;
+      instance.lastError = error instanceof Error ? error.message : String(error);
+      console.error(`Error executing script ${instance.scriptId} ${lifecycleMethod} for entity ${instance.entityId}:`, error);
     }
   }
 
   /**
-   * Create script context for an entity
+   * NEW: Create script context for a script instance
    */
   private createScriptContext(
-    entityId: string,
-    scriptId: string,
+    instance: ScriptInstance,
     deltaTime: number,
     fixedDeltaTime: number
   ): ScriptContext | null {
     // Find entity in the game world
     const entity = this.gameWorld.getRegistryManager()
       ?.getRegistry<Entity>("entities")
-      ?.get(entityId);
+      ?.get(instance.entityId);
 
     if (!entity) {
-      console.warn(`Entity ${entityId} not found for script context`);
+      console.warn(`Entity ${instance.entityId} not found for script context`);
       return null;
     }
 
-    // Get script parameters with defaults
-    const parameters = this.getScriptParametersWithDefaults(entityId, scriptId);
-
     const context: ScriptContext = {
       entity,
-      scriptId,
-      parameters,
+      scriptId: instance.scriptId,
+      parameters: instance.parameters, // Use instance-specific parameters
+      state: instance.state, // Instance-specific state object
       gameWorld: this.gameWorld,
       scene: this.gameWorld.getScene(),
       physicsManager: this.gameWorld.getPhysicsManager(),
@@ -668,22 +742,25 @@ export class ScriptManager {
    * Remove a script completely
    */
   public removeScript(scriptId: string): void {
-    const script = this.compiledScripts.get(scriptId);
-    if (!script) return;
-
-    // Detach from all entities
-    const entityIds = Array.from(this.scriptEntities.get(scriptId) || []);
+    // Get all entities using this script
+    const entityIds = this.getScriptEntities(scriptId);
+    
+    // Detach from all entities first
     for (const entityId of entityIds) {
       this.detachScript(entityId, scriptId);
     }
-
+    
     // Remove from compiled scripts
     this.compiledScripts.delete(scriptId);
+    
+    // Clean up performance metrics
     this.scriptPerformance.delete(scriptId);
+    
+    this.emitChange();
   }
 
   /**
-   * Enable/disable a script
+   * Enable/disable a script globally
    */
   public setScriptEnabled(scriptId: string, enabled: boolean): void {
     const script = this.compiledScripts.get(scriptId);
@@ -716,6 +793,14 @@ export class ScriptManager {
       script.hasErrors = false;
       script.lastError = undefined;
     }
+    
+    // Also clear errors in all instances of this script
+    for (const [instanceKey, instance] of this.scriptInstances) {
+      if (instance.scriptId === scriptId) {
+        instance.hasErrors = false;
+        instance.lastError = undefined;
+      }
+    }
   }
 
   /**
@@ -733,34 +818,31 @@ export class ScriptManager {
   }
 
   /**
-   * Destroy when entity is destroyed
+   * Called when an entity is destroyed
    */
   public onEntityDestroyed(entityId: string): void {
+    // Get all scripts attached to this entity
     const scriptIds = this.getEntityScripts(entityId);
+    
+    // Detach all scripts
     for (const scriptId of scriptIds) {
       this.detachScript(entityId, scriptId);
     }
-    
-    // Clean up initialization tracking
-    this.initializedScripts.delete(entityId);
   }
 
   /**
    * Dispose of the script manager
    */
   public dispose(): void {
-    // Call destroy on all active scripts
-    for (const [scriptId, entityIds] of this.scriptEntities) {
-      const script = this.compiledScripts.get(scriptId);
-      if (script?.lifecycle.destroy) {
-        for (const entityId of entityIds) {
-          const context = this.createScriptContext(entityId, scriptId, 0, 0);
-          if (context) {
-            try {
-              script.lifecycle.destroy(context);
-            } catch (error) {
-              console.error(`Error destroying script ${scriptId}:`, error);
-            }
+    // Call destroy on all active script instances
+    for (const [instanceKey, instance] of this.scriptInstances) {
+      if (instance.lifecycle.destroy) {
+        const context = this.createScriptContext(instance, 0, 0);
+        if (context) {
+          try {
+            instance.lifecycle.destroy(context);
+          } catch (error) {
+            console.error(`Error destroying script ${instance.scriptId}:`, error);
           }
         }
       }
@@ -768,32 +850,43 @@ export class ScriptManager {
 
     // Clear all data
     this.compiledScripts.clear();
+    this.scriptInstances.clear();
     this.entityScripts.clear();
     this.scriptEntities.clear();
     this.scriptPerformance.clear();
-    this.entityScriptParameters.clear();
-    this.initializedScripts.clear();
     this.changeListeners.clear();
   }
 
   // Parameter management methods
   public setScriptParameters(entityId: string, scriptId: string, parameters: EntityScriptParameters): void {
-    if (!this.entityScriptParameters.has(entityId)) {
-      this.entityScriptParameters.set(entityId, new Map());
+    const instanceKey = `${entityId}:${scriptId}`;
+    const instance = this.scriptInstances.get(instanceKey);
+    
+    if (instance) {
+      // Update the instance's parameters directly
+      instance.parameters = { ...parameters };
     }
-    this.entityScriptParameters.get(entityId)!.set(scriptId, parameters);
+    
     this.emitChange();
   }
 
   public getScriptParameters(entityId: string, scriptId: string): EntityScriptParameters {
-    const entityParams = this.entityScriptParameters.get(entityId);
-    if (!entityParams) return {};
-    return entityParams.get(scriptId) || {};
+    const instanceKey = `${entityId}:${scriptId}`;
+    const instance = this.scriptInstances.get(instanceKey);
+    
+    if (instance) {
+      return { ...instance.parameters };
+    }
+    
+    return {};
   }
 
   public getScriptParametersWithDefaults(entityId: string, scriptId: string): EntityScriptParameters {
     const script = this.compiledScripts.get(scriptId);
-    const currentParams = this.getScriptParameters(entityId, scriptId);
+    const instanceKey = `${entityId}:${scriptId}`;
+    const instance = this.scriptInstances.get(instanceKey);
+    
+    const currentParams = instance ? instance.parameters : {};
     const result: EntityScriptParameters = {};
 
     // Apply defaults from script definition
