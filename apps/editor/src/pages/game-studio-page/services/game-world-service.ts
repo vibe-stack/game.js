@@ -390,19 +390,17 @@ updateAvailableCameras(): void {
   
   const { setAvailableCameras, setActiveCamera } = useGameStudioStore.getState();
   
-  // Get all cameras from the camera manager
-  const cameraManager = this.gameWorld.getCameraManager();
-  const allCameras = cameraManager.getAllCameras();
+  // Get camera entities from the entities registry
+  const entitiesRegistry = this.gameWorld.getRegistryManager().getRegistry<Entity>("entities");
+  if (!entitiesRegistry) return;
   
-  // Filter out the editor camera to get only scene cameras
-  const sceneCameras = allCameras.filter(cam => cam.id !== this.editorCameraService.getEditorCameraId());
+  const cameraEntities = entitiesRegistry.getAllItems().filter(entity => entity.metadata.type === "camera");
   
-  // Convert to the format expected by the store (Entity-like objects)
-  const availableCameras = sceneCameras.map(cam => ({
-    entityId: cam.id,
-    entityName: cam.name,
-    // Add other properties that might be expected
-    metadata: { tags: ['camera'] }
+  // Convert to the format expected by the store
+  const availableCameras = cameraEntities.map(entity => ({
+    entityId: entity.entityId,
+    entityName: entity.entityName,
+    metadata: entity.metadata
   }));
   
   setAvailableCameras(availableCameras as any);
@@ -538,6 +536,14 @@ deleteEntity(entityId: string): boolean {
 
   const entity = entitiesRegistry.get(entityId);
   if (!entity) return false;
+
+  // Special handling for camera entities - remove from CameraManager
+  if (entity.metadata.type === "camera") {
+    const cameraManager = this.gameWorld.getCameraManager();
+    cameraManager.removeCamera(entityId);
+    // Update available cameras after removal
+    this.updateAvailableCameras();
+  }
 
   // Destroy the entity (this handles physics, scripts, and other cleanup)
   entity.destroy();

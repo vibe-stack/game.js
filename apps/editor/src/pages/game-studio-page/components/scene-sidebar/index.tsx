@@ -16,27 +16,21 @@ interface SceneSidebarProps {
   gameWorldService: React.RefObject<GameWorldService | null>;
 }
 
-export interface CameraItem {
-  id: string;
-  name: string;
-  type: "camera";
-  metadata: { tags: string[] };
-}
+
 
 export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
   const [activeTab, setActiveTab] = useState("scene");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [sceneEntities, setSceneEntities] = useState<Entity[]>([]);
-  const [sceneCameras, setSceneCameras] = useState<CameraItem[]>([]);
   const [copiedEntity, setCopiedEntity] = useState<Entity | null>(null);
   const { selectedEntity, setSelectedEntity, gameState } = useGameStudioStore();
 
-  // Poll for scene entities and cameras periodically and when entities are added
+  // Poll for scene entities periodically and when entities are added
   const updateEntities = React.useCallback(() => {
     const gameWorld = gameWorldService.current?.getGameWorld();
     if (gameWorld) {
-      // Update entities
+      // Update entities (now includes cameras as entities)
       const entitiesRegistry = gameWorld
         .getRegistryManager()
         .getRegistry<Entity>("entities");
@@ -49,24 +43,6 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
           gameWorldService.current?.getSelectionManager();
         selectionManager?.refreshInteractions();
       }
-
-      // Update cameras
-      const cameraManager = gameWorld.getCameraManager();
-      const allCameras = cameraManager.getAllCameras();
-      
-      // Filter out the editor camera to get only scene cameras
-      // Use the static constant from EditorCameraService instead of accessing the service
-      const editorCameraId = "__editor_orbit_camera__";
-      const sceneCamerasData = allCameras
-        .filter(cam => cam.id !== editorCameraId)
-        .map(cam => ({
-          id: cam.id,
-          name: cam.name,
-          type: "camera" as const,
-          metadata: { tags: ['camera'] }
-        }));
-      
-      setSceneCameras(sceneCamerasData);
     }
   }, [gameWorldService]);
 
@@ -212,7 +188,6 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
 
           <SceneTree
             sceneEntities={sceneEntities}
-            sceneCameras={sceneCameras}
             gameWorldService={gameWorldService}
             selectedEntity={selectedEntity}
             expandedNodes={expandedNodes}

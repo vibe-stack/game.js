@@ -18,6 +18,9 @@ import {
   DirectionalLight,
   PointLight,
   SpotLight,
+  Camera,
+  PerspectiveCamera,
+  OrthographicCamera,
   Entity,
   Mesh3D
 } from "@/models";
@@ -223,10 +226,29 @@ export class EntityCreator {
 
       // Cameras
       case "perspective-camera":
-        return this.createCamera("perspective", gameWorldService);
+        entity = new PerspectiveCamera({
+          name: `Perspective Camera ${this.entityCounter++}`,
+          position: new THREE.Vector3(5, 5, 10),
+          target: new THREE.Vector3(0, 0, 0),
+          fov: 75,
+          near: 0.1,
+          far: 1000
+        });
+        break;
         
       case "orthographic-camera":
-        return this.createCamera("orthographic", gameWorldService);
+        entity = new OrthographicCamera({
+          name: `Orthographic Camera ${this.entityCounter++}`,
+          position: new THREE.Vector3(5, 5, 10),
+          target: new THREE.Vector3(0, 0, 0),
+          left: -10,
+          right: 10,
+          top: 10,
+          bottom: -10,
+          near: 0.1,
+          far: 1000
+        });
+        break;
       
       default:
         throw new Error(`Unknown entity type: ${entityType}`);
@@ -235,6 +257,17 @@ export class EntityCreator {
     if (entity) {
       // Use GameWorld.createEntity to ensure proper setup (physics, script manager, interaction manager, etc.)
       gameWorld.createEntity(entity);
+      
+      // Special handling for camera entities - register their THREE.js camera with CameraManager
+      if (entity.metadata.type === "camera") {
+        const cameraEntity = entity as Camera;
+        if (cameraEntity.camera) {
+          const cameraManager = gameWorld.getCameraManager();
+          cameraManager.addCamera(entity.entityId, entity.entityName, cameraEntity.camera);
+          // Update available cameras in the UI
+          gameWorldService.updateAvailableCameras();
+        }
+      }
       
       // Notify selection manager about the new entity
       const selectionManager = gameWorldService.getSelectionManager();
@@ -250,39 +283,7 @@ export class EntityCreator {
     return null;
   }
 
-  static createCamera(type: "perspective" | "orthographic", gameWorldService: GameWorldService): Entity | null {
-    const gameWorld = gameWorldService.getGameWorld();
-    if (!gameWorld) {
-      throw new Error("Game world not initialized");
-    }
 
-    const cameraManager = gameWorld.getCameraManager();
-    const cameraId = `camera-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const cameraName = `${type === "perspective" ? "Perspective" : "Orthographic"} Camera ${this.entityCounter++}`;
-
-    if (type === "perspective") {
-      cameraManager.createPerspectiveCamera(cameraId, cameraName, {
-        position: new THREE.Vector3(5, 5, 10),
-        target: new THREE.Vector3(0, 0, 0),
-        fov: 75,
-        near: 0.1,
-        far: 1000
-      });
-    } else {
-      cameraManager.createOrthographicCamera(cameraId, cameraName, -10, 10, 10, -10, 0.1, 1000);
-      const camera = cameraManager.getCamera(cameraId);
-      if (camera) {
-        camera.position.set(5, 5, 10);
-        camera.lookAt(0, 0, 0);
-      }
-    }
-
-    // Update available cameras in the game studio
-    gameWorldService.updateAvailableCameras();
-
-    // Return null since cameras are not entities
-    return null;
-  }
 
   static async duplicateEntity(sourceEntity: Entity, gameWorldService: GameWorldService): Promise<Entity | null> {
     const gameWorld = gameWorldService.getGameWorld();

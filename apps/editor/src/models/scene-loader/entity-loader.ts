@@ -1,5 +1,5 @@
 import { LoaderContext, EntityData } from "./types";
-import { Entity, Box, Sphere, Cylinder, Cone, Torus, Capsule, Ring, Plane, Heightfield, Mesh3D, AmbientLight, DirectionalLight, PointLight, SpotLight } from "../index";
+import { Entity, Box, Sphere, Cylinder, Cone, Torus, Capsule, Ring, Plane, Heightfield, Mesh3D, AmbientLight, DirectionalLight, PointLight, SpotLight, Camera, PerspectiveCamera, OrthographicCamera } from "../index";
 import { CameraManager } from "../camera-manager";
 import * as THREE from "three/webgpu";
 import useGameStudioStore from "../../stores/game-studio-store";
@@ -76,12 +76,27 @@ export class EntityLoader {
       case "heightfield": entity = new Heightfield(config); break;
       case "mesh3d": entity = new Mesh3D(config); break;
       case "light": entity = this.createLight(config); break;
-      case "camera": this.createCamera(context, data); return null; // Cameras are not entities in the scene graph
+      case "camera": entity = this.createCameraEntity(data); break;
       default: throw new Error(`Unsupported entity type: ${data.type}`);
     }
 
     if (entity) {
       gameWorld.createEntity(entity);
+      
+      // Special handling for camera entities - register their THREE.js camera with CameraManager
+      if (data.type === "camera") {
+        const cameraEntity = entity as Camera;
+        if (cameraEntity.camera) {
+          const cameraManager = gameWorld.getCameraManager();
+          cameraManager.addCamera(entity.entityId, entity.entityName, cameraEntity.camera);
+          
+          // Set as active camera if specified
+          if (cameraEntity.isActive) {
+            cameraManager.setActiveCamera(entity.entityId);
+          }
+        }
+      }
+      
       if (data.physics?.enabled) {
         this.applyPhysicsToEntity(entity, data);
       }
@@ -153,21 +168,34 @@ export class EntityLoader {
     }
   }
 
-  private createCamera(context: LoaderContext, data: EntityData): void {
-    const cameraManager = context.gameWorld.getCameraManager();
-    const camera = data.properties?.type === 'orthographic'
-      ? new THREE.OrthographicCamera(data.properties?.left, data.properties?.right, data.properties?.top, data.properties?.bottom, data.properties?.near, data.properties?.far)
-      : new THREE.PerspectiveCamera(data.properties?.fov, data.properties?.aspect, data.properties?.near, data.properties?.far);
+  private createCameraEntity(data: EntityData): Entity {
+    const config = {
+      name: data.name,
+      position: new THREE.Vector3(data.transform.position.x, data.transform.position.y, data.transform.position.z),
+      rotation: new THREE.Euler(data.transform.rotation.x, data.transform.rotation.y, data.transform.rotation.z),
+      target: data.properties?.target ? new THREE.Vector3(data.properties.target.x, data.properties.target.y, data.properties.target.z) : new THREE.Vector3(0, 0, 0),
+      isActive: data.properties?.isActive ?? false,
+    };
 
-    camera.position.set(data.transform.position.x, data.transform.position.y, data.transform.position.z);
-    camera.rotation.set(data.transform.rotation.x, data.transform.rotation.y, data.transform.rotation.z);
-    // if(data.transform.target) camera.lookAt(new THREE.Vector3(...data.transform.target));
-
-    cameraManager.addCamera(data.id, data.name, camera);
-    cameraManager.setActiveCamera(data.id);
-    // if (data.active) {
-    //   cameraManager.setActiveCamera(data.id);
-    // }
+    if (data.properties?.type === 'orthographic') {
+      return new OrthographicCamera({
+        ...config,
+        left: data.properties?.left ?? -10,
+        right: data.properties?.right ?? 10,
+        top: data.properties?.top ?? 10,
+        bottom: data.properties?.bottom ?? -10,
+        near: data.properties?.near ?? 0.1,
+        far: data.properties?.far ?? 1000,
+      });
+    } else {
+      return new PerspectiveCamera({
+        ...config,
+        fov: data.properties?.fov ?? 75,
+        aspect: data.properties?.aspect ?? 16 / 9,
+        near: data.properties?.near ?? 0.1,
+        far: data.properties?.far ?? 1000,
+      });
+    }
   }
 
   private applyPhysicsToEntity(entity: Entity, data: EntityData): void {

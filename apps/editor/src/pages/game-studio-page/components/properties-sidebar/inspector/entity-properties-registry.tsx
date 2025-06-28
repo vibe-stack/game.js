@@ -1,5 +1,6 @@
 import React from "react";
 import { Entity } from "@/models";
+import { GameWorldService } from "../../../services/game-world-service";
 import { Box } from "@/models/primitives/box";
 import { Sphere } from "@/models/primitives/sphere";
 import { Cone } from "@/models/primitives/cone";
@@ -9,6 +10,7 @@ import { Capsule } from "@/models/primitives/capsule";
 import { Torus } from "@/models/primitives/torus";
 import { Ring } from "@/models/primitives/ring";
 import { Light } from "@/models/primitives/light";
+import { Camera } from "@/models/primitives/camera";
 import { Heightfield } from "@/models/primitives/heightfield";
 import { Mesh3D } from "@/models/primitives/mesh-3d";
 import { BoxProperties } from "./box-properties";
@@ -20,6 +22,7 @@ import { CapsuleProperties } from "./capsule-properties";
 import { TorusProperties } from "./torus-properties";
 import { RingProperties } from "./ring-properties";
 import { LightProperties } from "./light-properties";
+import { CameraProperties } from "./camera-properties";
 import { HeightfieldProperties } from "./heightfield-properties";
 import { Mesh3DProperties } from "./mesh-3d-properties";
 import { PhysicsProperties } from "./physics-properties";
@@ -28,9 +31,10 @@ import { CharacterControllerSection } from "./character-controller-section";
 
 interface EntityPropertiesRegistryProps {
   entity: Entity;
+  gameWorldService: React.RefObject<GameWorldService | null>;
 }
 
-export function EntityPropertiesRegistry({ entity }: EntityPropertiesRegistryProps) {
+export function EntityPropertiesRegistry({ entity, gameWorldService }: EntityPropertiesRegistryProps) {
   const renderEntitySpecificProperties = () => {
     if (entity instanceof Box) {
       return <BoxProperties entity={entity} />;
@@ -66,6 +70,10 @@ export function EntityPropertiesRegistry({ entity }: EntityPropertiesRegistryPro
 
     if (entity instanceof Light) {
       return <LightProperties entity={entity} />;
+    }
+
+    if (entity instanceof Camera) {
+      return <CameraProperties entity={entity} gameWorldService={gameWorldService} />;
     }
 
     if (entity instanceof Heightfield) {

@@ -100,6 +100,13 @@ export {
   SpotLight 
 } from "./primitives/light";
 
+// Camera primitives
+export { 
+  Camera, 
+  PerspectiveCamera, 
+  OrthographicCamera 
+} from "./primitives/camera";
+
 // Polyhedron primitives
 export { 
   Tetrahedron, 
@@ -208,6 +215,9 @@ export type { RingConfig } from "./primitives/ring";
 
 // Light primitive types
 export type { LightConfig } from "./primitives/light";
+
+// Camera primitive types
+export type { CameraEntityConfig } from "./primitives/camera";
 
 // Polyhedron primitive types
 export type { 

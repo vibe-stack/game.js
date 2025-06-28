@@ -95,6 +95,7 @@ export function Inspector({ gameWorldService }: InspectorProps) {
 
       <EntityPropertiesRegistry
         entity={selectedEntity}
+        gameWorldService={gameWorldService}
       />
 
       <TagsSection
