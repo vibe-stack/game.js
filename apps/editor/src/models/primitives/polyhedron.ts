@@ -102,6 +102,7 @@ abstract class Polyhedron extends Entity {
         scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
       },
       characterController: this.serializeCharacterController(),
+      scripts: this.serializeScripts(),
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
       geometry: { type: "PolyhedronGeometry", parameters: { radius: this.radius, detail: this.detail } }

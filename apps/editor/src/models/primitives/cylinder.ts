@@ -262,6 +262,7 @@ export class Cylinder extends Entity {
       layer: this.metadata.layer,
       physics: this.serializePhysics(),
       characterController: this.serializeCharacterController(),
+      scripts: this.serializeScripts(),
       geometry: { type: "CylinderGeometry", parameters: { radiusTop: this.dimensions.radiusTop, radiusBottom: this.dimensions.radiusBottom, height: this.dimensions.height, radialSegments: this.segmentConfig.radial, heightSegments: this.segmentConfig.height, openEnded: this.segmentConfig.openEnded, thetaStart: this.segmentConfig.thetaStart, thetaLength: this.segmentConfig.thetaLength } }
     };
   }

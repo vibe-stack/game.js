@@ -103,6 +103,32 @@ export class EntityLoader {
         entity.enableCharacterController(characterControllerConfig);
       }
       
+      // Reattach scripts if present in data
+      if (data.scripts && data.scripts.length > 0) {
+        const scriptManager = gameWorld.getScriptManager();
+        if (scriptManager) {
+          for (const scriptData of data.scripts) {
+            // Handle both old format (string array) and new format (object array)
+            const scriptId = typeof scriptData === 'string' ? scriptData : scriptData.scriptId;
+            const parameters = typeof scriptData === 'object' ? scriptData.parameters : {};
+            
+            // Check if script exists in the script manager
+            if (scriptManager.getScript(scriptId)) {
+              entity.attachScript(scriptId);
+              
+              // Set script parameters if they exist
+              if (parameters && Object.keys(parameters).length > 0) {
+                scriptManager.setScriptParameters(entity.entityId, scriptId, parameters);
+              }
+            } else {
+              console.warn(`Script ${scriptId} not found in script manager when loading entity ${entity.entityId}`);
+            }
+          }
+        } else {
+          console.warn(`Cannot reattach scripts: ScriptManager not available when loading entity ${entity.entityId}`);
+        }
+      }
+      
       if (data.children && data.children.length > 0) {
         for (const childData of data.children) {
           const childEntity = await this.createEntity(context, childData, entityMap);

@@ -193,6 +193,7 @@ export class Capsule extends Entity {
       layer: this.metadata.layer,
       physics: this.serializePhysics(),
       characterController: this.serializeCharacterController(),
+      scripts: this.serializeScripts(),
       geometry: {
         type: "CapsuleGeometry",
         parameters: {

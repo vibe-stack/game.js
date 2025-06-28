@@ -526,6 +526,7 @@ export class CustomHeightfield extends Heightfield {
         },
         scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
       },
+      scripts: this.serializeScripts(),
       visible: this.visible,
       castShadow: this.castShadow,
       receiveShadow: this.receiveShadow,

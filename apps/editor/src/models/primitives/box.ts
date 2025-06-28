@@ -138,6 +138,7 @@ export class Box extends Entity {
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
       physics: this.serializePhysics(),
       characterController: this.serializeCharacterController(),
+      scripts: this.serializeScripts(),
       geometry: { type: "BoxGeometry", parameters: { width: this.width, height: this.height, depth: this.depth } }
     };
   }

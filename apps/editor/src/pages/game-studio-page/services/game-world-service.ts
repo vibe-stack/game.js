@@ -126,16 +126,16 @@ async loadScene(sceneData: any): Promise<void> {
     await this.gameWorld.initialize();
 
     if (SceneLoader.validateSceneData(sceneData)) {
-      await this.sceneLoader.loadScene(this.gameWorld, sceneData);
-      this.currentSceneData = sceneData; // Keep a copy for reset
-      
-      // Reload scripts into the new game world
+      // Load scripts BEFORE loading the scene so entities can reattach them
       if (currentProject) {
         const scriptManager = this.gameWorld.getScriptManager();
         if (scriptManager) {
           await this.scriptLoaderService.loadScriptsIntoManager(scriptManager, currentProject.path);
         }
       }
+      
+      await this.sceneLoader.loadScene(this.gameWorld, sceneData);
+      this.currentSceneData = sceneData; // Keep a copy for reset
       
       // Reinitialize editor camera service after scene reload
       this.editorCameraService.initialize(this.gameWorld, canvas);

@@ -561,6 +561,7 @@ export class Mesh3D extends Entity {
       layer: this.metadata.layer,
       physics: this.serializePhysics(),
       characterController: this.serializeCharacterController(),
+      scripts: this.serializeScripts(),
       properties: {
         modelPath: this.modelPath,
         modelUrl: this.modelUrl,

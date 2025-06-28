@@ -48,6 +48,12 @@ export interface CharacterControllerConfig {
   jumpWhileSliding: boolean; // Allow jumping while sliding on slopes
   bunnyHopTolerance: number; // Time window for bunny hopping
   
+  // Moving platform and collision response
+  enableMovingPlatforms: boolean; // Whether to inherit velocity from moving platforms
+  enableMovingBodyPush: boolean; // Whether moving static bodies can push the character
+  movingPlatformMaxDistance: number; // Max distance to consider for moving platform detection
+  movingBodyPushForce: number; // Multiplier for push force from moving bodies
+  
   // Character controller settings
   offset: number; // Gap between character and environment
   maxSlopeClimbAngle: number; // in radians
@@ -158,6 +164,11 @@ export class CharacterController {
   // Animation state
   private lastAnimation: string | undefined;
   
+  // Moving platform tracking
+  private movingPlatformVelocity: THREE.Vector3 = new THREE.Vector3();
+  private lastMovingPlatformId: string | null = null;
+  private movingBodyPushVelocity: THREE.Vector3 = new THREE.Vector3();
+  
   constructor(
     character: Entity,
     cameraManager: CameraManager,
@@ -208,6 +219,12 @@ export class CharacterController {
       preSpeedBoost: 1.2,
       jumpWhileSliding: true,
       bunnyHopTolerance: 0.1,
+      
+      // Moving platform and collision response
+      enableMovingPlatforms: true,
+      enableMovingBodyPush: true,
+      movingPlatformMaxDistance: 0.5,
+      movingBodyPushForce: 1.0,
       
       offset: 0.01,
       maxSlopeClimbAngle: Math.PI / 4, // 45 degrees
@@ -1014,6 +1031,191 @@ export class CharacterController {
     }
   }
   
+  private detectMovingPlatform(): void {
+    if (!this.config.enableMovingPlatforms || !this.state.isGrounded) {
+      this.movingPlatformVelocity.set(0, 0, 0);
+      this.lastMovingPlatformId = null;
+      return;
+    }
+    
+    // Reset moving platform velocity
+    this.movingPlatformVelocity.set(0, 0, 0);
+    let currentMovingPlatformId: string | null = null;
+    
+    // Check collision data to find what we're standing on
+    for (let i = 0; i < this.rapierCharacterController!.numComputedCollisions(); i++) {
+      const collision = this.rapierCharacterController!.computedCollision(i);
+      if (collision && collision.normal1.y > 0.7) { // Standing on this surface
+        const colliderHandle = collision.collider;
+        
+        // Find the rigid body associated with this collider
+        const world = this.physicsManager.getWorld();
+        if (!world) continue;
+        
+        if (!colliderHandle) continue;
+        const collider = world.getCollider(colliderHandle.handle);
+        if (!collider) continue;
+        
+        const rigidBodyHandle = collider.parent();
+        if (!rigidBodyHandle) continue;
+        
+        const rigidBody = world.getRigidBody(rigidBodyHandle.handle);
+        if (!rigidBody) continue;
+        
+        // Check if this is a kinematic body (moving platform)
+        const bodyType = rigidBody.bodyType();
+        const rapierModule = this.physicsManager.getRapierModule();
+        if (!rapierModule) continue;
+        
+        const isKinematic = bodyType === rapierModule.RigidBodyType.KinematicPositionBased ||
+                          bodyType === rapierModule.RigidBodyType.KinematicVelocityBased;
+        
+        if (isKinematic) {
+          // Get the velocity of the moving platform
+          const linvel = rigidBody.linvel();
+          const platformVelocity = new THREE.Vector3(linvel.x, linvel.y, linvel.z);
+          
+          // Only inherit horizontal movement from platforms
+          this.movingPlatformVelocity.set(platformVelocity.x, 0, platformVelocity.z);
+          currentMovingPlatformId = colliderHandle.handle.toString();
+          break;
+        }
+      }
+    }
+    
+    this.lastMovingPlatformId = currentMovingPlatformId;
+  }
+  
+  private detectMovingBodyCollisions(deltaTime: number): void {
+    if (!this.config.enableMovingBodyPush) {
+      this.movingBodyPushVelocity.set(0, 0, 0);
+      return;
+    }
+    
+    // Reset push velocity
+    this.movingBodyPushVelocity.set(0, 0, 0);
+    
+    // Method 1: Check computed collisions from character controller movement
+    for (let i = 0; i < this.rapierCharacterController!.numComputedCollisions(); i++) {
+      const collision = this.rapierCharacterController!.computedCollision(i);
+      if (!collision) continue;
+      
+      this.processMovingBodyCollision(collision.collider, collision.normal1, deltaTime);
+    }
+    
+    // Method 2: Direct world collision query for when character is stationary
+    // This handles cases where kinematic bodies move into the character
+    this.queryWorldCollisions(deltaTime);
+    
+    // Limit the push velocity to prevent excessive forces
+    const maxPushSpeed = this.config.maxSpeed * 2;
+    if (this.movingBodyPushVelocity.length() > maxPushSpeed) {
+      this.movingBodyPushVelocity.normalize().multiplyScalar(maxPushSpeed);
+    }
+  }
+  
+  private processMovingBodyCollision(colliderHandle: any, normal: any, deltaTime: number): void {
+    const world = this.physicsManager.getWorld();
+    if (!world || !colliderHandle) return;
+    
+    const collider = world.getCollider(colliderHandle.handle);
+    if (!collider) return;
+    
+    const rigidBodyHandle = collider.parent();
+    if (!rigidBodyHandle) return;
+    
+    const rigidBody = world.getRigidBody(rigidBodyHandle.handle);
+    if (!rigidBody) return;
+    
+    // Check if this is a moving kinematic or dynamic body
+    const bodyType = rigidBody.bodyType();
+    const rapierModule = this.physicsManager.getRapierModule();
+    if (!rapierModule) return;
+    
+    const isMovingBody = bodyType === rapierModule.RigidBodyType.KinematicPositionBased ||
+                        bodyType === rapierModule.RigidBodyType.KinematicVelocityBased ||
+                        bodyType === rapierModule.RigidBodyType.Dynamic;
+    
+    if (isMovingBody) {
+      const linvel = rigidBody.linvel();
+      const bodyVelocity = new THREE.Vector3(linvel.x, linvel.y, linvel.z);
+      
+      // Only apply push if the body is moving fast enough
+      if (bodyVelocity.length() > 0.05) {
+        const normalVec = new THREE.Vector3(
+          normal.x as number,
+          normal.y as number,
+          normal.z as number
+        );
+        
+        // Calculate the component of body velocity in the direction of the collision normal
+        const pushComponent = bodyVelocity.dot(normalVec);
+        
+        if (pushComponent > 0.01) { // Body is moving into the character
+          // Apply push force in the direction of the normal
+          const pushForce = normalVec.multiplyScalar(pushComponent * this.config.movingBodyPushForce);
+          this.movingBodyPushVelocity.add(pushForce);
+        }
+      }
+    }
+  }
+  
+  private queryWorldCollisions(deltaTime: number): void {
+    const world = this.physicsManager.getWorld();
+    const characterCollider = this.getCharacterCollider();
+    if (!world || !characterCollider) return;
+    
+    // Iterate through all contact pairs to find collisions with the character
+    world.contactPairsWith(characterCollider, (otherCollider: RapierType.Collider) => {
+      
+      const rigidBodyHandle = otherCollider.parent();
+      if (!rigidBodyHandle) return;
+      
+      const rigidBody = world.getRigidBody(rigidBodyHandle.handle);
+      if (!rigidBody) return;
+      
+      // Check if this is a kinematic body
+      const bodyType = rigidBody.bodyType();
+      const rapierModule = this.physicsManager.getRapierModule();
+      if (!rapierModule) return;
+      
+      const isKinematic = bodyType === rapierModule.RigidBodyType.KinematicPositionBased ||
+                         bodyType === rapierModule.RigidBodyType.KinematicVelocityBased;
+      
+      if (isKinematic) {
+        const linvel = rigidBody.linvel();
+        const bodyVelocity = new THREE.Vector3(linvel.x, linvel.y, linvel.z);
+        
+        // Only process if the kinematic body is moving
+        if (bodyVelocity.length() > 0.1) {
+          // Get contact information
+          const characterPos = characterCollider.translation();
+          const otherPos = otherCollider.translation();
+          
+          // Calculate direction from other object to character
+          const pushDirection = new THREE.Vector3(
+            characterPos.x - otherPos.x,
+            characterPos.y - otherPos.y,
+            characterPos.z - otherPos.z
+          );
+          
+          if (pushDirection.length() > 0) {
+            pushDirection.normalize();
+            
+            // Calculate how much the kinematic body is moving toward the character
+            const approachSpeed = -bodyVelocity.dot(pushDirection);
+            
+            if (approachSpeed > 0.01) {
+              // Apply push force proportional to approach speed
+              const pushForce = pushDirection.multiplyScalar(approachSpeed * this.config.movingBodyPushForce);
+              this.movingBodyPushVelocity.add(pushForce);
+            }
+          }
+        }
+      }
+    });
+  }
+  
   private updateAdvancedMovement(deltaTime: number): void {
     if (!this.rapierCharacterController) {
       console.warn("Rapier character controller not available");
@@ -1025,6 +1227,10 @@ export class CharacterController {
       console.warn("Character collider not found");
       return;
     }
+
+    // Detect moving platforms and moving body collisions BEFORE processing movement
+    this.detectMovingPlatform();
+    this.detectMovingBodyCollisions(deltaTime);
 
     // Update jump buffer and coyote time
     if (this.inputState.jump && !this.previousInputState.jump) {
@@ -1092,11 +1298,16 @@ export class CharacterController {
       this.currentVelocity.normalize().multiplyScalar(this.config.maxVelocity);
     }
 
+    // Add moving platform velocity and moving body push velocity to the current velocity
+    const totalMovementVelocity = this.currentVelocity.clone()
+      .add(this.movingPlatformVelocity)
+      .add(this.movingBodyPushVelocity);
+
     // Combine horizontal and vertical movement
     const desiredTranslation = new THREE.Vector3(
-      this.currentVelocity.x * deltaTime,
+      totalMovementVelocity.x * deltaTime,
       this.verticalVelocity * deltaTime,
-      this.currentVelocity.z * deltaTime
+      totalMovementVelocity.z * deltaTime
     );
 
     // Use Rapier's character controller to compute movement

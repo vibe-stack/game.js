@@ -73,6 +73,7 @@ export abstract class Light extends Entity {
       },
       visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      scripts: this.serializeScripts(),
       properties: {
         type: this.lightType,
         color: `#${this.light.color.getHexString()}`,

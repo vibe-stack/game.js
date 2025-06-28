@@ -541,6 +541,7 @@ export class Heightfield extends Entity {
         scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
       },
       physics: this.serializePhysics(),
+      scripts: this.serializeScripts(),
       visible: this.visible,
       castShadow: this.castShadow,
       receiveShadow: this.receiveShadow,

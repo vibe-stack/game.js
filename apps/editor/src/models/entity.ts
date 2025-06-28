@@ -697,6 +697,15 @@ export abstract class Entity extends THREE.Object3D {
     };
   }
 
+  protected serializeScripts() {
+    if (!this.scriptManager || this.attachedScripts.length === 0) return undefined;
+    
+    return this.attachedScripts.map(scriptId => ({
+      scriptId,
+      parameters: this.scriptManager!.getScriptParameters(this.entityId, scriptId)
+    }));
+  }
+
   // Script system methods
   attachScript(scriptId: string): this {
     if (!this.scriptManager) {

@@ -178,6 +178,7 @@ export class Plane extends Entity {
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
       physics: this.serializePhysics(),
       characterController: this.serializeCharacterController(),
+      scripts: this.serializeScripts(),
       geometry: { type: "PlaneGeometry", parameters: { width: this.dimensions.width, height: this.dimensions.height, widthSegments: this.segments.width, heightSegments: this.segments.height } }
     };
   }

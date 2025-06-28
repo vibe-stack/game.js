@@ -105,6 +105,7 @@ export class Sphere extends Entity {
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
       physics: this.serializePhysics(),
       characterController: this.serializeCharacterController(),
+      scripts: this.serializeScripts(),
       geometry: { type: "SphereGeometry", parameters: { radius: this.radius } }
     };
   }

@@ -39,6 +39,10 @@ export class PhysicsManager {
     return this.world;
   }
 
+  getRapierModule(): typeof RAPIER | null {
+    return this.rapierModule;
+  }
+
   createRigidBody(
     id: string,
     config: PhysicsConfig,

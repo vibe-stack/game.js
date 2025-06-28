@@ -185,6 +185,7 @@ export class Torus extends Entity {
       userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
       physics: this.serializePhysics(),
       characterController: this.serializeCharacterController(),
+      scripts: this.getAttachedScripts(),
       geometry: { type: "TorusGeometry", parameters: { radius: this.dimensions.radius, tube: this.dimensions.tube, radialSegments: this.segmentConfig.radial, tubularSegments: this.segmentConfig.tubular, arc: this.segmentConfig.arc } }
     };
   }

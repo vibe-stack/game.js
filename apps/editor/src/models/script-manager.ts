@@ -198,7 +198,7 @@ export class ScriptManager {
    * Compile a script from string code
    */
   public compileScript(config: ScriptConfig): CompiledScript {
-    console.log(`Compiling script ${config.id}...`);
+
     
     try {
       // Check if script already exists and remove it first to prevent conflicts
@@ -215,14 +215,13 @@ export class ScriptManager {
       let extractedParameters: any[] = [];
 
       if (isAlreadyCompiled) {
-        console.log(`Script ${config.id} appears to be already compiled JavaScript`);
+
         
         // Extract parameters from the compiled code if they exist
         const parametersMatch = config.code.match(/var parameters = (\[[\s\S]*?\]);/);
         if (parametersMatch) {
           try {
             extractedParameters = eval(parametersMatch[1]);
-            console.log(`Extracted parameters from compiled code:`, extractedParameters);
           } catch (error) {
             console.warn(`Failed to extract parameters from compiled code:`, error);
           }
@@ -248,7 +247,6 @@ export class ScriptManager {
           };
         `;
       } else {
-        console.log(`Script ${config.id} appears to be TypeScript source code`);
         
         // Transform ES6 export syntax to function declarations for TypeScript source
         const transformedCode = this.transformScriptCode(config.code);
@@ -278,22 +276,13 @@ export class ScriptManager {
         `;
       }
       
-      console.log(`Transformed code for ${config.id}:`, functionStr.substring(0, 200) + '...');
       
       // NEW: Create a factory function that returns fresh instances
       const scriptFactory = new Function('THREE', functionStr);
 
       const result = scriptFactory(THREE);
       
-      console.log(`Script ${config.id} compilation result:`, {
-        hasInit: !!result.init,
-        hasUpdate: !!result.update,
-        hasFixedUpdate: !!result.fixedUpdate,
-        hasDestroy: !!result.destroy,
-        parametersFromCode: result.parameters,
-        parametersFromConfig: config.parameters,
-        extractedParameters: extractedParameters
-      });
+
 
       const compiledScript: CompiledScript = {
         id: config.id,
@@ -309,7 +298,6 @@ export class ScriptManager {
       };
 
       this.compiledScripts.set(config.id, compiledScript);
-      console.log(`Script ${config.id} compiled successfully`);
       this.emitChange();
       return compiledScript;
 
@@ -326,8 +314,6 @@ export class ScriptManager {
       };
 
       this.compiledScripts.set(config.id, compiledScript);
-      console.error(detailedError);
-      console.error('Script code that failed to compile:', config.code);
       this.emitChange();
       return compiledScript;
     }
@@ -415,7 +401,6 @@ export class ScriptManager {
    * Attach a script to an entity
    */
   public attachScript(entityId: string, scriptId: string): boolean {
-    console.log(`Attaching script ${scriptId} to entity ${entityId}`);
     
     const script = this.compiledScripts.get(scriptId);
     if (!script) {
@@ -427,7 +412,6 @@ export class ScriptManager {
     
     // Check if instance already exists
     if (this.scriptInstances.has(instanceKey)) {
-      console.warn(`Script ${scriptId} already attached to entity ${entityId}`);
       return false;
     }
 
@@ -449,18 +433,10 @@ export class ScriptManager {
       return false;
     }
 
-    console.log(`Script ${scriptId} attached. Config:`, {
-      enabled: script.config.enabled,
-      hasInit: !!instance.lifecycle.init,
-      parametersCount: script.parameters?.length || 0
-    });
-
     // Initialize script instance if it has an init function
     if (instance.lifecycle.init) {
-      console.log(`Initializing script ${scriptId} for entity ${entityId}`);
       this.initializeScriptInstance(instance);
     } else {
-      console.log(`Script ${scriptId} has no init function`);
     }
 
     this.emitChange();
@@ -483,7 +459,6 @@ export class ScriptManager {
         try {
           instance.lifecycle.destroy!(context);
         } catch (error) {
-          console.error(`Error in script ${scriptId} destroy:`, error);
         }
       }
     }
@@ -533,7 +508,6 @@ export class ScriptManager {
     try {
       await instance.lifecycle.init(context);
       instance.isInitialized = true;
-      console.log(`Script ${instance.scriptId} initialized successfully for entity ${instance.entityId}`);
     } catch (error) {
       instance.hasErrors = true;
       instance.lastError = error instanceof Error ? error.message : String(error);

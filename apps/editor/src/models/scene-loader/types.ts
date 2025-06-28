@@ -75,6 +75,10 @@ export interface EntityData {
   };
   materialId?: string;
   properties?: Record<string, any>;
+  scripts?: Array<{
+    scriptId: string;
+    parameters: Record<string, any>; // Entity-specific script parameters
+  }>; // Array of attached scripts with their parameters
   children?: EntityData[];
 }
 
