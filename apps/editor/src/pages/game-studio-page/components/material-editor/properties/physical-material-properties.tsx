@@ -479,6 +479,42 @@ export function PhysicalMaterialProperties({ properties, onChange }: PhysicalMat
                 compact
               />
             )}
+
+            <TextureInput
+              label="Displacement Map"
+              value={properties.displacementMap}
+              uvScale={properties.displacementMapProps?.repeat || { x: 1, y: 1 }}
+              uvOffset={properties.displacementMapProps?.offset || { x: 0, y: 0 }}
+              uvRotation={properties.displacementMapProps?.rotation || 0}
+              onChange={(path) => handleTextureChange("displacementMap", path)}
+              onUVChange={(uv) => handleTextureUVChange("displacementMap", uv)}
+            />
+
+            {properties.displacementMap && (
+              <DragInput
+                label="Displacement Scale"
+                value={properties.displacementScale || 1}
+                onChange={(value) => handlePropertyChange("displacementScale", value)}
+                step={0.01}
+                precision={2}
+                min={0}
+                max={5}
+                compact
+              />
+            )}
+
+            {properties.displacementMap && (
+              <DragInput
+                label="Displacement Bias"
+                value={properties.displacementBias || 0}
+                onChange={(value) => handlePropertyChange("displacementBias", value)}
+                step={0.01}
+                precision={2}
+                min={-1}
+                max={1}
+                compact
+              />
+            )}
           </div>
         )}
       </div>

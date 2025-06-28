@@ -503,6 +503,7 @@ export class CharacterController {
         );
 
         followConfig.offset = offset;
+        this._updateThirdPersonCameraCollision(followConfig);
         this.cameraManager.setCameraFollow(this.cameraId, followConfig);
       }
 
@@ -1440,6 +1441,61 @@ export class CharacterController {
       this.cameraManager.removeCamera(this.cameraId);
     } catch (error) {
       console.warn(`Failed to remove camera ${this.cameraId}:`, error);
+    }
+  }
+
+  private _updateThirdPersonCameraCollision(followConfig: CameraFollowConfig): void {
+    const world = this.physicsManager.getWorld();
+    const rapier = this.physicsManager.getRapierModule();
+    if (this.config.cameraMode !== 'third-person' || !world || !rapier) {
+      return;
+    }
+  
+    const characterCollider = this.getCharacterCollider();
+    if (!characterCollider) return;
+  
+    // Start point of the raycast (e.g., character's head)
+    const rayOriginPoint = this.character.position.clone();
+    rayOriginPoint.y += this.config.cameraHeight * 0.7;
+  
+    // The calculated offset for the camera if there were no obstacles
+    const idealOffset = followConfig.offset!.clone();
+  
+    // The ideal position of the camera in world space
+    const idealCameraPosition = this.character.position.clone().add(idealOffset);
+  
+    // Vector from the character's head to the ideal camera position
+    const cameraVector = idealCameraPosition.clone().sub(rayOriginPoint);
+    const maxDistance = cameraVector.length();
+    if (maxDistance < 0.01) return; // Avoid issues with zero-length vectors
+
+    const rayDirection = cameraVector.normalize();
+  
+    const ray = new rapier.Ray(
+      { x: rayOriginPoint.x, y: rayOriginPoint.y, z: rayOriginPoint.z },
+      { x: rayDirection.x, y: rayDirection.y, z: rayDirection.z }
+    );
+  
+    const hit = world.castRay(
+      ray,
+      maxDistance,
+      true, // solid
+      undefined,
+      undefined,
+      characterCollider
+    );
+  
+    if (hit) {
+      // A wall or object is in the way.
+      // Move the camera to the point of collision, with a small offset.
+      const newDistance = Math.max(Math.abs(this.config.cameraMinDistance), (hit as any).timeOfImpact - 0.2);
+  
+      // The new camera position is along the cameraVector from the origin point.
+      const newCameraPosition = rayOriginPoint.clone().add(rayDirection.multiplyScalar(newDistance));
+  
+      // We need to calculate the new offset from the character's origin
+      const newOffset = newCameraPosition.sub(this.character.position);
+      followConfig.offset = newOffset;
     }
   }
 }
