@@ -9,6 +9,7 @@ import ErrorDisplay from "./components/error-display";
 import SceneSidebar from "./components/scene-sidebar";
 import PropertiesSidebar from "./components/properties-sidebar";
 import { MaterialEditor } from "./components/material-editor";
+import ShaderEditor from "./components/shader-editor";
 import { toast } from "sonner";
 import { Entity } from "@/models";
 
@@ -158,6 +159,7 @@ export default function GameStudioPage() {
       />
       <GameCanvas gameWorldService={gameWorldServiceRef} />
       { gameState === "playing" ? null : <MaterialEditor />}
+      { gameState === "playing" ? null : <ShaderEditor />}
     </div>
   );
 }

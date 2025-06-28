@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Edit, Palette, Info } from "lucide-react";
+import { Edit, Palette, Info, Sparkles } from "lucide-react";
 import { Entity } from "@/models";
 import useGameStudioStore from "@/stores/game-studio-store";
 import { MaterialApplicationService } from "../../material-editor/material-application-service";
@@ -11,7 +11,7 @@ interface MaterialsSectionProps {
 }
 
 export function MaterialsSection({ entity }: MaterialsSectionProps) {
-  const { setMaterialEditorOpen, setMaterialEditorEntity } = useGameStudioStore();
+  const { setMaterialEditorOpen, setMaterialEditorEntity, setShaderEditorOpen, setShaderEditorEntity } = useGameStudioStore();
 
   // Check if entity has material support
   const hasMaterialSupport = 'getMaterial' in entity && 'setMaterial' in entity;
@@ -97,16 +97,31 @@ export function MaterialsSection({ entity }: MaterialsSectionProps) {
             </div>
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleOpenMaterialEditor}
-            disabled={!hasMaterialSupport}
-            className="w-full h-8 text-xs"
-          >
-            <Edit className="w-3 h-3 mr-2" />
-            {hasMaterialSupport ? "Edit Material" : "Not Supported"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenMaterialEditor}
+              disabled={!hasMaterialSupport}
+              className="flex-1 h-8 text-xs"
+            >
+              <Edit className="w-3 h-3 mr-2" />
+              {hasMaterialSupport ? "Edit Material" : "Not Supported"}
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShaderEditorEntity(entity.entityId.toString());
+                setShaderEditorOpen(true);
+              }}
+              className="h-8 text-xs"
+              title="Open Shader Editor"
+            >
+              <Sparkles className="w-3 h-3" />
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

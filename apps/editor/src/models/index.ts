@@ -51,6 +51,21 @@ export {
   loadExampleScripts,
 } from "./example-scripts";
 
+// Shader System
+export {
+  ShaderManager,
+  shaderManager,
+  TSLShader
+} from "./shader-manager";
+
+// Example Shaders
+export {
+  EXAMPLE_SHADERS,
+  getExampleShader,
+  getExampleShaderIds,
+  loadExampleShaders,
+} from "./example-shaders";
+
 // Character controller
 export { 
   CharacterController,
@@ -201,4 +216,16 @@ export type {
   OctahedronConfig, 
   DodecahedronConfig, 
   IcosahedronConfig 
-} from "./primitives/polyhedron"; 
+} from "./primitives/polyhedron";
+
+// Shader types
+export type {
+  ShaderType,
+  ShaderParameter,
+  TSLShaderConfig,
+  TSLNodeDefinition,
+  TSLPortDefinition,
+  TSLConnectionDefinition,
+  CompiledShader,
+  ShaderContext
+} from "./types"; 

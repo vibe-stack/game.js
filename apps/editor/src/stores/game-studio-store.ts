@@ -26,6 +26,9 @@ interface GameStudioState {
   materialEditorOpen: boolean;
   materialEditorEntity: string | null;
   sceneFileName: string | null;
+  shaderEditorOpen: boolean;
+  shaderEditorEntity: string | null;
+  selectedShaderId: string | null;
   // Actions - These should mostly set state, logic is in services/models
   setCurrentProject: (project: GameProject | null) => void;
   setCurrentScene: (scene: SceneData | null) => void;
@@ -50,6 +53,9 @@ interface GameStudioState {
   setMaterialEditorOpen: (open: boolean) => void;
   setMaterialEditorEntity: (entityId: string | null) => void;
   setSceneFileName: (fileName: string | null) => void;
+  setShaderEditorOpen: (open: boolean) => void;
+  setShaderEditorEntity: (entityId: string | null) => void;
+  setSelectedShaderId: (shaderId: string | null) => void;
   // Game control actions - These trigger service calls and update state
   playGame: () => void;
   pauseGame: () => void;
@@ -80,6 +86,9 @@ const useGameStudioStore = create<GameStudioState>()(
     materialEditorOpen: false,
     materialEditorEntity: null,
     sceneFileName: null,
+    shaderEditorOpen: false,
+    shaderEditorEntity: null,
+    selectedShaderId: null,
 
     // Basic Setters
     setCurrentProject: (project) => {
@@ -106,6 +115,9 @@ const useGameStudioStore = create<GameStudioState>()(
     setMaterialEditorOpen: (open) => set({ materialEditorOpen: open }),
     setMaterialEditorEntity: (entityId) => set({ materialEditorEntity: entityId }),
     setSceneFileName: (fileName) => set({ sceneFileName: fileName }),
+    setShaderEditorOpen: (open) => set({ shaderEditorOpen: open }),
+    setShaderEditorEntity: (entityId) => set({ shaderEditorEntity: entityId }),
+    setSelectedShaderId: (shaderId) => set({ selectedShaderId: shaderId }),
     loadScene: (sceneName) => {
       set({ currentSceneName: sceneName, shouldLoadScene: true, isLoading: true, error: null });
     },
