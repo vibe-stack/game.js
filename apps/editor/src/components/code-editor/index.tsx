@@ -11,6 +11,14 @@ import { configureMonaco } from "./monaco-config";
 // Configure Monaco to load locally instead of from CDN
 loader.config({ monaco });
 
+// Disable workers that cause issues in Electron
+(window as any).MonacoEnvironment = {
+  getWorker: function (_: any, label: string) {
+    // Return a dummy worker to prevent errors
+    return new Worker('data:text/javascript;charset=utf-8,');
+  }
+};
+
 interface CodeFile {
   path: string;
   name: string;
@@ -56,6 +64,20 @@ export default function CodeEditor({ isOpen, onClose, initialFile }: CodeEditorP
       setOpenFiles(prev => 
         prev.map(f => f.path === filePath ? { ...f, isDirty: false } : f)
       );
+      
+      // Trigger script recompilation if it's a TypeScript file
+      if (filePath.endsWith('.ts') && filePath.includes('/scripts/')) {
+        // Extract the relative script path
+        const projectPathNormalized = currentProject.path.replace(/\\/g, '/');
+        const filePathNormalized = filePath.replace(/\\/g, '/');
+        const relativePath = filePathNormalized.replace(`${projectPathNormalized}/scripts/`, '');
+        
+        try {
+          await window.scriptAPI.compileScript(currentProject.path, relativePath);
+        } catch (error) {
+          console.error('Failed to recompile script:', error);
+        }
+      }
     } catch (error) {
       console.error('Failed to save file:', error);
     }
@@ -335,6 +357,16 @@ export default function CodeEditor({ isOpen, onClose, initialFile }: CodeEditorP
                   tabSize: 2,
                   insertSpaces: true,
                   wordWrap: 'on',
+                  // Disable features that might cause issues in Electron
+                  contextmenu: false,
+                  hover: { enabled: false },
+                  parameterHints: { enabled: false },
+                  quickSuggestions: false,
+                  suggestOnTriggerCharacters: false,
+                  acceptSuggestionOnCommitCharacter: false,
+                  acceptSuggestionOnEnter: 'off',
+                  snippetSuggestions: 'none',
+                  wordBasedSuggestions: 'off',
                 }}
               />
             </div>

@@ -4,8 +4,7 @@ import { DragInput } from "@/components/ui/drag-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface ScriptParametersProps {
   entityId: string;
@@ -27,101 +26,80 @@ export function ScriptParameters({
     scriptManager.setScriptParameters(entityId, scriptId, newParams);
   };
 
-  // Prevent event bubbling to avoid interfering with script card clicks
-  const handleContainerClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-  };
-
-  const handleMouseInteraction = (e: React.MouseEvent) => {
-    e.stopPropagation();
-  };
-
-  const handleFocusInteraction = (e: React.FocusEvent) => {
-    e.stopPropagation();
-  };
-
   if (!parameters || parameters.length === 0) {
     return null;
   }
 
   return (
-    <Card className="bg-white/5 border-white/10" onClick={handleContainerClick}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm text-white flex items-center gap-2">
-          <Settings className="h-4 w-4" />
-          Script Parameters
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <div className="space-y-3">
+      <h5 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Parameters</h5>
+      <div className="space-y-2.5">
         {parameters.map((param) => (
           <div key={param.name} className="space-y-1">
-            <Label className="text-gray-300 text-xs">
+            <Label className="text-xs text-gray-400">
               {param.name}
               {param.description && (
-                <span className="text-gray-500 ml-1">({param.description})</span>
+                <span className="text-gray-600 ml-1 font-normal">• {param.description}</span>
               )}
             </Label>
             
             {param.type === 'number' && (
-              <div onMouseDown={handleMouseInteraction} onFocus={handleFocusInteraction}>
-                <DragInput
-                  value={currentParams[param.name] || param.defaultValue}
-                  onChange={(value) => handleParameterChange(param.name, value)}
-                  min={param.min}
-                  max={param.max}
-                  step={param.step || 0.1}
-                  className="bg-white/5 border-white/20 text-white h-7"
-                />
-              </div>
+              <DragInput
+                value={currentParams[param.name] !== undefined ? currentParams[param.name] : param.defaultValue}
+                onChange={(value) => handleParameterChange(param.name, value)}
+                min={param.min}
+                max={param.max}
+                step={param.step || 0.1}
+                className="h-7 bg-gray-900/50 border-gray-800 text-gray-200 text-xs hover:bg-gray-800/50 focus:bg-gray-800"
+              />
             )}
             
             {param.type === 'string' && (
-              <input
+              <Input
                 type="text"
-                value={currentParams[param.name] || param.defaultValue}
+                value={currentParams[param.name] !== undefined ? currentParams[param.name] : param.defaultValue}
                 onChange={(e) => handleParameterChange(param.name, e.target.value)}
-                onMouseDown={handleMouseInteraction}
-                onFocus={handleFocusInteraction}
-                className="w-full bg-white/5 border-white/20 text-white text-sm h-7 px-2 rounded"
+                className="h-7 bg-gray-900/50 border-gray-800 text-gray-200 text-xs placeholder:text-gray-600 hover:bg-gray-800/50 focus:bg-gray-800"
+                placeholder={String(param.defaultValue || '')}
               />
             )}
             
             {param.type === 'boolean' && (
-              <div onClick={handleContainerClick}>
+              <div className="flex items-center">
                 <Switch
                   checked={currentParams[param.name] !== undefined ? currentParams[param.name] : param.defaultValue}
                   onCheckedChange={(checked) => handleParameterChange(param.name, checked)}
-                  className="data-[state=checked]:bg-lime-500"
+                  className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-700 scale-75"
                 />
               </div>
             )}
             
             {param.type === 'select' && param.options && (
-              <div onClick={handleContainerClick}>
-                <Select
-                  value={currentParams[param.name] || param.defaultValue}
-                  onValueChange={(value) => handleParameterChange(param.name, value)}
-                >
-                  <SelectTrigger className="w-full bg-white/5 border-white/20 text-white h-7">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {param.options.map((option: string) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select
+                value={currentParams[param.name] !== undefined ? currentParams[param.name] : param.defaultValue}
+                onValueChange={(value) => handleParameterChange(param.name, value)}
+              >
+                <SelectTrigger className="h-7 bg-gray-900/50 border-gray-800 text-gray-200 text-xs hover:bg-gray-800/50 focus:bg-gray-800">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {param.options.map((option: string) => (
+                    <SelectItem key={option} value={option} className="text-xs">
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
             
             {param.type === 'vector3' && (
-              <div className="grid grid-cols-3 gap-1" onClick={handleContainerClick}>
+              <div className="grid grid-cols-3 gap-1">
                 {['x', 'y', 'z'].map((axis) => (
-                  <div key={axis} onMouseDown={handleMouseInteraction} onFocus={handleFocusInteraction}>
+                  <div key={axis}>
                     <DragInput
-                      value={currentParams[param.name]?.[axis] || param.defaultValue?.[axis] || 0}
+                      value={currentParams[param.name]?.[axis] !== undefined 
+                        ? currentParams[param.name][axis] 
+                        : param.defaultValue?.[axis] || 0}
                       onChange={(value) => {
                         const currentVec = currentParams[param.name] || param.defaultValue || { x: 0, y: 0, z: 0 };
                         handleParameterChange(param.name, { ...currentVec, [axis]: value });
@@ -129,7 +107,7 @@ export function ScriptParameters({
                       min={param.min}
                       max={param.max}
                       step={param.step || 0.1}
-                      className="bg-white/5 border-white/20 text-white h-7"
+                      className="h-7 bg-gray-900/50 border-gray-800 text-gray-200 text-xs hover:bg-gray-800/50 focus:bg-gray-800"
                     />
                   </div>
                 ))}
@@ -137,7 +115,7 @@ export function ScriptParameters({
             )}
           </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 } 

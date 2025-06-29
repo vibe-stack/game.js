@@ -23,8 +23,6 @@ export class LightingLoader {
     for (const lightData of lightingData.spot) {
       this.loadSpotLight(context, lightData);
     }
-
-    console.log("Lighting configuration loaded");
   }
 
   private clearExistingLights(context: LoaderContext): void {

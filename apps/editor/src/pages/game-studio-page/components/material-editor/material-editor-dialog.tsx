@@ -151,7 +151,6 @@ export function MaterialEditorDialog({ open, onClose }: MaterialEditorDialogProp
     // Apply the material to the entity
     const success = await MaterialApplicationService.applyMaterialToEntity(entity, editingMaterial);
     if (success) {
-      console.log('Material applied successfully');
     } else {
       console.error('Failed to apply material');
     }

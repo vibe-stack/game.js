@@ -5,9 +5,7 @@ import { useEntityProperties, useEntityScriptState } from "@/hooks/use-entity-st
 import { useScriptManagerState } from "@/hooks/use-script-manager-state";
 import { Entity, EXAMPLE_SCRIPTS, getExampleScriptIds } from "@/models";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Play, 
@@ -22,15 +20,19 @@ import {
 import { AttachedScripts } from "./attached-scripts";
 import { ScriptLibrary } from "./script-library";
 import { ScriptEditor } from "./script-editor";
+import { ScriptLoaderService } from "@/services/script-loader-service";
 
 interface BehaviorsProps {
   gameWorldService: React.RefObject<GameWorldService | null>;
+  onOpenCodeEditor?: (scriptPath: string) => void;
 }
 
-export function Behaviors({ gameWorldService }: BehaviorsProps) {
-  const { selectedEntity: selectedEntityId } = useGameStudioStore();
+export function Behaviors({ gameWorldService, onOpenCodeEditor }: BehaviorsProps) {
+  const { selectedEntity: selectedEntityId, currentProject } = useGameStudioStore();
   const [activeView, setActiveView] = useState<'attached' | 'library' | 'editor'>('attached');
   const [selectedScript, setSelectedScript] = useState<string | null>(null);
+  
+  const scriptLoaderService = ScriptLoaderService.getInstance();
   
   // Get the selected entity
   const selectedEntity = useMemo(() => {
@@ -97,6 +99,8 @@ export function Behaviors({ gameWorldService }: BehaviorsProps) {
     }
     
     selectedEntity.attachScript(scriptId);
+    // Force update view
+    setActiveView('attached');
   };
 
   const handleDetachScript = (scriptId: string) => {
@@ -109,83 +113,104 @@ export function Behaviors({ gameWorldService }: BehaviorsProps) {
     scriptManager.setScriptEnabled(scriptId, enabled);
   };
 
+  const handleEditScript = (scriptPath: string) => {
+    if (!currentProject || !onOpenCodeEditor) return;
+    
+    // Construct the full absolute path
+    // If the path is already absolute, use it as is
+    // Otherwise, construct it relative to the project's scripts directory
+    let fullPath: string;
+    if (scriptPath.startsWith('/') || scriptPath.includes(':\\')) {
+      // Already an absolute path
+      fullPath = scriptPath;
+    } else if (scriptPath.startsWith('scripts/')) {
+      // Path includes scripts directory
+      fullPath = `${currentProject.path}/${scriptPath}`;
+    } else {
+      // Just the filename, add scripts directory
+      fullPath = `${currentProject.path}/scripts/${scriptPath}`;
+    }
+
+    onOpenCodeEditor(fullPath);
+  };
+
   if (!selectedEntity || !properties || !scriptManager) {
     return (
       <div className="flex flex-col items-center justify-center h-40 text-gray-400">
-        <Activity className="h-8 w-8 mb-2" />
-        <p>No entity selected</p>
-        <p className="text-sm">Select an entity to manage its behaviors</p>
+        <Activity className="h-8 w-8 mb-2 opacity-50" />
+        <p className="text-sm">No entity selected</p>
+        <p className="text-xs opacity-60">Select an entity to manage its behaviors</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 p-2">
+    <div className="space-y-3 p-2">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Zap className="h-5 w-5 text-lime-400" />
-          <h3 className="text-lg font-semibold text-white">Behaviors</h3>
-        </div>
-        <Badge variant="secondary" className="bg-lime-500/20 text-lime-300">
-          {attachedScripts.length} script{attachedScripts.length !== 1 ? 's' : ''}
+        <h3 className="text-sm font-medium text-gray-200">Behaviors</h3>
+        <Badge 
+          variant="secondary" 
+          className="text-xs bg-gray-800 text-gray-400 border-0"
+        >
+          {attachedScripts.length}
         </Badge>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 rounded-lg bg-white/5 p-1">
+      <div className="flex gap-0.5 p-0.5 rounded-md bg-gray-900/50">
         <Button
-          variant={activeView === 'attached' ? 'default' : 'ghost'}
+          variant="ghost"
           size="sm"
           onClick={() => setActiveView('attached')}
-          className={`flex-1 text-xs ${
+          className={`flex-1 h-7 text-xs transition-colors ${
             activeView === 'attached' 
-              ? 'bg-lime-500/20 text-lime-300 hover:bg-lime-500/30' 
-              : 'text-gray-400 hover:text-white'
+              ? 'bg-gray-800 text-white' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
           }`}
         >
-          <Activity className="h-3 w-3 mr-1" />
           Attached
         </Button>
         <Button
-          variant={activeView === 'library' ? 'default' : 'ghost'}
+          variant="ghost"
           size="sm"
           onClick={() => setActiveView('library')}
-          className={`flex-1 text-xs ${
+          className={`flex-1 h-7 text-xs transition-colors ${
             activeView === 'library' 
-              ? 'bg-lime-500/20 text-lime-300 hover:bg-lime-500/30' 
-              : 'text-gray-400 hover:text-white'
+              ? 'bg-gray-800 text-white' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
           }`}
         >
-          <Code className="h-3 w-3 mr-1" />
           Library
         </Button>
         <Button
-          variant={activeView === 'editor' ? 'default' : 'ghost'}
+          variant="ghost"
           size="sm"
           onClick={() => setActiveView('editor')}
-          className={`flex-1 text-xs ${
+          className={`flex-1 h-7 text-xs transition-colors ${
             activeView === 'editor' 
-              ? 'bg-lime-500/20 text-lime-300 hover:bg-lime-500/30' 
-              : 'text-gray-400 hover:text-white'
+              ? 'bg-gray-800 text-white' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
           }`}
         >
-          <Plus className="h-3 w-3 mr-1" />
           Create
         </Button>
       </div>
 
       {/* Content */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="h-[calc(100vh-24rem)]">
         {activeView === 'attached' && (
           <AttachedScripts
             attachedScripts={attachedScripts}
             scriptManager={scriptManager}
+            scriptLoaderService={scriptLoaderService}
+            currentProject={currentProject}
             onDetachScript={handleDetachScript}
             onToggleScript={handleToggleScript}
             onSelectScript={setSelectedScript}
             selectedScript={selectedScript}
             entityId={selectedEntityId!}
+            onEditScript={handleEditScript}
           />
         )}
         
@@ -202,8 +227,8 @@ export function Behaviors({ gameWorldService }: BehaviorsProps) {
             scriptManager={scriptManager}
             onScriptCreated={(scriptId: string) => {
               handleAttachScript(scriptId);
-              setActiveView('attached');
             }}
+            onEditScript={handleEditScript}
           />
         )}
       </ScrollArea>

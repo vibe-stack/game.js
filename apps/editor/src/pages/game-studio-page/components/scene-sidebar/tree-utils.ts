@@ -116,35 +116,28 @@ export class TreeUtils {
     flatItems: FlatTreeItem[],
     gameWorldService: React.RefObject<GameWorldService | null>,
     onUpdate?: () => void
-  ): Promise<boolean> {
-    console.log("TreeUtils.handleDragEnd called", { activeId, overId });
-    
+  ): Promise<boolean> {  
     if (!overId || !gameWorldService.current) {
-      console.log("Invalid drag end: missing overId or gameWorldService");
       return false;
     }
 
     const gameWorld = gameWorldService.current.getGameWorld();
     if (!gameWorld) {
-      console.log("No game world available");
       return false;
     }
 
     const entitiesRegistry = gameWorld.getRegistryManager().getRegistry<Entity>("entities");
     if (!entitiesRegistry) {
-      console.log("No entities registry available");
       return false;
     }
 
     const activeEntity = entitiesRegistry.get(activeId);
     if (!activeEntity) {
-      console.log("Active entity not found:", activeId);
       return false;
     }
 
     // Check if move is valid
     if (!this.canMoveTo(activeId, overId, flatItems)) {
-      console.log("Invalid move detected");
       return false;
     }
 
@@ -152,20 +145,15 @@ export class TreeUtils {
     const overItem = flatItems.find(item => item.entity.entityId === overId);
     
     if (!activeItem || !overItem) {
-      console.log("Missing active or over item");
       return false;
     }
 
     try {
-      console.log("Executing drag operation...");
       
       // Determine the drop operation type
       const dropResult = this.getDropOperation(activeItem, overItem, flatItems);
-      console.log("Drop operation:", dropResult);
       
       await this.executeDropOperation(dropResult, activeEntity, gameWorld, entitiesRegistry);
-      
-      console.log("Drag operation completed successfully");
       
       // Trigger UI update
       if (onUpdate) {
@@ -174,7 +162,6 @@ export class TreeUtils {
       
       return true;
     } catch (error) {
-      console.error("Failed to handle drag end:", error);
       return false;
     }
   }
@@ -188,17 +175,6 @@ export class TreeUtils {
     flatItems: FlatTreeItem[]
   ): DropOperation {
     const overEntity = overItem.entity;
-    
-    console.log("Determining drop operation:", {
-      activeItem: activeItem.entity.entityName,
-      activeDepth: activeItem.depth,
-      overItem: overItem.entity.entityName,
-      overDepth: overItem.depth
-    });
-    
-    // For now, let's default to making parent-child relationships
-    // This will allow any entity to become a parent by having something dropped on it
-    console.log("Making child relationship - any entity can become a parent");
     return {
       type: 'child',
       target: overEntity,
@@ -216,27 +192,18 @@ export class TreeUtils {
     entitiesRegistry: any
   ): Promise<void> {
     const scene = gameWorld.getScene();
-    
-    console.log("Executing drop operation:", {
-      type: operation.type,
-      activeEntity: activeEntity.entityName,
-      target: operation.target.entityName,
-      position: operation.position
-    });
+
     
     // Always remove from current parent first
     if (activeEntity.parent) {
-      console.log("Removing from current parent:", activeEntity.parent);
       activeEntity.parent.remove(activeEntity);
     }
     
     if (operation.type === 'child') {
-      console.log("Adding as child to:", operation.target.entityName);
       // Add as child to target
       operation.target.add(activeEntity);
     } else if (operation.type === 'sibling') {
       const targetParent = operation.target.parent;
-      console.log("Adding as sibling, target parent:", targetParent === scene ? "scene" : targetParent);
       
       if (targetParent && targetParent !== scene) {
         // Add to target's parent
@@ -247,8 +214,6 @@ export class TreeUtils {
         const targetIndex = children.indexOf(operation.target);
         const activeIndex = children.indexOf(activeEntity);
         
-        console.log("Reordering siblings:", { targetIndex, activeIndex, position: operation.position });
-        
         if (targetIndex !== -1 && activeIndex !== -1) {
           const newIndex = operation.position === 'after' ? targetIndex + 1 : targetIndex;
           
@@ -257,17 +222,13 @@ export class TreeUtils {
             children.splice(activeIndex, 1);
             const insertIndex = activeIndex < newIndex ? newIndex - 1 : newIndex;
             children.splice(insertIndex, 0, activeEntity);
-            console.log("Reordered from", activeIndex, "to", insertIndex);
           }
         }
       } else {
         // Add to scene root
-        console.log("Adding to scene root");
         scene.add(activeEntity);
       }
     }
-    
-    console.log("Drop operation completed. New parent:", activeEntity.parent);
   }
 
   /**

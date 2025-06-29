@@ -103,7 +103,6 @@ let state: ScriptState;
  * Use this to set up initial state, create materials, subscribe to events, etc.
  */
 export function init(context: any): void {
-  console.log(`Script initialized on entity: ${context.entity.entityName}`);
   
   // Initialize script state
   state = {
@@ -197,8 +196,6 @@ export function fixedUpdate(context: any, fixedDeltaTime: number): void {
  * Use this to clean up resources, unsubscribe from events, etc.
  */
 export function destroy(context: any): void {
-  console.log(`Script destroyed on entity: ${context.entity.entityName}`);
-  
   // Clean up any resources
   state = null as any;
   
@@ -302,11 +299,9 @@ function handleAIBehavior(context: any, deltaTime: number, params: any): void {
  * Optional: Export additional functions that can be called from other scripts
  */
 export function takeDamage(amount: number): void {
-  console.log(`Entity took ${amount} damage`);
   // Implement damage logic
 }
 
 export function heal(amount: number): void {
-  console.log(`Entity healed ${amount} health`);
   // Implement healing logic
 } 

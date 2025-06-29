@@ -12,10 +12,12 @@ import useGameStudioStore from "@/stores/game-studio-store";
 
 interface PropertiesSidebarProps {
   gameWorldService: React.RefObject<GameWorldService | null>;
+  onOpenCodeEditor?: (scriptPath: string) => void;
 }
 
 export default function PropertiesSidebar({
   gameWorldService,
+  onOpenCodeEditor,
 }: PropertiesSidebarProps) {
   const [activeTab, setActiveTab] = useState("inspector");
   const { gameState } = useGameStudioStore();
@@ -78,7 +80,10 @@ export default function PropertiesSidebar({
             value="behaviors"
             className="m-2 flex min-h-0 flex-1 flex-col overflow-y-auto"
           >
-            <Behaviors gameWorldService={gameWorldService} />
+            <Behaviors 
+              gameWorldService={gameWorldService} 
+              onOpenCodeEditor={onOpenCodeEditor}
+            />
           </TabsContent>
 
           <TabsContent

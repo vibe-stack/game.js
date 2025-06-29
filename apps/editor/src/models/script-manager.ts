@@ -692,6 +692,13 @@ export class ScriptManager {
   }
 
   /**
+   * Public method to find an entity by ID (for use by external services)
+   */
+  public findEntity(entityId: string): Entity | undefined {
+    return this.findEntityById(entityId);
+  }
+
+  /**
    * Update performance metrics for a script
    */
   private updatePerformanceMetrics(scriptId: string, executionTime: number): void {
@@ -719,9 +726,15 @@ export class ScriptManager {
     // Get all entities using this script
     const entityIds = this.getScriptEntities(scriptId);
     
-    // Detach from all entities first
+    // Detach from all entities first (call entity's detachScript method to update their arrays)
     for (const entityId of entityIds) {
-      this.detachScript(entityId, scriptId);
+      const entity = this.findEntityById(entityId);
+      if (entity) {
+        entity.detachScript(scriptId);
+      } else {
+        // Fallback to script manager method if entity not found
+        this.detachScript(entityId, scriptId);
+      }
     }
     
     // Remove from compiled scripts

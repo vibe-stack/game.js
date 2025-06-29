@@ -359,8 +359,7 @@ export function gameLoopExample() {
   const assetSystem = new OpenWorldAssetSystem();
   
   // Initialize
-  assetSystem.preloadStarterArea().then(() => {
-    console.log('Game ready to start!');
+  assetSystem.preloadStarterArea().then(() => { 
     
     // Game loop
     function update(deltaTime: number) {
@@ -370,7 +369,6 @@ export function gameLoopExample() {
       
       // Monitor streaming performance
       const status = assetSystem.getStreamingStatus();
-      console.log(`Assets: ${status.loaded} loaded, ${status.loading} loading, ${status.queued} queued`);
       
       // Monitor performance metrics
       const metrics = assetSystem.getPerformanceMetrics();
@@ -381,7 +379,6 @@ export function gameLoopExample() {
       
       // Memory management
       if (metrics.streaming.memoryUtilization > 90) {
-        console.log('Memory pressure detected, cleaning cache');
         assetSystem.forceCacheCleanup();
       }
     }
@@ -425,11 +422,7 @@ export async function preprocessAssets() {
 
   // Save processed variants
   // In a real build system, you'd save these to your asset directory
-  console.log('Processed texture variants:', {
-    high: highQuality.byteLength,
-    medium: mediumQuality.byteLength,
-    low: lowQuality.byteLength,
-  });
+
 
   pipeline.dispose();
 }

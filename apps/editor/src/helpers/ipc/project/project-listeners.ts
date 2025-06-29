@@ -38,7 +38,6 @@ import {
 import { ProjectService } from "../../../services/project-service";
 
 export function addProjectEventListeners() {
-  console.log("Adding project event listeners...");
 
   // Project Management
   ipcMain.handle(PROJECT_LOAD_PROJECTS_CHANNEL, () => ProjectService.loadProjects());
@@ -116,6 +115,4 @@ export function addProjectEventListeners() {
     ProjectService.saveScriptFile(...args));
   ipcMain.handle(PROJECT_OPEN_SCRIPT_IN_EDITOR_CHANNEL, (_, ...args: [string, string]) => 
     ProjectService.openScriptInEditor(...args));
-
-  console.log("Project event listeners added successfully");
 } 

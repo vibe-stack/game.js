@@ -1,6 +1,5 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { 
@@ -9,47 +8,75 @@ import {
   Pause, 
   AlertTriangle, 
   Clock,
-  TrendingUp,
-  Info
+  Edit2,
+  Info,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { ScriptManager, CompiledScript } from "@/models";
 import { ScriptParameters } from "./script-parameters";
+import { toast } from "sonner";
+import { ScriptLoaderService } from "@/services/script-loader-service";
+import { GameProject } from "@/types/project";
 
 interface AttachedScriptsProps {
   attachedScripts: string[];
   scriptManager: ScriptManager;
+  scriptLoaderService: ScriptLoaderService;
+  currentProject: GameProject | null;
   onDetachScript: (scriptId: string) => void;
   onToggleScript: (scriptId: string, enabled: boolean) => void;
   onSelectScript: (scriptId: string | null) => void;
   selectedScript: string | null;
   entityId: string;
+  onEditScript: (scriptPath: string) => void;
 }
 
 export function AttachedScripts({
   attachedScripts,
   scriptManager,
+  scriptLoaderService,
+  currentProject,
   onDetachScript,
   onToggleScript,
   onSelectScript,
   selectedScript,
-  entityId
+  entityId,
+  onEditScript
 }: AttachedScriptsProps) {
+  
+  const getScriptPath = (scriptId: string): string | null => {
+    if (!currentProject) return null;
+    
+    // Try to get the path from the script loader service
+    const loadedScripts = scriptLoaderService.getLoadedScripts(currentProject.path);
+    const loadedScript = loadedScripts.find(ls => ls.config.id === scriptId);
+    
+    if (loadedScript && loadedScript.path) {
+      return loadedScript.path;
+    }
+    
+    // For example scripts that don't have file paths
+    return null;
+  };
   
   if (attachedScripts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-32 text-gray-400 border-2 border-dashed border-gray-600 rounded-lg">
-        <Play className="h-6 w-6 mb-2" />
+      <div className="flex flex-col items-center justify-center h-32 text-gray-500 rounded-lg p-4">
+        <Play className="h-6 w-6 mb-2 opacity-50" />
         <p className="text-sm">No behaviors attached</p>
-        <p className="text-xs text-gray-500">Add scripts from the Library tab</p>
+        <p className="text-xs opacity-60">Add scripts from the Library tab</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {attachedScripts.map((scriptId) => {
         const script = scriptManager.getScript(scriptId);
         if (!script) return null;
+        
+        const scriptPath = getScriptPath(scriptId);
         
         return (
           <ScriptCard
@@ -60,7 +87,15 @@ export function AttachedScripts({
             onSelect={() => onSelectScript(selectedScript === scriptId ? null : scriptId)}
             onDetach={() => onDetachScript(scriptId)}
             onToggle={(enabled) => onToggleScript(scriptId, enabled)}
+            onEdit={() => {
+              if (scriptPath) {
+                onEditScript(scriptPath);
+              } else {
+                toast.error("This is an example script and cannot be edited");
+              }
+            }}
             entityId={entityId}
+            isFileScript={!!scriptPath}
           />
         );
       })}
@@ -75,7 +110,9 @@ interface ScriptCardProps {
   onSelect: () => void;
   onDetach: () => void;
   onToggle: (enabled: boolean) => void;
+  onEdit: () => void;
   entityId: string;
+  isFileScript: boolean;
 }
 
 function ScriptCard({ 
@@ -85,147 +122,119 @@ function ScriptCard({
   onSelect, 
   onDetach, 
   onToggle,
-  entityId
+  onEdit,
+  entityId,
+  isFileScript
 }: ScriptCardProps) {
   const metrics = scriptManager.getScriptPerformance(script.id);
   
   return (
-    <Card 
-      className={`cursor-pointer transition-all hover:bg-white/5 ${
-        isSelected ? 'ring-2 ring-lime-400 bg-lime-500/10' : 'bg-white/5'
+    <div 
+      className={`rounded-md transition-all ${
+        isSelected ? 'bg-gray-800 ring-1 ring-gray-700' : 'bg-gray-900/50 hover:bg-gray-800/50'
       }`}
-      onClick={onSelect}
     >
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <CardTitle className="text-sm text-white">{script.config.name}</CardTitle>
-            <CardDescription className="text-xs text-gray-400">
-              Priority: {script.config.priority}
-            </CardDescription>
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onSelect}
+              className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
+            >
+              {isSelected ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </Button>
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-medium text-gray-200 truncate">{script.config.name}</h4>
+                {script.hasErrors && (
+                  <AlertTriangle className="h-3 w-3 text-red-400 flex-shrink-0" />
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">Priority: {script.config.priority}</p>
+            </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            {/* Status badges */}
-            {script.hasErrors && (
-              <Badge variant="destructive" className="text-xs px-1 py-0">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                Error
-              </Badge>
+          <div className="flex items-center gap-1">
+            {isFileScript && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onEdit}
+                className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
+              >
+                <Edit2 className="h-3 w-3" />
+              </Button>
             )}
             
-            <Badge 
-              variant={script.config.enabled ? "default" : "secondary"} 
-              className={`text-xs px-2 py-0 ${
-                script.config.enabled ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-400'
-              }`}
-            >
-              {script.config.enabled ? 'Active' : 'Inactive'}
-            </Badge>
-          </div>
-        </div>
-      </CardHeader>
-      
-      <CardContent className="pt-0">
-        {/* Error message if any */}
-        {script.hasErrors && script.lastError && (
-          <div className="mb-3 p-2 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-300">
-            <strong>Error:</strong> {script.lastError}
-          </div>
-        )}
-        
-        {/* Performance metrics */}
-        {metrics && metrics.callCount > 0 && (
-          <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-1 text-gray-400">
-              <Clock className="h-3 w-3" />
-              Avg: {metrics.averageTime.toFixed(2)}ms
-            </div>
-            <div className="flex items-center gap-1 text-gray-400">
-              <TrendingUp className="h-3 w-3" />
-              Calls: {metrics.callCount}
-            </div>
-          </div>
-        )}
-        
-        {/* Script lifecycle info */}
-        <div className="mb-3 flex flex-wrap gap-1">
-          {script.lifecycle.init && (
-            <Badge variant="outline" className="text-xs px-1 py-0 border-blue-400/30 text-blue-300">
-              init
-            </Badge>
-          )}
-          {script.lifecycle.update && (
-            <Badge variant="outline" className="text-xs px-1 py-0 border-green-400/30 text-green-300">
-              update
-            </Badge>
-          )}
-          {script.lifecycle.fixedUpdate && (
-            <Badge variant="outline" className="text-xs px-1 py-0 border-yellow-400/30 text-yellow-300">
-              fixedUpdate
-            </Badge>
-          )}
-          {script.lifecycle.destroy && (
-            <Badge variant="outline" className="text-xs px-1 py-0 border-red-400/30 text-red-300">
-              destroy
-            </Badge>
-          )}
-        </div>
-        
-        {/* Controls */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
             <Switch
               checked={script.config.enabled}
               onCheckedChange={onToggle}
-              className="data-[state=checked]:bg-lime-500"
+              className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-700 scale-75"
             />
-            <span className="text-xs text-gray-400">
-              {script.config.enabled ? 'Enabled' : 'Disabled'}
-            </span>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDetach}
+              className="h-6 w-6 p-0 text-gray-400 hover:text-red-400 hover:bg-red-900/20"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
           </div>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDetach();
-            }}
-            className="h-7 w-7 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
         </div>
+        
+        {/* Error message if any */}
+        {script.hasErrors && script.lastError && (
+          <div className="mt-2 p-2 bg-red-900/20 rounded text-xs text-red-400">
+            {script.lastError}
+          </div>
+        )}
         
         {/* Script details when selected */}
         {isSelected && (
-          <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
-            <div className="space-y-2 text-xs">
-              <div>
-                <span className="text-gray-400">Script ID:</span>
-                <span className="ml-2 text-white font-mono">{script.id}</span>
+          <div className="mt-3 pt-3 border-t border-gray-800 space-y-3">
+            {/* Performance metrics */}
+            {metrics && metrics.callCount > 0 && (
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-1 text-gray-400">
+                  <Clock className="h-3 w-3" />
+                  <span>Avg: {metrics.averageTime.toFixed(2)}ms</span>
+                </div>
+                <div className="flex items-center gap-1 text-gray-400">
+                  <span>Calls: {metrics.callCount}</span>
+                </div>
               </div>
-              
-              {metrics && (
-                <>
-                  <div>
-                    <span className="text-gray-400">Total Time:</span>
-                    <span className="ml-2 text-white">{metrics.totalTime.toFixed(2)}ms</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Max Time:</span>
-                    <span className="ml-2 text-white">{metrics.maxTime.toFixed(2)}ms</span>
-                  </div>
-                </>
+            )}
+            
+            {/* Lifecycle badges */}
+            <div className="flex flex-wrap gap-1">
+              {script.lifecycle.init && (
+                <Badge variant="outline" className="text-xs h-5 px-1.5 border-gray-700 text-gray-400">
+                  init
+                </Badge>
               )}
-              
-              <div>
-                <span className="text-gray-400">Status:</span>
-                <span className={`ml-2 ${script.hasErrors ? 'text-red-300' : 'text-green-300'}`}>
-                  {script.hasErrors ? 'Error' : 'OK'}
-                </span>
-              </div>
+              {script.lifecycle.update && (
+                <Badge variant="outline" className="text-xs h-5 px-1.5 border-gray-700 text-gray-400">
+                  update
+                </Badge>
+              )}
+              {script.lifecycle.fixedUpdate && (
+                <Badge variant="outline" className="text-xs h-5 px-1.5 border-gray-700 text-gray-400">
+                  fixedUpdate
+                </Badge>
+              )}
+              {script.lifecycle.destroy && (
+                <Badge variant="outline" className="text-xs h-5 px-1.5 border-gray-700 text-gray-400">
+                  destroy
+                </Badge>
+              )}
             </div>
             
             {/* Script Parameters */}
@@ -239,7 +248,7 @@ function ScriptCard({
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 } 

@@ -32,7 +32,6 @@ export class ShaderApplicationService {
         (entity as any).emitChange();
       }
       
-      console.log('Shader applied successfully to entity:', entity.entityId);
       return true;
     } catch (error) {
       console.error('Failed to apply shader to entity:', error);

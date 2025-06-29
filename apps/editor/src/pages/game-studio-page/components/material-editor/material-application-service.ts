@@ -34,7 +34,6 @@ export class MaterialApplicationService {
         (entity as any).emitChange();
       }
       
-      console.log('Material applied successfully to entity:', entity.entityId);
       return true;
     } catch (error) {
       console.error('Failed to apply material to entity:', error);

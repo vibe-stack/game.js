@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import useGameStudioStore from "@/stores/game-studio-store";
 import { GameWorldService } from "./services/game-world-service";
@@ -10,6 +10,7 @@ import SceneSidebar from "./components/scene-sidebar";
 import PropertiesSidebar from "./components/properties-sidebar";
 import { MaterialEditor } from "./components/material-editor";
 import ShaderEditor from "./components/shader-editor";
+import CodeEditor from "@/components/code-editor";
 import { toast } from "sonner";
 import { Entity } from "@/models";
 
@@ -18,6 +19,10 @@ export default function GameStudioPage() {
   const gameWorldServiceRef = useRef<GameWorldService | null>(null);
   // State for double-X key deletion
   const lastXKeyPressRef = useRef<number>(0);
+  
+  // Code editor state
+  const [codeEditorOpen, setCodeEditorOpen] = useState(false);
+  const [editingScriptPath, setEditingScriptPath] = useState<string | null>(null);
   
   const { currentProject, selectedEntity, gameState } = useGameStudioStore();
   const { setSaving, error, playGame, pauseGame, resetGame, resumeGame, setSelectedEntity } = useGameStudioStore.getState();
@@ -147,7 +152,13 @@ export default function GameStudioPage() {
     <div className="relative h-screen overflow-hidden bg-gray-900">
       <LoadingOverlay />
       { gameState === "playing" ? null : <SceneSidebar gameWorldService={gameWorldServiceRef} />}
-      { gameState === "playing" ? null : <PropertiesSidebar gameWorldService={gameWorldServiceRef} />}
+      { gameState === "playing" ? null : <PropertiesSidebar 
+        gameWorldService={gameWorldServiceRef} 
+        onOpenCodeEditor={(scriptPath: string) => {
+          setEditingScriptPath(scriptPath);
+          setCodeEditorOpen(true);
+        }}
+      />}
       <FloatingToolbar
         onHome={handleGoHome}
         onSave={handleSave}
@@ -160,6 +171,16 @@ export default function GameStudioPage() {
       <GameCanvas gameWorldService={gameWorldServiceRef} />
       { gameState === "playing" ? null : <MaterialEditor />}
       { gameState === "playing" ? null : <ShaderEditor />}
+      
+      {/* Code Editor - rendered at page level */}
+      <CodeEditor
+        isOpen={codeEditorOpen}
+        onClose={() => {
+          setCodeEditorOpen(false);
+          setEditingScriptPath(null);
+        }}
+        initialFile={editingScriptPath || undefined}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { ScriptManager, ScriptConfig, ScriptParameter } from '@/models/script-manager';
+import { Entity } from '@/models/entity';
 import { toast } from 'sonner';
 
 interface LoadedScript {
@@ -103,7 +104,6 @@ export class ScriptLoaderService {
       const compiledCode = await window.scriptAPI.readCompiledScript(projectPath, scriptPath);
       
       if (existingScript && existingScript.config.code === compiledCode) {
-        console.log(`Script ${scriptId} already loaded with same content, skipping reload`);
         return;
       }
       
@@ -128,12 +128,38 @@ export class ScriptLoaderService {
       
       // Automatically load into script manager if available
       if (this.currentScriptManager && this.currentProjectPath === projectPath) {
-        if (!this.currentScriptManager.getScript(scriptId)) {
+        const existingCompiledScript = this.currentScriptManager.getScript(scriptId);
+        
+        if (!existingCompiledScript) {
+          // Script doesn't exist in manager, compile it
           try {
             this.currentScriptManager.compileScript(config);
-            console.log(`Automatically loaded script: ${scriptName}`);
           } catch (error) {
             console.error(`Failed to auto-load script ${scriptId}:`, error);
+          }
+        } else {
+          // Script exists but needs to be recompiled with new content
+          // Get entities that currently have this script attached before recompiling
+          const entitiesWithScript = this.currentScriptManager.getScriptEntities(scriptId);
+          
+          try {
+            // Recompile the script (this will detach from all entities)
+            this.currentScriptManager.compileScript(config);
+            
+            // Re-attach the script to entities that had it before
+            for (const entityId of entitiesWithScript) {
+              // Get the entity from the game world and call its attachScript method
+              const entity = this.currentScriptManager.findEntity(entityId);
+              
+              if (entity) {
+                entity.attachScript(scriptId);
+              } else {
+                // Fallback to script manager method if entity not found
+                this.currentScriptManager.attachScript(entityId, scriptId);
+              }
+            }
+          } catch (error) {
+            console.error(`Failed to recompile script ${scriptId}:`, error);
           }
         }
       }
@@ -226,7 +252,7 @@ export class ScriptLoaderService {
       // Request recompilation from main process
       const result = await window.scriptAPI.compileScript(projectPath, scriptPath);
       if (result.success) {
-        // Reload the script
+        // Reload the script (this will handle reattachment automatically)
         await this.loadScriptFromFile(projectPath, scriptPath);
         return true;
       }

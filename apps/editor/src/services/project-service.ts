@@ -281,7 +281,6 @@ export class ProjectService {
   }
 
   static registerIpcHandlers() {
-    console.log("Registering project IPC handlers...");
     
     // Project
     ipcMain.handle("project:load-projects", () => ProjectService.loadProjects());
@@ -324,7 +323,5 @@ export class ProjectService {
     // Script Management
     ipcMain.handle("project:save-script-file", (_, ...args: [string, string, string]) => ProjectService.saveScriptFile(...args));
     ipcMain.handle("project:open-script-in-editor", (_, ...args: [string, string]) => ProjectService.openScriptInEditor(...args));
-    
-    console.log("Project IPC handlers registered successfully");
   }
 }

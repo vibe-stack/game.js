@@ -28,6 +28,21 @@ export default function GameCanvas({ gameWorldService }: GameCanvasProps) {
       try {
         setLoading(true);
         
+        // Wait for canvas to be properly sized by React/CSS
+        await new Promise(resolve => {
+          const checkSize = () => {
+            if (canvasRef.current) {
+              const rect = canvasRef.current.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0) {
+                resolve(undefined);
+              } else {
+                requestAnimationFrame(checkSize);
+              }
+            }
+          };
+          checkSize();
+        });
+        
         if (!gameWorldService.current) {
           gameWorldService.current = new GameWorldService();
           // Set the service in the store so other components can access it
@@ -122,38 +137,35 @@ export default function GameCanvas({ gameWorldService }: GameCanvasProps) {
     };
   }, [gameWorldService]);
 
-  // Handle canvas resize
-  // useEffect(() => {
-  //   const handleResize = () => {
-  //     if (canvasRef.current && gameWorldService.current) {
-  //       const rect = canvasRef.current.getBoundingClientRect();
-  //       const width = rect.width;
-  //       const height = rect.height;
-        
-  //       // Set canvas display size (CSS pixels)
-  //       canvasRef.current.style.width = `${width}px`;
-  //       canvasRef.current.style.height = `${height}px`;
-        
-  //       // Set canvas buffer size (actual pixels)
-  //       const pixelRatio = window.devicePixelRatio || 1;
-  //       canvasRef.current.width = width * pixelRatio;
-  //       canvasRef.current.height = height * pixelRatio;
-        
-  //       // Update the renderer size
-  //       gameWorldService.current.getGameWorld()?.resize(width, height);
-  //     }
-  //   };
+  // Handle canvas resize using ResizeObserver for better accuracy
+  useEffect(() => {
+    if (!canvasRef.current) return;
 
-  //   window.addEventListener('resize', handleResize);
+    const handleResize = (entries: ResizeObserverEntry[]) => {
+      if (!gameWorldService.current) return;
+      
+      const entry = entries[0];
+      const { width, height } = entry.contentRect;
+      
+      if (width > 0 && height > 0) {
+        // Update the Three.js renderer and cameras
+        gameWorldService.current.resize(width, height);
+      }
+    };
+
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(canvasRef.current);
     
-  //   // Initial resize with a small delay to ensure canvas is mounted
-  //   const timeoutId = setTimeout(handleResize, 100);
+    // Initial resize
+    const rect = canvasRef.current.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0 && gameWorldService.current) {
+      gameWorldService.current.resize(rect.width, rect.height);
+    }
 
-  //   return () => {
-  //     window.removeEventListener('resize', handleResize);
-  //     clearTimeout(timeoutId);
-  //   };
-  // }, [gameWorldService]);
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [gameWorldService]);
 
   return (
     <div className="absolute inset-0 pt-12">

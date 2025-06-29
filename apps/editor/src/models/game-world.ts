@@ -49,11 +49,8 @@ export class GameWorld {
       antialias: config.antialias ?? true,
     });
     
-    const canvasRect = config.canvas.getBoundingClientRect();
-    const width = canvasRect.width || config.canvas.clientWidth || 800;
-    const height = canvasRect.height || config.canvas.clientHeight || 600;
-    
-    this.renderer.setSize(width, height);
+    // Don't set initial size here - let React/CSS handle it first
+    // We'll set the proper size during initialization
     this.renderer.setPixelRatio(config.pixelRatio ?? window.devicePixelRatio);
     
     if (config.shadowMapEnabled) {
@@ -70,9 +67,10 @@ export class GameWorld {
     this.cameras = this.registryManager.createRegistry<THREE.Camera>("cameras");
     this.controls = this.registryManager.createRegistry<any>("controls");
 
-    this.cameraManager = new CameraManager(this.cameras, this.stateManager, this.scene, width / height);
+    // Use default aspect ratio initially - will be updated during initialization
+    this.cameraManager = new CameraManager(this.cameras, this.stateManager, this.scene, 16/9);
     this.cameraControlManager = new CameraControlManager(this.controls, this.stateManager);
-    this.setupDefaultCamera(width, height);
+    this.setupDefaultCamera(1920, 1080); // Default size, will be updated
     
     this.interactionManager = new InteractionManager(this.renderer as any, this.cameraManager, config.canvas);
     this.debugRenderer = new DebugRenderer(this.scene, this.physicsManager);
@@ -86,6 +84,18 @@ export class GameWorld {
 
   async initialize(): Promise<void> {
     await this.renderer.init();
+    
+    // Now that the renderer is initialized and canvas is mounted, set proper size
+    const canvas = this.renderer.domElement as HTMLCanvasElement;
+    const rect = canvas.getBoundingClientRect();
+    const width = rect.width || canvas.clientWidth || 800;
+    const height = rect.height || canvas.clientHeight || 600;
+    
+    if (width > 0 && height > 0) {
+      this.renderer.setSize(width, height, false);
+      this.cameraManager.resize(width, height);
+    }
+    
     this.startRenderLoop();
   }
 
@@ -260,7 +270,16 @@ export class GameWorld {
   disablePhysicsDebugRender(): void { this.debugRenderer.disable(); }
   isRunningState(): boolean { return this.isRunning; }
   isPausedState(): boolean { return this.isPaused; }
-  resize(width: number, height: number): void { this.renderer.setSize(width, height); this.cameraManager.resize(width, height); }
+  resize(width: number, height: number): void { 
+    if (width <= 0 || height <= 0) return;
+    
+    // Update renderer size
+    this.renderer.setSize(width, height, false); // false = don't update CSS styles
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+    
+    // Update camera aspect ratios
+    this.cameraManager.resize(width, height); 
+  }
 
   dispose(): void {
     this.stop();

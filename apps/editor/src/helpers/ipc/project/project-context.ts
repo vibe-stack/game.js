@@ -6,7 +6,6 @@ import {
 } from "./project-channels";
 
 export function exposeProjectContext() {
-  console.log("Exposing project context...");
   
   contextBridge.exposeInMainWorld("projectAPI", {
     // Project Management
@@ -121,6 +120,5 @@ export function exposeProjectContext() {
         return Promise.resolve(null);
     }
   });
-  
-  console.log("Project context exposed successfully");
+
 }

@@ -209,7 +209,6 @@ export function createSerializationExample() {
 
   // Serialize the terrain
   const serializedData = originalTerrain.serialize();
-  console.log("Serialized terrain data:", serializedData);
 
   // Deserialize to create a copy
   const recreatedTerrain = CustomHeightfield.deserialize(serializedData);
@@ -334,42 +333,31 @@ export function createCustomNoiseTerrainExample() {
 
 // Example usage and testing
 export function runHeightfieldExamples() {
-  console.log("=== Heightfield Examples ===");
   
   try {
     // Test basic terrain creation
     const basicExamples = createBasicTerrainExamples();
-    console.log("✓ Basic terrain examples created");
     
     // Test advanced terrain
     const advancedTerrain = createAdvancedTerrainExample();
-    console.log("✓ Advanced terrain created");
     
     // Test editable terrain
     const editableTerrain = createEditableTerrainExample();
-    console.log("✓ Editable terrain created with modifications");
     
     // Test voronoi terrain
     const voronoiTerrain = createVoronoiTerrainExample();
-    console.log("✓ Voronoi terrain created with custom modifications");
     
     // Test serialization
     const serializationExample = createSerializationExample();
-    console.log("✓ Serialization example completed");
     
     // Test physics integration
     const physicsExample = createPhysicsIntegrationExample();
-    console.log("✓ Physics integration example created");
     
     // Test multi-terrain scene
     const multiTerrainScene = createMultiTerrainScene();
-    console.log("✓ Multi-terrain scene created");
     
     // Test custom noise terrain
     const customNoiseTerrain = createCustomNoiseTerrainExample();
-    console.log("✓ Custom noise terrain created");
-    
-    console.log("All heightfield examples completed successfully!");
     
     return {
       basicExamples,

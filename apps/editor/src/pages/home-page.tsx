@@ -79,12 +79,7 @@ export default function HomePage() {
 
   const loadProjects = async () => {
     try {
-      console.log("Loading projects...");
-      console.log("projectAPI available:", !!window.projectAPI);
-      console.log("loadProjects method available:", !!window.projectAPI?.loadProjects);
-      
       const loadedProjects = await window.projectAPI.loadProjects();
-      console.log("Projects loaded:", loadedProjects);
       setProjects(loadedProjects);
       setStoreCurrentProject(loadedProjects[0]);
     } catch (error) {
@@ -134,11 +129,6 @@ export default function HomePage() {
 
   const openProject = async (project: GameProject) => {
     try {
-      console.log("Opening project:", project.path);
-      console.log("projectAPI available:", !!window.projectAPI);
-      console.log("openProject method available:", !!window.projectAPI?.openProject);
-      
-      // Load fresh project data
       const freshProject = await window.projectAPI.openProject(project.path);
       setCurrentProject(freshProject);
       navigate({ to: "/game-studio-page" });

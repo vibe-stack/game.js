@@ -479,7 +479,6 @@ export class Heightfield extends Entity {
   static createDebugTerrain(
     config: Partial<HeightfieldConfig> = {},
   ): Heightfield {
-    console.log("Creating debug heightfield terrain for physics testing...");
 
     const terrain = new Heightfield({
       width: 20,
@@ -517,8 +516,6 @@ export class Heightfield extends Entity {
     // Update the terrain with new heights
     (terrain as any).heights = heights;
     terrain.updateDisplacement();
-
-    console.log("Debug terrain created with manual height data");
     return terrain;
   }
 

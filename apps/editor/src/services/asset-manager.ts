@@ -60,8 +60,6 @@ export class AssetManager {
 
     AssetManager.assetServer = server;
     AssetManager.assetServerPort = port;
-    
-    console.log(`Asset server started on port ${port} serving ${projectPath}`);
     return port;
   }
 
@@ -70,7 +68,6 @@ export class AssetManager {
       AssetManager.assetServer.close();
       AssetManager.assetServer = null;
       AssetManager.assetServerPort = 0;
-      console.log('Asset server stopped');
     }
   }
 

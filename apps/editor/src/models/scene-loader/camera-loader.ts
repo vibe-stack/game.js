@@ -26,8 +26,6 @@ export class CameraLoader {
             controlManager.addControls(data.id, data.name + " Controls", controls);
           }
         }
-
-        console.log(`Loaded camera: ${data.name} (${data.type})`);
       } catch (error) {
         console.error(`Failed to load camera ${data.name}:`, error);
       }

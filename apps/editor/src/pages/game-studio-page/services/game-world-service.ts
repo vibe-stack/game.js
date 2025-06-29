@@ -204,10 +204,7 @@ async saveScene(): Promise<void> {
   if (!this.gameWorld) return;
 
   // FIXED: Clean up duplicate materials before saving
-  const duplicatesRemoved = materialSystem.cleanupDuplicateMaterials();
-  if (duplicatesRemoved > 0) {
-    console.log(`Cleaned up ${duplicatesRemoved} duplicate materials before saving`);
-  }
+  materialSystem.cleanupDuplicateMaterials();
 
   const { currentProject, currentScene, sceneFileName } = useGameStudioStore.getState();
   if (!currentProject) return;
@@ -507,23 +504,34 @@ private updateCharacterControllers(deltaTime: number): void {
   });
 }
 
-// Update method to be called in the render loop
-update(): void {
-  if (this.gameWorld) {
-    this.editorCameraService.update();
-    
-    // Update helpers
-    this.helperManager.update();
-    
-    // Update character controllers during gameplay
-    const { gameState } = useGameStudioStore.getState();
-    if (gameState === 'playing') {
-      // Calculate delta time (you might want to get this from the game world)
-      const deltaTime = 1/60; // Assuming 60fps, ideally get this from game world
-      this.updateCharacterControllers(deltaTime);
+  // Update method to be called in the render loop
+  update(): void {
+    if (this.gameWorld) {
+      this.editorCameraService.update();
+      
+      // Update helpers
+      this.helperManager.update();
+      
+      // Update character controllers during gameplay
+      const { gameState } = useGameStudioStore.getState();
+      if (gameState === 'playing') {
+        // Calculate delta time (you might want to get this from the game world)
+        const deltaTime = 1/60; // Assuming 60fps, ideally get this from game world
+        this.updateCharacterControllers(deltaTime);
+      }
     }
   }
-}
+
+  // Resize method to handle window/canvas resize
+  resize(width: number, height: number): void {
+    if (this.gameWorld) {
+      // Resize the Three.js renderer and camera manager
+      this.gameWorld.resize(width, height);
+      
+      // Resize the editor camera service
+      this.editorCameraService.resize(width, height);
+    }
+  }
 
 /**
  * Delete an entity by ID with proper cleanup

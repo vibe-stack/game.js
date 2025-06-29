@@ -37,9 +37,6 @@ export function testRotationScript() {
   // Attach the script to the entity
   sphere.attachScript('simple-rotation');
   
-  console.log('Rotation script attached to sphere!');
-  console.log('Attached scripts:', sphere.getAttachedScripts());
-  
   return { sphere, scriptManager };
 }
 
@@ -50,7 +47,6 @@ export function testCustomScript() {
     let bounceSpeed = 2.0;
     
     export function init(context) {
-      console.log('Bouncing script initialized for:', context.entity.entityName);
       context.entity.userData.originalY = context.entity.position.y;
     }
     
@@ -61,7 +57,6 @@ export function testCustomScript() {
     }
     
     export function destroy(context) {
-      console.log('Bouncing script destroyed for:', context.entity.entityName);
     }
   `;
   
@@ -85,8 +80,6 @@ export function testCustomScript() {
   const sphere = new Sphere({ radius: 0.5 });
   gameWorld.createEntity(sphere);
   sphere.attachScript('custom-bounce');
-  
-  console.log('Custom bounce script attached!');
   return { sphere, scriptManager };
 }
 
@@ -107,7 +100,6 @@ export function testScriptManagement() {
   };
   
   const compiledScript = scriptManager.compileScript(errorScript);
-  console.log('Error script compiled:', !compiledScript.hasErrors);
   
   // Create entity and attach script
   const sphere = new Sphere({ radius: 0.3 });
@@ -119,19 +111,15 @@ export function testScriptManagement() {
   
   // Check for errors
   const script = scriptManager.getScript('error-script');
-  console.log('Script has errors:', script?.hasErrors);
-  console.log('Script error:', script?.lastError);
   
   // Get performance metrics
   const metrics = scriptManager.getScriptPerformance('error-script');
-  console.log('Script performance:', metrics);
   
   return { sphere, scriptManager };
 }
 
 // Example: Load all example scripts
 export function loadAllExampleScripts() {
-  console.log('Loading all example scripts...');
   
   const scriptIds = Object.keys(EXAMPLE_SCRIPTS);
   const loadedScripts: string[] = [];
@@ -141,13 +129,11 @@ export function loadAllExampleScripts() {
     try {
       scriptManager.compileScript(scriptConfig);
       loadedScripts.push(scriptConfig.id);
-      console.log(`✓ Loaded script: ${scriptConfig.name}`);
     } catch (error) {
       console.error(`✗ Failed to load script: ${scriptConfig.name}`, error);
     }
   }
   
-  console.log(`Loaded ${loadedScripts.length} scripts successfully`);
   return loadedScripts;
 }
 
@@ -168,8 +154,6 @@ export function testMultipleScripts() {
     sphere.attachScript('health-system');
   }
   
-  console.log('Multiple scripts attached:', sphere.getAttachedScripts());
-  
   // Run a few update cycles
   for (let i = 0; i < 5; i++) {
     scriptManager.update(0.016);
@@ -180,24 +164,16 @@ export function testMultipleScripts() {
 
 // Export a function to run all tests
 export function runAllTests() {
-  console.log('🧪 Running Script System Tests...\n');
   
-  console.log('1. Testing Rotation Script:');
   testRotationScript();
   
-  console.log('\n2. Testing Custom Script:');
   testCustomScript();
   
-  console.log('\n3. Testing Script Management:');
   testScriptManagement();
   
-  console.log('\n4. Loading All Example Scripts:');
   loadAllExampleScripts();
   
-  console.log('\n5. Testing Multiple Scripts:');
   testMultipleScripts();
-  
-  console.log('\n✅ All tests completed!');
 }
 
 // Auto-run tests if this file is imported

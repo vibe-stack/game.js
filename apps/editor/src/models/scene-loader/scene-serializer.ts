@@ -7,7 +7,6 @@ import * as THREE from "three/webgpu";
 
 export class SceneSerializer {
   async serializeScene(gameWorld: GameWorld, sceneName: string): Promise<SceneData> {
-    console.log(`Serializing scene: ${sceneName}`);
 
     // For the snapshot, we'll create a minimal structure that matches SceneData
     const physicsManager = gameWorld.getPhysicsManager();

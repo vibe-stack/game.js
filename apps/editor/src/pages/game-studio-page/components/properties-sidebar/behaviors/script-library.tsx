@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { 
   Plus, 
   Search, 
   Code, 
-  Zap, 
   Play,
   GamepadIcon,
   Heart,
@@ -16,7 +13,6 @@ import {
   Package,
   Sun,
   CheckCircle,
-  File,
   FileCode,
   FolderOpen
 } from "lucide-react";
@@ -91,15 +87,15 @@ export function ScriptLibrary({
 
   // Helper function to get description from script name/id
   const getScriptDescription = (script: any) => {
-    if (script.path) return `Located at: ${script.path}`;
-    if (script.id.includes('rotation')) return 'Continuously rotates the entity around its Y axis';
-    if (script.id.includes('movement')) return 'Physics-based movement with keyboard input';
-    if (script.id.includes('health')) return 'Health system with damage and healing capabilities';
-    if (script.id.includes('ai')) return 'Basic AI behavior with chase and attack states';
-    if (script.id.includes('collectible')) return 'Makes entity collectible with interaction effects';
-    if (script.id.includes('spawner')) return 'Spawns entities at regular intervals';
-    if (script.id.includes('daynight')) return 'Day/night cycle with dynamic lighting';
-    return 'Custom behavior script';
+    if (script.path) return script.path;
+    if (script.id.includes('rotation')) return 'Rotates entity continuously';
+    if (script.id.includes('movement')) return 'Physics-based movement';
+    if (script.id.includes('health')) return 'Health system with damage';
+    if (script.id.includes('ai')) return 'Basic AI behavior';
+    if (script.id.includes('collectible')) return 'Collectible item';
+    if (script.id.includes('spawner')) return 'Entity spawner';
+    if (script.id.includes('daynight')) return 'Day/night cycle';
+    return 'Custom behavior';
   };
 
   // Combine file scripts and example scripts for filtering
@@ -143,60 +139,59 @@ export function ScriptLibrary({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
         <Input
           placeholder="Search scripts..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-400"
+          className="h-7 pl-8 bg-gray-900/50 border-gray-800 text-gray-200 text-xs placeholder:text-gray-600"
         />
       </div>
 
       {/* Scripts by category */}
-      {sortedCategories.map(([category, scripts], index) => (
-        <div key={category} className="space-y-2">
-          {index > 0 && <Separator className="bg-white/10" />}
-          
-          <div className="flex items-center gap-2">
-            {category === 'Project Scripts' && <FolderOpen className="h-4 w-4 text-lime-300" />}
-            <h4 className="text-sm font-medium text-lime-300 uppercase tracking-wide">
-              {category}
-            </h4>
-            <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-lime-500/20 text-lime-300">
-              {scripts.length}
-            </Badge>
+      <div className="space-y-3">
+        {sortedCategories.map(([category, scripts]) => (
+          <div key={category} className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <h5 className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                {category}
+              </h5>
+              <Badge variant="secondary" className="text-xs bg-gray-800 text-gray-500 border-0">
+                {scripts.length}
+              </Badge>
+            </div>
+            
+            <div className="space-y-1">
+              {scripts.map((script) => {
+                const isAttached = attachedScripts.includes(script.id);
+                const IconComponent = getScriptIcon(script.id);
+                
+                return (
+                  <ScriptLibraryCard
+                    key={script.id}
+                    script={script}
+                    description={getScriptDescription(script)}
+                    icon={IconComponent}
+                    isAttached={isAttached}
+                    isFileScript={script.id?.startsWith('file:')}
+                    scriptPath={script.path}
+                    onAttach={() => onAttachScript(script.id)}
+                  />
+                );
+              })}
+            </div>
           </div>
-          
-          <div className="space-y-2">
-            {scripts.map((script) => {
-              const isAttached = attachedScripts.includes(script.id);
-              const IconComponent = getScriptIcon(script.id);
-              
-              return (
-                <ScriptLibraryCard
-                  key={script.id}
-                  script={script}
-                  description={getScriptDescription(script)}
-                  icon={IconComponent}
-                  isAttached={isAttached}
-                  isFileScript={script.id?.startsWith('file:')}
-                  scriptPath={script.path}
-                  onAttach={() => onAttachScript(script.id)}
-                />
-              );
-            })}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
 
       {filteredScripts.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-32 text-gray-400">
-          <Search className="h-6 w-6 mb-2" />
+        <div className="flex flex-col items-center justify-center h-32 text-gray-500">
+          <Search className="h-6 w-6 mb-2 opacity-50" />
           <p className="text-sm">No scripts found</p>
-          <p className="text-xs text-gray-500">Try a different search term</p>
+          <p className="text-xs opacity-60">Try a different search term</p>
         </div>
       )}
     </div>
@@ -224,110 +219,64 @@ function ScriptLibraryCard({
 }: ScriptLibraryCardProps) {
   
   return (
-    <Card className="bg-white/5 hover:bg-white/10 transition-colors">
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-3">
-            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-              isFileScript ? 'bg-blue-500/20' : 'bg-lime-500/20'
-            }`}>
-              <IconComponent className={`h-4 w-4 ${
-                isFileScript ? 'text-blue-400' : 'text-lime-400'
-              }`} />
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-sm text-white truncate">
-                {script.name}
-              </CardTitle>
-              <CardDescription className="text-xs text-gray-400">
-                {isFileScript ? 'File Script' : `Priority: ${script.priority}`}
-              </CardDescription>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {isAttached && (
-              <Badge variant="secondary" className="text-xs px-2 py-0 bg-green-500/20 text-green-300">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Attached
-              </Badge>
-            )}
-          </div>
+    <div className={`group p-2.5 rounded-md transition-colors ${
+      isAttached 
+        ? 'bg-gray-800/30' 
+        : 'bg-gray-900/50 hover:bg-gray-800/50'
+    }`}>
+      <div className="flex items-start gap-2">
+        <div className={`flex-shrink-0 w-7 h-7 rounded flex items-center justify-center ${
+          isFileScript ? 'bg-blue-500/10' : 'bg-green-500/10'
+        }`}>
+          <IconComponent className={`h-3.5 w-3.5 ${
+            isFileScript ? 'text-blue-400' : 'text-green-400'
+          }`} />
         </div>
-      </CardHeader>
-      
-      <CardContent className="pt-0">
-        <p className="text-xs text-gray-300 mb-3 line-clamp-2">
-          {description}
-        </p>
         
-        {!isFileScript && (
-          /* Lifecycle badges for example scripts */
-          <div className="mb-3 flex flex-wrap gap-1">
-            {script.lifecycle?.init && (
-              <Badge variant="outline" className="text-xs px-1 py-0 border-blue-400/30 text-blue-300">
-                init
-              </Badge>
-            )}
-            {script.lifecycle?.update && (
-              <Badge variant="outline" className="text-xs px-1 py-0 border-green-400/30 text-green-300">
-                update
-              </Badge>
-            )}
-            {script.lifecycle?.fixedUpdate && (
-              <Badge variant="outline" className="text-xs px-1 py-0 border-yellow-400/30 text-yellow-300">
-                fixedUpdate
-              </Badge>
-            )}
-            {script.lifecycle?.destroy && (
-              <Badge variant="outline" className="text-xs px-1 py-0 border-red-400/30 text-red-300">
-                destroy
-              </Badge>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-xs font-medium text-gray-200 truncate">
+              {script.name}
+            </h4>
+            {isAttached && (
+              <CheckCircle className="h-3 w-3 text-green-400 flex-shrink-0" />
             )}
           </div>
-        )}
-        
-        {/* Script parameters */}
-        {script.parameters && script.parameters.length > 0 && (
-          <div className="mb-3">
-            <p className="text-xs text-gray-400 mb-1">Parameters:</p>
-            <div className="flex flex-wrap gap-1">
-              {script.parameters.map((param: any, idx: number) => (
-                <Badge key={idx} variant="outline" className="text-xs px-1 py-0 border-purple-400/30 text-purple-300">
+          <p className="text-xs text-gray-500 truncate mt-0.5">
+            {description}
+          </p>
+          
+          {/* Parameters preview */}
+          {script.parameters && script.parameters.length > 0 && (
+            <div className="flex gap-1 mt-1.5 flex-wrap">
+              {script.parameters.slice(0, 3).map((param: any, idx: number) => (
+                <Badge key={idx} variant="outline" className="text-xs h-4 px-1 border-gray-700 text-gray-500">
                   {param.name}
                 </Badge>
               ))}
+              {script.parameters.length > 3 && (
+                <Badge variant="outline" className="text-xs h-4 px-1 border-gray-700 text-gray-500">
+                  +{script.parameters.length - 3}
+                </Badge>
+              )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
         
         {/* Attach button */}
         <Button
           onClick={onAttach}
           disabled={isAttached}
           size="sm"
-          className={`w-full text-xs ${
+          className={`h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity ${
             isAttached 
-              ? 'bg-green-500/20 text-green-300 cursor-not-allowed' 
-              : isFileScript
-                ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
-                : 'bg-lime-500/20 text-lime-300 hover:bg-lime-500/30'
+              ? 'bg-green-600/20 text-green-400 cursor-not-allowed' 
+              : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
           }`}
         >
-          {isAttached ? (
-            <>
-              <CheckCircle className="h-3 w-3 mr-1" />
-              Already Attached
-            </>
-          ) : (
-            <>
-              <Plus className="h-3 w-3 mr-1" />
-              Attach Script
-            </>
-          )}
+          {isAttached ? 'Attached' : 'Attach'}
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 } 

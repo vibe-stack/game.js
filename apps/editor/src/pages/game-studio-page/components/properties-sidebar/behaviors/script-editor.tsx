@@ -3,10 +3,8 @@ import { ScriptManager } from "@/models";
 import { ScriptLoaderService } from "@/services/script-loader-service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { 
   FileCode, 
   FolderOpen,
@@ -15,20 +13,19 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle,
-  Edit,
-  FileText,
+  Edit2,
   Loader
 } from "lucide-react";
 import useGameStudioStore from "@/stores/game-studio-store";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 interface ScriptEditorProps {
   scriptManager: ScriptManager;
   onScriptCreated: (scriptId: string) => void;
+  onEditScript: (scriptPath: string) => void;
 }
 
-export function ScriptEditor({ scriptManager, onScriptCreated }: ScriptEditorProps) {
+export function ScriptEditor({ scriptManager, onScriptCreated, onEditScript }: ScriptEditorProps) {
   const { currentProject } = useGameStudioStore();
   const scriptLoaderService = ScriptLoaderService.getInstance();
   
@@ -38,35 +35,36 @@ export function ScriptEditor({ scriptManager, onScriptCreated }: ScriptEditorPro
   const [newScriptName, setNewScriptName] = useState("");
   const [compilationStatus, setCompilationStatus] = useState<Record<string, 'success' | 'error' | 'compiling'>>({});
   const [scriptErrors, setScriptErrors] = useState<Record<string, string>>({});
+  const [refreshCounter, setRefreshCounter] = useState(0);
   
   // Poll for available script files
-  useEffect(() => {
+  const refreshScripts = useCallback(async () => {
     if (!currentProject) return;
 
-    const checkScripts = async () => {
-      try {
-        const status = await window.scriptAPI.getCompilationStatus(currentProject.path);
-        const compiledScripts = await window.scriptAPI.getCompiledScripts(currentProject.path);
-        
-        const scriptPaths = Object.keys(compiledScripts);
-        setAvailableScripts(scriptPaths);
-        
-        // Update compilation status
-        const newStatus: Record<string, 'success' | 'error' | 'compiling'> = {};
-        scriptPaths.forEach(path => {
-          newStatus[path] = 'success'; // Default to success if compiled
-        });
-        setCompilationStatus(newStatus);
-      } catch (error) {
-        console.error('Failed to get script files:', error);
-      }
-    };
+    try {
+      const status = await window.scriptAPI.getCompilationStatus(currentProject.path);
+      const compiledScripts = await window.scriptAPI.getCompiledScripts(currentProject.path);
+      
+      const scriptPaths = Object.keys(compiledScripts);
+      setAvailableScripts(scriptPaths);
+      
+      // Update compilation status
+      const newStatus: Record<string, 'success' | 'error' | 'compiling'> = {};
+      scriptPaths.forEach(path => {
+        newStatus[path] = 'success'; // Default to success if compiled
+      });
+      setCompilationStatus(newStatus);
+    } catch (error) {
+      console.error('Failed to get script files:', error);
+    }
+  }, [currentProject]);
 
-    checkScripts();
-    const interval = setInterval(checkScripts, 2000);
+  useEffect(() => {
+    refreshScripts();
+    const interval = setInterval(refreshScripts, 2000);
     
     return () => clearInterval(interval);
-  }, [currentProject]);
+  }, [refreshScripts, refreshCounter]);
 
   const handleCreateScript = async () => {
     if (!currentProject || !newScriptName.trim()) {
@@ -78,50 +76,92 @@ export function ScriptEditor({ scriptManager, onScriptCreated }: ScriptEditorPro
     
     // Create script file content with template
     const scriptContent = `// ${newScriptName}
-// This script runs on entities in the game
-
-import * as THREE from 'three';
-
-// Optional: Export parameters that can be configured in the editor
+// Oscillating movement script
 export const parameters = [
   {
-    name: 'speed',
+    name: 'speedMove',
     type: 'number' as const,
-    defaultValue: 1,
+    defaultValue: 4,
     min: 0,
     max: 10,
     step: 0.1,
-    description: 'Movement speed'
+    description: 'Oscillation speed'
+  },
+  {
+    name: 'axis',
+    type: 'string' as const,
+    defaultValue: 'x',
+    options: ['x', 'y', 'z'],
+    description: 'Axis to oscillate on'
+  },
+  {
+    name: 'maxDistance',
+    type: 'number' as const,
+    defaultValue: 5,
+    min: 0.1,
+    max: 20,
+    step: 0.1,
+    description: 'Maximum distance from starting position'
   }
 ];
 
-// Called once when the script is attached to an entity
-export function init(context) {
-  console.log('Script initialized on', context.entity.entityName);
+let startPosition: any = null;
+let time = 0;
+
+export function init(context: any): void {
+  console.log('Oscillate script initialized on', context.entity.entityName);
+  console.log('Initial parameters:', context.parameters);
+  // Store the initial position as the center point
+  startPosition = {
+    x: context.entity.position.x,
+    y: context.entity.position.y,
+    z: context.entity.position.z
+  };
+  time = 0;
 }
 
-// Called every frame
-export function update(context, deltaTime) {
-  // Example: Rotate the entity
-  const rotation = context.entity.getRotation();
-  rotation.y += deltaTime * (context.entity.getScriptParameters(context.entity.entityId, '${scriptPath.replace(/\.ts$/, '')}')?.speed || 1);
-  context.entity.setRotation(rotation);
+export function update(context: any, deltaTime: number): void {
+  // Get parameters
+  const speed = context.parameters.speed || 2;
+  const axis = context.parameters.axis || 'x';
+  const maxDistance = context.parameters.maxDistance || 5;
+  
+  // Update time
+  time += deltaTime * speed;
+  
+  // Calculate oscillation offset using sine wave
+  const offset = Math.sin(time) * maxDistance;
+  
+  // Apply oscillation to the specified axis
+  const position = context.entity.position;
+  position.x = startPosition.x;
+  position.y = startPosition.y;
+  position.z = startPosition.z;
+  
+  switch (axis) {
+    case 'x':
+      position.x = startPosition.x + offset;
+      break;
+    case 'y':
+      position.y = startPosition.y + offset;
+      break;
+    case 'z':
+      position.z = startPosition.z + offset;
+      break;
+  }
 }
 
-// Optional: Called at fixed intervals for physics
-export function fixedUpdate(context, fixedDeltaTime) {
-  // Physics-related updates go here
-}
-
-// Optional: Called when the script is removed or entity is destroyed
-export function destroy(context) {
-  console.log('Script destroyed');
-}
+export function destroy(context: any): void {
+  // Reset to original position
+  if (startPosition) {
+    context.entity.position.x = startPosition.x;
+    context.entity.position.y = startPosition.y;
+    context.entity.position.z = startPosition.z;
+  }
+} 
 `;
 
     try {
-      console.log(`Creating script file: ${scriptPath} in project: ${currentProject.path}`);
-      
       // Save the script file
       await window.projectAPI.saveScriptFile(currentProject.path, scriptPath, scriptContent);
       
@@ -129,22 +169,29 @@ export function destroy(context) {
       setNewScriptName("");
       setIsCreatingNew(false);
       
-      // Give the compilation system time to detect and compile the script
-      console.log('Waiting for script compilation...');
+      // Force refresh to pick up new script
+      setRefreshCounter(prev => prev + 1);
+      
+      // Wait a bit then check if script is available
       setTimeout(async () => {
-        console.log('Checking if script was compiled and loaded...');
+        await refreshScripts();
         const scriptId = scriptLoaderService.getScriptIdFromPath(currentProject.path, scriptPath);
-        console.log(`Looking for script with ID: ${scriptId}`);
         
-        // Check if script is available in the manager
+        // Try to attach if available
         if (scriptManager.getScript(scriptId)) {
-          console.log('Script found in manager, attempting to attach...');
           onScriptCreated(scriptId);
         } else {
-          console.log('Script not yet available in manager');
-          toast.info(`Script created but still compiling...`);
+          // Try to manually reload the script
+          try {
+            await scriptLoaderService.reloadScript(currentProject.path, scriptPath);
+            if (scriptManager.getScript(scriptId)) {
+              onScriptCreated(scriptId);
+            }
+          } catch (error) {
+            console.error('Failed to reload new script:', error);
+          }
         }
-      }, 3000); // Increased timeout to 3 seconds
+      }, 1000);
       
     } catch (error) {
       console.error('Failed to create script:', error);
@@ -153,15 +200,8 @@ export function destroy(context) {
   };
 
   const handleEditScript = async (scriptPath: string) => {
-    if (!currentProject) return;
-    
-    try {
-      // Open the script in the code editor
-      await window.projectAPI.openScriptInEditor(currentProject.path, scriptPath);
-      toast.success(`Opened ${scriptPath} in editor`);
-    } catch (error) {
-      toast.error(`Failed to open script: ${error}`);
-    }
+    // Pass the relative script path - the parent component will handle full path construction
+    onEditScript(scriptPath);
   };
 
   const handleRecompileScript = async (scriptPath: string) => {
@@ -201,90 +241,80 @@ export function destroy(context) {
 
   if (!currentProject) {
     return (
-      <div className="flex flex-col items-center justify-center h-32 text-gray-400">
-        <AlertCircle className="h-6 w-6 mb-2" />
+      <div className="flex flex-col items-center justify-center h-32 text-gray-500">
+        <AlertCircle className="h-6 w-6 mb-2 opacity-50" />
         <p className="text-sm">No project loaded</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Create New Script */}
-      <Card className="bg-white/5">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm text-white flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Create New Script
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {isCreatingNew ? (
-            <>
-              <Input
-                placeholder="script-name.ts"
-                value={newScriptName}
-                onChange={(e) => setNewScriptName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateScript()}
-                className="bg-white/5 border-white/10 text-white"
-                autoFocus
-              />
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={handleCreateScript}
-                  className="flex-1 bg-lime-500/20 text-lime-300 hover:bg-lime-500/30"
-                >
-                  <Save className="h-3 w-3 mr-1" />
-                  Create
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setIsCreatingNew(false);
-                    setNewScriptName("");
-                  }}
-                  className="text-gray-400 hover:text-white"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </>
-          ) : (
-            <Button
-              size="sm"
-              onClick={() => setIsCreatingNew(true)}
-              className="w-full bg-lime-500/20 text-lime-300 hover:bg-lime-500/30"
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              New Script
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
-      <Separator className="bg-white/10" />
+      <div className="space-y-2">
+        <h5 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Create New Script</h5>
+        {isCreatingNew ? (
+          <div className="space-y-2">
+            <Input
+              placeholder="script-name.ts"
+              value={newScriptName}
+              onChange={(e) => setNewScriptName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateScript()}
+              className="h-7 bg-gray-900/50 border-gray-800 text-gray-200 text-xs placeholder:text-gray-600"
+              autoFocus
+            />
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                onClick={handleCreateScript}
+                className="flex-1 h-7 bg-green-600/20 text-green-400 hover:bg-green-600/30 border-0"
+              >
+                <Save className="h-3 w-3 mr-1" />
+                Create
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setIsCreatingNew(false);
+                  setNewScriptName("");
+                }}
+                className="h-7 text-gray-400 hover:text-white"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button
+            size="sm"
+            onClick={() => setIsCreatingNew(true)}
+            className="w-full h-7 bg-gray-800 text-gray-200 hover:bg-gray-700 border-0"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            New Script
+          </Button>
+        )}
+      </div>
 
       {/* Existing Scripts */}
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-lime-300 uppercase tracking-wide flex items-center gap-2">
-          <FolderOpen className="h-4 w-4" />
-          Project Scripts
-          <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-lime-500/20 text-lime-300">
+        <div className="flex items-center justify-between">
+          <h5 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Project Scripts</h5>
+          <Badge variant="secondary" className="text-xs bg-gray-800 text-gray-500 border-0">
             {availableScripts.length}
           </Badge>
-        </h4>
+        </div>
 
         <ScrollArea className="h-64">
           {availableScripts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-32 text-gray-400">
-              <FileCode className="h-6 w-6 mb-2" />
+            <div className="flex flex-col items-center justify-center h-32 text-gray-500">
+              <FileCode className="h-6 w-6 mb-2 opacity-50" />
               <p className="text-sm">No scripts found</p>
-              <p className="text-xs">Create your first script above</p>
+              <p className="text-xs opacity-60">Create your first script above</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {availableScripts.map((scriptPath) => (
                 <ScriptFileCard
                   key={scriptPath}
@@ -322,66 +352,54 @@ function ScriptFileCard({
   onRecompile 
 }: ScriptFileCardProps) {
   return (
-    <Card className="bg-white/5 hover:bg-white/10 transition-colors">
-      <CardHeader className="p-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-2 flex-1 min-w-0">
-            <FileCode className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-sm text-white truncate">
-                {scriptName}
-              </CardTitle>
-              <CardDescription className="text-xs text-gray-400 truncate">
-                {scriptPath}
-              </CardDescription>
-              {error && (
-                <p className="text-xs text-red-400 mt-1 line-clamp-2">
-                  {error}
-                </p>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-1 ml-2">
-            {status === 'compiling' && (
-              <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-yellow-500/20 text-yellow-300">
-                <Loader className="h-3 w-3 animate-spin" />
-              </Badge>
-            )}
-            {status === 'success' && (
-              <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-green-500/20 text-green-300">
-                <CheckCircle className="h-3 w-3" />
-              </Badge>
-            )}
-            {status === 'error' && (
-              <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-red-500/20 text-red-300">
-                <AlertCircle className="h-3 w-3" />
-              </Badge>
+    <div className="group bg-gray-900/50 hover:bg-gray-800/50 rounded p-2 transition-colors">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          <FileCode className="h-3.5 w-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-gray-200 truncate">
+              {scriptName}
+            </p>
+            <p className="text-xs text-gray-500 truncate">
+              {scriptPath}
+            </p>
+            {error && (
+              <p className="text-xs text-red-400 mt-1 line-clamp-2">
+                {error}
+              </p>
             )}
           </div>
         </div>
         
-        <div className="flex gap-1 mt-2">
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {status === 'compiling' && (
+            <Loader className="h-3 w-3 animate-spin text-yellow-400" />
+          )}
+          {status === 'success' && (
+            <CheckCircle className="h-3 w-3 text-green-400" />
+          )}
+          {status === 'error' && (
+            <AlertCircle className="h-3 w-3 text-red-400" />
+          )}
+          
           <Button
             size="sm"
             variant="ghost"
             onClick={onEdit}
-            className="text-xs h-7 text-gray-400 hover:text-white"
+            className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
           >
-            <Edit className="h-3 w-3 mr-1" />
-            Edit
+            <Edit2 className="h-3 w-3" />
           </Button>
           <Button
             size="sm"
             variant="ghost"
             onClick={onRecompile}
-            className="text-xs h-7 text-gray-400 hover:text-white"
+            className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
           >
-            <RefreshCw className="h-3 w-3 mr-1" />
-            Recompile
+            <RefreshCw className="h-3 w-3" />
           </Button>
         </div>
-      </CardHeader>
-    </Card>
+      </div>
+    </div>
   );
 } 

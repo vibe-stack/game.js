@@ -139,7 +139,6 @@ export default function SceneTree({
     // Handle the drag end in the game engine
     try {
       const success = await TreeUtils.handleDragEnd(activeId, overId, flatItems, gameWorldService, onEntitiesChanged);
-      console.log("Drag operation result:", success);
     } catch (error) {
       console.error("Failed to handle drag end:", error);
     }
