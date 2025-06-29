@@ -24,6 +24,7 @@ export function Behaviors({ gameWorldService, onOpenCodeEditor }: BehaviorsProps
   const { selectedEntity: selectedEntityId, currentProject } = useGameStudioStore();
   const [activeView, setActiveView] = useState<'attached' | 'library' | 'editor'>('attached');
   const [selectedScript, setSelectedScript] = useState<string | null>(null);
+  const [updateTrigger, setUpdateTrigger] = useState(0);
   
   const scriptLoaderService = ScriptLoaderService.getInstance();
   
@@ -54,10 +55,11 @@ export function Behaviors({ gameWorldService, onOpenCodeEditor }: BehaviorsProps
   // Use the script manager state hook for React synchronization
   useScriptManagerState(scriptManager);
 
-  // Get attached scripts - now using the dedicated script state hook
+  // Get attached scripts - directly from entity to ensure fresh data
   const attachedScripts = useMemo(() => {
-    return scriptState.attachedScripts;
-  }, [scriptState.attachedScripts, scriptState._scriptStateCounter]); // Include counter for force dependency
+    if (!selectedEntity) return [];
+    return selectedEntity.getAttachedScripts();
+  }, [selectedEntity, scriptState._scriptStateCounter, updateTrigger]);
 
   // Load example scripts if not loaded
   React.useEffect(() => {
@@ -82,16 +84,16 @@ export function Behaviors({ gameWorldService, onOpenCodeEditor }: BehaviorsProps
     
     const script = scriptManager.getScript(scriptId);
     if (!script) {
-      console.error(`Script ${scriptId} not found`);
       return;
     }
     
     if (selectedEntity.hasScript(scriptId)) {
-      console.warn(`Script ${scriptId} already attached to entity`);
       return;
     }
     
     selectedEntity.attachScript(scriptId);
+    // Force React re-render by updating trigger
+    setUpdateTrigger(prev => prev + 1);
     // Force update view
     setActiveView('attached');
   };
@@ -99,6 +101,8 @@ export function Behaviors({ gameWorldService, onOpenCodeEditor }: BehaviorsProps
   const handleDetachScript = (scriptId: string) => {
     if (!selectedEntity) return;
     selectedEntity.detachScript(scriptId);
+    // Force React re-render by updating trigger
+    setUpdateTrigger(prev => prev + 1);
   };
 
   const handleToggleScript = (scriptId: string, enabled: boolean) => {
