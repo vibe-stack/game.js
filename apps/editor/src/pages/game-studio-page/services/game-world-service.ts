@@ -175,6 +175,11 @@ async loadScene(sceneData: any): Promise<void> {
       
       setCurrentScene(sceneData);
       setGameState("initial");
+      
+      // Force update debug renderer after scene load to ensure proper visualization
+      if (this.gameWorld?.isPhysicsDebugRenderEnabled()) {
+        this.gameWorld.enablePhysicsDebugRender(); // This will trigger an update
+      }
     } else {
       throw new Error("Invalid scene data format");
     }

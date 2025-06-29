@@ -43,6 +43,9 @@ export class DebugRenderer {
       
       // Initialize buffer attributes on first enable
       this.initializeBuffers();
+      
+      // Force an immediate update to sync with current physics state
+      this.update();
     }
   }
 

@@ -211,6 +211,10 @@ export class TransformControlsManager {
     // Update physics if the entity has physics
     if (this.currentEntity.hasPhysics()) {
       this.currentEntity.syncPhysicsFromTransform();
+      // Force update debug renderer to show updated physics state
+      if (this.gameWorld?.isPhysicsDebugRenderEnabled()) {
+        this.gameWorld.forceUpdatePhysicsDebugRender();
+      }
     }
 
     // CRITICAL FIX: Update the GameWorld's entity snapshot so transforms persist through game play/reset cycles

@@ -251,7 +251,7 @@ export default function EditorModeToolbar() {
       >
         <Scale3d size={16} />
       </Button>
-      <div className="w-px h-4 bg-border mx-1" />
+      {/* <div className="w-px h-4 bg-border mx-1" />
       <Button
         size="sm"
         variant="ghost"
@@ -260,7 +260,7 @@ export default function EditorModeToolbar() {
         title="Undo (Ctrl+Z)"
       >
         <RotateCcw size={16} />
-      </Button>
+      </Button> */}
     </div>
   </div>
   );

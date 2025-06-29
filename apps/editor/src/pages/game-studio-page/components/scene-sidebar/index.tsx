@@ -143,28 +143,30 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}
-        className="flex h-full flex-col"
+        className="flex h-full max-w-full flex-col"
       >
-        <TabsList className="m-2 mb-0 grid w-full grid-cols-3 bg-white/5">
-          <TabsTrigger
-            value="scene"
-            className="text-white data-[state=active]:bg-white/20"
-          >
-            <div className="flex items-center gap-2">
-              <LayersIcon className="h-4 w-4" />
-              <span className="text-sm">Scene</span>
-            </div>
-          </TabsTrigger>
-          <TabsTrigger
-            value="files"
-            className="text-white data-[state=active]:bg-white/20"
-          >
-            <div className="flex items-center gap-2">
-              <FileIcon className="h-4 w-4" />
-              <span className="text-sm">Files</span>
-            </div>
-          </TabsTrigger>
-        </TabsList>
+        <div className="w-full px-2 pt-2">
+          <TabsList className="h-12 grid w-full grid-cols-2 bg-white/5">
+            <TabsTrigger
+              value="scene"
+              className="text-white data-[state=active]:bg-white/20"
+            >
+              <div className="flex items-center gap-2">
+                <LayersIcon className="h-4 w-4" />
+                <span className="text-sm">Scene</span>
+              </div>
+            </TabsTrigger>
+            <TabsTrigger
+              value="files"
+              className="text-white data-[state=active]:bg-white/20"
+            >
+              <div className="flex items-center gap-2">
+                <FileIcon className="h-4 w-4" />
+                <span className="text-sm">Files</span>
+              </div>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent
           value="scene"

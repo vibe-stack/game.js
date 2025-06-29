@@ -159,6 +159,8 @@ export class GameWorld {
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
     }
+    // Force update debug renderer when stopping to show current state
+    this.forceUpdateDebugRenderer();
   }
 
   reset(): void {
@@ -167,6 +169,8 @@ export class GameWorld {
       this.restoreEntitySnapshot();
     } else {
       console.warn("No snapshot available to reset entities.");
+      // Even without a snapshot, force update debug renderer to clear any stale visuals
+      this.forceUpdateDebugRenderer();
     }
   }
 
@@ -212,12 +216,24 @@ export class GameWorld {
         entity.updateMatrixWorld(true);
       }
     });
+    
+    // Force update debug renderer to sync with new physics positions
+    this.forceUpdateDebugRenderer();
+  }
+
+  private forceUpdateDebugRenderer(): void {
+    // Force the debug renderer to immediately update with current physics state
+    if (this.debugRenderer.isEnabled()) {
+      this.debugRenderer.update();
+    }
   }
 
   pause(): void {
     if (this.isRunning) {
       this.isPaused = true;
       this.clock.stop();
+      // Force update debug renderer when pausing to show current state
+      this.forceUpdateDebugRenderer();
     }
   }
 
@@ -271,6 +287,7 @@ export class GameWorld {
   togglePhysicsDebugRender(): void { this.debugRenderer.toggle(); }
   enablePhysicsDebugRender(): void { this.debugRenderer.enable(); }
   disablePhysicsDebugRender(): void { this.debugRenderer.disable(); }
+  forceUpdatePhysicsDebugRender(): void { this.forceUpdateDebugRenderer(); }
   isRunningState(): boolean { return this.isRunning; }
   isPausedState(): boolean { return this.isPaused; }
   resize(width: number, height: number): void { 

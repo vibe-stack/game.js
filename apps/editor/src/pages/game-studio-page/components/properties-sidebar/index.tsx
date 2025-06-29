@@ -37,7 +37,8 @@ export default function PropertiesSidebar({
         onValueChange={setActiveTab}
         className="flex h-full flex-col"
       >
-        <TabsList className="m-2 mb-0 grid w-full grid-cols-4 bg-white/5">
+        <div className="w-full px-2 pt-2">
+        <TabsList className="h-12 grid w-full grid-cols-4 bg-white/5">
           <TabsTrigger
             value="inspector"
             className="flex items-center gap-2 text-white data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-300"
@@ -67,7 +68,7 @@ export default function PropertiesSidebar({
             Chat
           </TabsTrigger>
         </TabsList>
-
+        </div>
         <div className="flex min-h-0 flex-1 flex-col">
           <TabsContent
             value="inspector"
