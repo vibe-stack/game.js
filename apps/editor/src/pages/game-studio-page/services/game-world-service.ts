@@ -110,6 +110,12 @@ async loadScene(sceneData: any): Promise<void> {
   const { setCurrentScene, setGameState, currentProject } = useGameStudioStore.getState();
 
   try {
+    // Stop any running scripts before disposing the game world
+    const scriptManager = this.gameWorld.getScriptManager();
+    if (scriptManager) {
+      scriptManager.stopGameplay();
+    }
+    
     // Clear the existing scene completely before loading new one
     // Store reference to canvas before disposing
     const canvas = this.gameWorld.getCanvas();
@@ -266,6 +272,12 @@ play(): void {
     const { activeCamera } = useGameStudioStore.getState();
     this.prePlaActiveCamera = activeCamera;
     
+    // Initialize scripts before starting the game
+    const scriptManager = this.gameWorld.getScriptManager();
+    if (scriptManager) {
+      scriptManager.startGameplay();
+    }
+    
     this.gameWorld.start();
     useGameStudioStore.getState().setGameState('playing');
     this.selectionManager.onGameStateChanged('playing');
@@ -280,6 +292,12 @@ play(): void {
 
 pause(): void {
   if (this.gameWorld) {
+    // Pause scripts
+    const scriptManager = this.gameWorld.getScriptManager();
+    if (scriptManager) {
+      scriptManager.pauseGameplay();
+    }
+    
     this.gameWorld.pause();
     useGameStudioStore.getState().setGameState('paused');
     this.selectionManager.onGameStateChanged('paused');
@@ -291,6 +309,12 @@ pause(): void {
 
 resume(): void {
   if (this.gameWorld) {
+    // Resume scripts
+    const scriptManager = this.gameWorld.getScriptManager();
+    if (scriptManager) {
+      scriptManager.resumeGameplay();
+    }
+    
     this.gameWorld.resume();
     useGameStudioStore.getState().setGameState('playing');
     this.selectionManager.onGameStateChanged('playing');
@@ -302,6 +326,12 @@ resume(): void {
 
 reset(): void {
   if (this.gameWorld) {
+    // Stop scripts and destroy their state
+    const scriptManager = this.gameWorld.getScriptManager();
+    if (scriptManager) {
+      scriptManager.stopGameplay();
+    }
+    
     this.gameWorld.reset();
     useGameStudioStore.getState().setGameState('initial');
     this.selectionManager.onGameStateChanged('initial');
@@ -335,6 +365,12 @@ reset(): void {
 
 stop(): void {
   if (this.gameWorld) {
+    // Stop scripts and destroy their state
+    const scriptManager = this.gameWorld.getScriptManager();
+    if (scriptManager) {
+      scriptManager.stopGameplay();
+    }
+    
     this.gameWorld.stop();
     useGameStudioStore.getState().setGameState('initial');
   }

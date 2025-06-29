@@ -322,7 +322,7 @@ export default ${safeName};
     }
   }
 
-  private async compileScript(projectPath: string, relativePath: string): Promise<void> {
+  private async compileScript(projectPath: string, relativePath: string, force = false): Promise<void> {
     try {
       const scriptWatcher = this.watchers.get(projectPath);
       if (!scriptWatcher) return;
@@ -334,12 +334,14 @@ export default ${safeName};
       // Ensure output directory exists
       await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
 
-      // Check if we need to compile (based on file modification time)
-      const inputStat = await fs.promises.stat(inputPath);
-      const lastCompiled = scriptWatcher.lastCompilation.get(relativePath);
-      
-      if (lastCompiled && inputStat.mtime <= lastCompiled) {
-        return; // Skip compilation if file hasn't changed
+      // Check if we need to compile (based on file modification time) unless forced
+      if (!force) {
+        const inputStat = await fs.promises.stat(inputPath);
+        const lastCompiled = scriptWatcher.lastCompilation.get(relativePath);
+        
+        if (lastCompiled && inputStat.mtime <= lastCompiled) {
+          return; // Skip compilation if file hasn't changed
+        }
       }
 
       // Get list of npm dependencies that are actually used in scripts
@@ -435,7 +437,8 @@ const GameEngine = {
 
   async compileSpecificScript(projectPath: string, scriptPath: string): Promise<{ success: boolean; outputPath?: string; error?: string }> {
     try {
-      await this.compileScript(projectPath, scriptPath);
+      // Force compilation when called explicitly (e.g., from code editor save)
+      await this.compileScript(projectPath, scriptPath, true);
       const scriptWatcher = this.watchers.get(projectPath);
       const outputPath = scriptWatcher?.compiledScripts.get(scriptPath);
       

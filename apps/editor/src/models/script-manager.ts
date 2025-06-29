@@ -146,8 +146,70 @@ export class ScriptManager {
     maxTime: number;
   }>();
 
+  // NEW: Game state tracking
+  private isGamePlaying = false;
+
   constructor(gameWorld: GameWorld) {
     this.gameWorld = gameWorld;
+  }
+
+  // NEW: Game state management methods
+  public startGameplay(): void {
+    this.isGamePlaying = true;
+    this.initializeAllScripts();
+  }
+
+  public stopGameplay(): void {
+    this.isGamePlaying = false;
+    this.destroyAllScripts();
+  }
+
+  public pauseGameplay(): void {
+    this.isGamePlaying = false;
+  }
+
+  public resumeGameplay(): void {
+    this.isGamePlaying = true;
+  }
+
+  // NEW: Initialize all attached scripts
+  private async initializeAllScripts(): Promise<void> {
+    const initPromises: Promise<void>[] = [];
+    
+    for (const [instanceKey, instance] of this.scriptInstances) {
+      if (instance.lifecycle.init && !instance.isInitialized) {
+        initPromises.push(this.initializeScriptInstance(instance));
+      }
+    }
+    
+    await Promise.all(initPromises);
+  }
+
+  // NEW: Destroy all scripts
+  private destroyAllScripts(): void {
+    for (const [instanceKey, instance] of this.scriptInstances) {
+      if (instance.lifecycle.destroy && instance.isInitialized) {
+        this.destroyScriptInstance(instance);
+      }
+    }
+  }
+
+  // NEW: Destroy a single script instance
+  private destroyScriptInstance(instance: ScriptInstance): void {
+    if (!instance.lifecycle.destroy || !instance.isInitialized) return;
+
+    const context = this.createScriptContext(instance, 0, 0);
+    if (!context) return;
+
+    try {
+      instance.lifecycle.destroy(context);
+      instance.isInitialized = false;
+      instance.state = {}; // Reset state
+    } catch (error) {
+      instance.hasErrors = true;
+      instance.lastError = error instanceof Error ? error.message : String(error);
+      console.error(`Error destroying script ${instance.scriptId} for entity ${instance.entityId}:`, error);
+    }
   }
 
   // Change listener methods for React synchronization
@@ -433,12 +495,6 @@ export class ScriptManager {
       return false;
     }
 
-    // Initialize script instance if it has an init function
-    if (instance.lifecycle.init) {
-      this.initializeScriptInstance(instance);
-    } else {
-    }
-
     this.emitChange();
     return true;
   }
@@ -452,15 +508,9 @@ export class ScriptManager {
     
     if (!instance) return false;
 
-    // Call destroy if the script has it
-    if (instance.lifecycle.destroy) {
-      const context = this.createScriptContext(instance, 0, 0);
-      if (context) {
-        try {
-          instance.lifecycle.destroy!(context);
-        } catch (error) {
-        }
-      }
+    // Call destroy if the script is initialized
+    if (instance.isInitialized) {
+      this.destroyScriptInstance(instance);
     }
 
     // Remove instance
@@ -519,6 +569,9 @@ export class ScriptManager {
    * Update scripts
    */
   public update(deltaTime: number): void {
+    // Only update scripts if the game is playing
+    if (!this.isGamePlaying) return;
+    
     this.currentTime += deltaTime;
     this.frameCount++;
     
@@ -551,6 +604,9 @@ export class ScriptManager {
         }
         continue;
       }
+      
+      // Only execute scripts that are initialized
+      if (!instance.isInitialized) continue;
       
       const lifecycleFunction = instance.lifecycle[lifecycleMethod];
       if (!lifecycleFunction) continue;
@@ -811,7 +867,7 @@ export class ScriptManager {
     // Get all scripts attached to this entity
     const scriptIds = this.getEntityScripts(entityId);
     
-    // Detach all scripts
+    // Detach all scripts (this will call destroy if they're initialized)
     for (const scriptId of scriptIds) {
       this.detachScript(entityId, scriptId);
     }
@@ -821,19 +877,8 @@ export class ScriptManager {
    * Dispose of the script manager
    */
   public dispose(): void {
-    // Call destroy on all active script instances
-    for (const [instanceKey, instance] of this.scriptInstances) {
-      if (instance.lifecycle.destroy) {
-        const context = this.createScriptContext(instance, 0, 0);
-        if (context) {
-          try {
-            instance.lifecycle.destroy(context);
-          } catch (error) {
-            console.error(`Error destroying script ${instance.scriptId}:`, error);
-          }
-        }
-      }
-    }
+    // Destroy all active script instances
+    this.destroyAllScripts();
 
     // Clear all data
     this.compiledScripts.clear();

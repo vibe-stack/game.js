@@ -7,15 +7,32 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useGameStudioStore from "@/stores/game-studio-store";
 import { configureMonaco } from "./monaco-config";
+import { toast } from "sonner";
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
+import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
+import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
+import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 
 // Configure Monaco to load locally instead of from CDN
 loader.config({ monaco });
 
-// Disable workers that cause issues in Electron
+// Properly configure workers for Vite
 (window as any).MonacoEnvironment = {
   getWorker: function (_: any, label: string) {
-    // Return a dummy worker to prevent errors
-    return new Worker('data:text/javascript;charset=utf-8,');
+    if (label === 'json') {
+      return new jsonWorker();
+    }
+    if (label === 'css' || label === 'scss' || label === 'less') {
+      return new cssWorker();
+    }
+    if (label === 'html' || label === 'handlebars' || label === 'razor') {
+      return new htmlWorker();
+    }
+    if (label === 'typescript' || label === 'javascript') {
+      return new tsWorker();
+    }
+    return new editorWorker();
   }
 };
 
@@ -73,9 +90,16 @@ export default function CodeEditor({ isOpen, onClose, initialFile }: CodeEditorP
         const relativePath = filePathNormalized.replace(`${projectPathNormalized}/scripts/`, '');
         
         try {
-          await window.scriptAPI.compileScript(currentProject.path, relativePath);
+          const result = await window.scriptAPI.compileScript(currentProject.path, relativePath);
+          if (result.success) {
+            toast.success(`Script ${relativePath} recompiled successfully`);
+          } else {
+            console.error('Failed to recompile script:', result.error);
+            toast.error(`Failed to recompile script: ${result.error}`);
+          }
         } catch (error) {
           console.error('Failed to recompile script:', error);
+          toast.error(`Failed to recompile script: ${error}`);
         }
       }
     } catch (error) {
@@ -367,6 +391,12 @@ export default function CodeEditor({ isOpen, onClose, initialFile }: CodeEditorP
                   acceptSuggestionOnEnter: 'off',
                   snippetSuggestions: 'none',
                   wordBasedSuggestions: 'off',
+                  // Disable model validation and markers that require workers
+                  scrollbar: {
+                    useShadows: false,
+                  },
+                  // Additional worker-related disabling
+                  'semanticHighlighting.enabled': false,
                 }}
               />
             </div>
