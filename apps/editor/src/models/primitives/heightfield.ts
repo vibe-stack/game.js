@@ -302,18 +302,7 @@ export class Heightfield extends Entity {
     (this.uvScale as any).x = x;
     (this.uvScale as any).y = y;
 
-    this.geometry.attributes.uv.array.forEach((_, i) => {
-      if (i % 2 === 0) {
-        this.geometry.attributes.uv.array[i] =
-          (this.geometry.attributes.uv.array[i] / this.uvScale.x) * x;
-      } else {
-        this.geometry.attributes.uv.array[i] =
-          (this.geometry.attributes.uv.array[i] / this.uvScale.y) * y;
-      }
-    });
-
-    this.geometry.attributes.uv.needsUpdate = true;
-    this.emitChange();
+    this.regenerateGeometry();
     return this;
   }
 
@@ -350,6 +339,14 @@ export class Heightfield extends Entity {
       this.dimensions.rows - 1,
     );
 
+    this.geometry.attributes.uv.array.forEach((_, i) => {
+      if (i % 2 === 0) {
+        this.geometry.attributes.uv.array[i] *= this.uvScale.x;
+      } else {
+        this.geometry.attributes.uv.array[i] *= this.uvScale.y;
+      }
+    });
+
     this.geometry.rotateX(-Math.PI / 2);
     this.generateHeightfield();
     this.applyDisplacement();
@@ -358,15 +355,16 @@ export class Heightfield extends Entity {
     if (this._needsPhysicsUpdate) {
       this.updatePhysics();
     }
+    this.emitChange();
   }
 
   protected updatePhysics(): void {
     if (!this.physicsManager || !this.colliderId) return;
 
     // Remove old collider and create new one
-    // this.physicsManager.removeCollider(this.colliderId);
-    // this.createCollider();
-    // this._needsPhysicsUpdate = false;
+    this.physicsManager.removeCollider(this.colliderId);
+    this.createCollider();
+    this._needsPhysicsUpdate = false;
   }
 
   // Getters

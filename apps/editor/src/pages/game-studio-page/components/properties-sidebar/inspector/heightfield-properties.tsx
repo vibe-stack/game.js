@@ -259,9 +259,9 @@ export function HeightfieldProperties({ entity }: HeightfieldPropertiesProps) {
             <DragInput
               value={entity.dimensions.width}
               onChange={(value) => handleDimensionChange("width", value)}
-              min={0.1}
+              min={1}
               max={1000}
-              step={0.1}
+              step={1}
               className="text-xs"
             />
           </div>
@@ -270,9 +270,9 @@ export function HeightfieldProperties({ entity }: HeightfieldPropertiesProps) {
             <DragInput
               value={entity.dimensions.depth}
               onChange={(value) => handleDimensionChange("depth", value)}
-              min={0.1}
+              min={1}
               max={1000}
-              step={0.1}
+              step={1}
               className="text-xs"
             />
           </div>
