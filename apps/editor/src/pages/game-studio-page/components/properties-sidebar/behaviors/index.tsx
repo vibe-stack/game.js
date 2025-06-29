@@ -7,15 +7,8 @@ import { Entity, EXAMPLE_SCRIPTS, getExampleScriptIds } from "@/models";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  Play, 
-  Pause, 
-  Trash2, 
-  Plus, 
-  Code, 
-  Activity,
-  Zap,
-  Clock
+import {
+  Activity
 } from "lucide-react";
 import { AttachedScripts } from "./attached-scripts";
 import { ScriptLibrary } from "./script-library";

@@ -13,6 +13,9 @@ import { SceneData } from "../types/project";
 import { SceneLoader } from "./scene-loader";
 import { SceneSerializer } from "./scene-loader/scene-serializer";
 import { ScriptManager } from "./script-manager";
+import { ShaderManager } from './shader-manager';
+import { SoundManager } from './sound-manager';
+import { AssetManager } from './asset-manager';
 
 export class GameWorld {
   public readonly scene: THREE.Scene;
@@ -70,7 +73,7 @@ export class GameWorld {
     // Use default aspect ratio initially - will be updated during initialization
     this.cameraManager = new CameraManager(this.cameras, this.stateManager, this.scene, 16/9);
     this.cameraControlManager = new CameraControlManager(this.controls, this.stateManager);
-    this.setupDefaultCamera(1920, 1080); // Default size, will be updated
+    // this.setupDefaultCamera(1920, 1080); // Default size, will be updated
     
     this.interactionManager = new InteractionManager(this.renderer as any, this.cameraManager, config.canvas);
     this.debugRenderer = new DebugRenderer(this.scene, this.physicsManager);
@@ -99,13 +102,13 @@ export class GameWorld {
     this.startRenderLoop();
   }
 
-  private setupDefaultCamera(width: number, height: number): void {
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    camera.position.set(0, 5, 10);
-    camera.lookAt(0, 0, 0);
-    this.cameras.add("default-camera", "Default Camera", camera);
-    this.cameraManager.setActiveCamera("default-camera");
-  }
+  // private setupDefaultCamera(width: number, height: number): void {
+  //   const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+  //   camera.position.set(0, 5, 10);
+  //   camera.lookAt(0, 0, 0);
+  //   this.cameras.add("default-camera", "Default Camera", camera);
+  //   this.cameraManager.setActiveCamera("default-camera");
+  // }
 
   private async initializePhysics(gravity?: THREE.Vector3): Promise<void> {
     await this.physicsManager.initialize(gravity);

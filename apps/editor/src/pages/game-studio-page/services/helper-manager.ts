@@ -2,6 +2,7 @@ import * as THREE from "three/webgpu";
 import { GameWorld } from "@/models/game-world";
 import { Entity } from "@/models/entity";
 import { Light } from "@/models/primitives/light";
+import { EditorCameraService } from "./editor-camera-service";
 
 export class HelperManager {
   private gameWorld: GameWorld | null = null;
@@ -65,6 +66,9 @@ export class HelperManager {
     cameras.forEach(({ id, camera }) => {
       // Skip the currently active camera (don't show helper for the camera we're looking through)
       if (id === cameraManager.getActiveCameraId()) return;
+
+      // Also skip the editor's own orbit controls camera
+      if (id === EditorCameraService.EDITOR_CAMERA_ID) return;
 
       let helper: THREE.Object3D | null = null;
 

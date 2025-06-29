@@ -8,7 +8,7 @@ export class EditorCameraService {
   private gameWorld: GameWorld | null = null;
   private _isEditorCameraActive = false;
   
-  private static readonly EDITOR_CAMERA_ID = "__editor_orbit_camera__";
+  public static readonly EDITOR_CAMERA_ID = "__editor_orbit_camera__";
 
   initialize(gameWorld: GameWorld, canvas: HTMLCanvasElement): void {
     this.gameWorld = gameWorld;

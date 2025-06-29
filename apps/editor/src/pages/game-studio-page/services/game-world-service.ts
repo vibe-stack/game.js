@@ -271,6 +271,22 @@ play(): void {
     // Store the currently active camera before gameplay starts
     const { activeCamera } = useGameStudioStore.getState();
     this.prePlaActiveCamera = activeCamera;
+
+    // When starting gameplay, find a suitable scene camera to switch to.
+    const entitiesRegistry = this.gameWorld.getRegistryManager().getRegistry<Entity>("entities");
+    if (entitiesRegistry) {
+      const cameraEntities = entitiesRegistry.getAllItems().filter(
+        entity => entity.metadata.type === "camera"
+      );
+
+      if (cameraEntities.length > 0) {
+        // Switch to the first available camera
+        this.switchToCamera(cameraEntities[0].entityId);
+      } else {
+        // If no scene cameras, keep using the editor camera but log a warning
+        console.warn("No scene cameras found. Starting gameplay with the editor camera.");
+      }
+    }
     
     // Initialize scripts before starting the game
     const scriptManager = this.gameWorld.getScriptManager();
@@ -449,46 +465,28 @@ switchToCamera(cameraId: string): boolean {
   if (!this.gameWorld) return false;
   
   const { setActiveCamera, setTransitioning } = useGameStudioStore.getState();
-  
+  let success = false;
+
   if (cameraId === this.editorCameraService.getEditorCameraId()) {
-    // Switch to editor camera
-    setTransitioning(true);
-    const success = this.editorCameraService.switchToEditorCamera();
-    if (success) {
-      setActiveCamera(cameraId);
-      // Update transform controls camera
-      const activeCamera = this.gameWorld.getCameraManager().getActiveCamera();
-      if (activeCamera) {
-        this.transformControlsManager.updateCamera(activeCamera);
-      }
-    }
-    
-    // Simulate transition for smooth UX
-    setTimeout(() => {
-      setTransitioning(false);
-    }, 300);
-    
-    return success;
+    success = this.editorCameraService.switchToEditorCamera();
   } else {
-    // Switch to scene camera
-    setTransitioning(true);
-    const success = this.editorCameraService.switchToSceneCamera(cameraId);
-    if (success) {
-      setActiveCamera(cameraId);
-      // Update transform controls camera
-      const activeCamera = this.gameWorld.getCameraManager().getActiveCamera();
-      if (activeCamera) {
-        this.transformControlsManager.updateCamera(activeCamera);
-      }
-    }
-    
-    // Simulate transition for smooth UX
-    setTimeout(() => {
-      setTransitioning(false);
-    }, 300);
-    
-    return success;
+    success = this.editorCameraService.switchToSceneCamera(cameraId);
   }
+
+  if (success) {
+    const newActiveCamera = this.gameWorld.getCameraManager().getActiveCamera();
+    if (newActiveCamera) {
+      this.transformControlsManager.updateCamera(newActiveCamera);
+    }
+    setActiveCamera(cameraId);
+    this.helperManager.onCamerasChanged(); // Refresh helpers on any camera change
+  }
+  
+  // UI transition state
+  setTransitioning(true);
+  setTimeout(() => setTransitioning(false), 300);
+
+  return success;
 }
 
 isEditorCameraActive(): boolean {
