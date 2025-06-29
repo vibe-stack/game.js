@@ -189,9 +189,6 @@ importers:
       esbuild:
         specifier: ^0.25.5
         version: 0.25.5
-      esbuild-wasm:
-        specifier: ^0.25.5
-        version: 0.25.5
       express:
         specifier: ^4.17.21
         version: 4.21.2
@@ -252,6 +249,9 @@ importers:
       three:
         specifier: ^0.176.0
         version: 0.176.0
+      tslib:
+        specifier: ^2.8.1
+        version: 2.8.1
       utf-8-validate:
         specifier: ^5.0.10
         version: 5.0.10
@@ -3141,11 +3141,6 @@ packages:
 
   es6-error@4.1.1:
     resolution: {integrity: sha512-Um/+FxMr9CISWh0bi5Zv0iOD+4cFh5qLeks1qhAopKVAJw3drgKbKySikp7wGhDL0HPeaja0P5ULZrxLkniUVg==}
-
-  esbuild-wasm@0.25.5:
-    resolution: {integrity: sha512-V/rbdOws2gDcnCAECfPrajhuafI0WY4WumUgc8ZHwOLnvmM0doLQ+dqvVFI2qkVxQsvo6880aC9IjpyDqcwwTw==}
-    engines: {node: '>=18'}
-    hasBin: true
 
   esbuild@0.25.5:
     resolution: {integrity: sha512-P8OtKZRv/5J5hhz0cUAdu/cLuPIKXpQl1R9pZtvmHWQvrAUVd0UNIPT4IB4W3rNOqVO0rlqHmCIbSwxh/c9yUQ==}
@@ -8977,8 +8972,6 @@ snapshots:
 
   es6-error@4.1.1:
     optional: true
-
-  esbuild-wasm@0.25.5: {}
 
   esbuild@0.25.5:
     optionalDependencies:

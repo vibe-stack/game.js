@@ -2,6 +2,7 @@ import React from "react";
 import { Entity } from "@/models";
 import { GameWorldService } from "../../../services/game-world-service";
 import { Box } from "@/models/primitives/box";
+import { Group } from "@/models/primitives/group";
 import { Sphere } from "@/models/primitives/sphere";
 import { Cone } from "@/models/primitives/cone";
 import { Cylinder } from "@/models/primitives/cylinder";
@@ -36,6 +37,10 @@ interface EntityPropertiesRegistryProps {
 
 export function EntityPropertiesRegistry({ entity, gameWorldService }: EntityPropertiesRegistryProps) {
   const renderEntitySpecificProperties = () => {
+    if (entity instanceof Group) {
+      return null;
+    }
+
     if (entity instanceof Box) {
       return <BoxProperties entity={entity} />;
     }

@@ -19,31 +19,18 @@ export class SceneSerializer {
     const entityRegistry = gameWorld.getRegistryManager().getRegistry<Entity>("entities");
 
     if (entityRegistry) {
-      for (const item of entityRegistry.getAllRegistryItems()) {
-        if (typeof item.item.serialize === 'function') {
-          const entity = item.item;
-          const serialized = entity.serialize();
-          
+      // Only serialize root entities (those without parents in the registry)
+      const allEntities = entityRegistry.getAllRegistryItems().map(item => item.item);
+      const rootEntities = allEntities.filter(entity => {
+        // Check if this entity has a parent that's also in the registry
+        const parent = entity.parent;
+        return !parent || !allEntities.some(e => e === parent);
+      });
+
+      for (const entity of rootEntities) {
+        if (typeof entity.serialize === 'function') {
+          const serialized = this.serializeEntityWithChildren(entity, entityMaterials);
           if (serialized) {
-            // Check if entity has materials and serialize them
-            if ('getMaterial' in entity && typeof entity.getMaterial === 'function') {
-              const material = entity.getMaterial();
-              if (material) {
-                // Convert the THREE.js material back to a MaterialDefinition for serialization
-                const materialDef = MaterialApplicationService.getCurrentMaterialFromEntity(entity);
-                if (materialDef) {
-                  entityMaterials.set(materialDef.id, materialDef);
-                  
-                  // Add material reference to the serialized entity
-                  serialized.material = {
-                    type: material.constructor.name,
-                    properties: this.serializeMaterialProperties(material)
-                  };
-                  serialized.materialId = materialDef.id;
-                }
-              }
-            }
-            
             entities.push(serialized);
           }
         }
@@ -244,5 +231,42 @@ export class SceneSerializer {
         }
       }
     }
+  }
+
+  private serializeEntityWithChildren(entity: Entity, entityMaterials: Map<string, any>): any | null {
+    const serialized = entity.serialize();
+    
+    if (serialized) {
+      // Check if entity has materials and serialize them
+      if ('getMaterial' in entity && typeof entity.getMaterial === 'function') {
+        const material = entity.getMaterial();
+        if (material) {
+          // Convert the THREE.js material back to a MaterialDefinition for serialization
+          const materialDef = MaterialApplicationService.getCurrentMaterialFromEntity(entity);
+          if (materialDef) {
+            entityMaterials.set(materialDef.id, materialDef);
+            
+            // Add material reference to the serialized entity
+            serialized.material = {
+              type: material.constructor.name,
+              properties: this.serializeMaterialProperties(material)
+            };
+            serialized.materialId = materialDef.id;
+          }
+        }
+      }
+      
+      // Recursively serialize children
+      if ('children' in entity && Array.isArray(entity.children)) {
+        serialized.children = entity.children
+          .filter(child => child instanceof Entity)
+          .map(child => this.serializeEntityWithChildren(child as Entity, entityMaterials))
+          .filter(Boolean);
+      }
+      
+      return serialized;
+    }
+    
+    return null;
   }
 }

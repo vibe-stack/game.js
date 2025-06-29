@@ -10,6 +10,29 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    // asar: false, // Disable ASAR to avoid pnpm symlink issues
+    // Ensure esbuild is not ignored during packaging
+    // ignore: (path: string) => {
+    //   // Always keep esbuild and its platform-specific binaries
+    //   if (path.includes("node_modules/esbuild") || path.includes("node_modules/@esbuild")) {
+    //     return false;
+    //   }
+      
+    //   // Ignore only specific development dependencies that aren't needed at runtime
+    //   if (/node_modules\/(typescript|@types\/|eslint|prettier|vitest|playwright|electron-devtools-installer)/i.test(path)) {
+    //     return true;
+    //   }
+      
+    //   // Ignore documentation and test files
+    //   if (/\.(md|txt|LICENSE|test\.|spec\.)$/i.test(path)) {
+    //     return true;
+    //   }
+      
+    //   // Keep everything else (including runtime dependencies like tslib)
+    //   return false;
+    // },
+    // // Use prune: false to prevent dependency resolution issues with pnpm workspaces
+    // prune: false,
   },
   rebuildConfig: {},
   makers: [

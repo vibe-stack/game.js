@@ -317,13 +317,23 @@ export abstract class Entity extends THREE.Object3D {
     if (!this.physicsManager) return;
     this.rigidBodyId = `${this.entityId}_body`;
     
+    // Update world matrix to ensure we get correct world transforms
+    this.updateMatrixWorld(true);
+    
+    // Use world position and quaternion for physics bodies
+    const worldPosition = new THREE.Vector3();
+    this.getWorldPosition(worldPosition);
+    
+    const worldQuaternion = new THREE.Quaternion();
+    this.getWorldQuaternion(worldQuaternion);
+    
     // Calculate physics body position with collider offset for character controllers
-    let physicsPosition = this.position.clone();
+    const physicsPosition = worldPosition.clone();
     if (this.hasCharacterController && this.characterControllerConfig) {
       physicsPosition.add(this.characterControllerConfig.colliderOffset);
     }
     
-    const rigidBody = this.physicsManager.createRigidBody(this.rigidBodyId, config, physicsPosition, this.quaternion);
+    const rigidBody = this.physicsManager.createRigidBody(this.rigidBodyId, config, physicsPosition, worldQuaternion);
     if (rigidBody) {
       this.colliderId = `${this.entityId}_collider`;
       this.createCollider(config);
@@ -396,15 +406,39 @@ export abstract class Entity extends THREE.Object3D {
     if (!this.physicsManager || !this.rigidBodyId) return;
     const rigidBody = this.physicsManager.getRigidBody(this.rigidBodyId);
     if (rigidBody) {
+      // Use world position instead of local position for physics bodies
+      this.updateMatrixWorld(true);
+      const worldPosition = new THREE.Vector3();
+      this.getWorldPosition(worldPosition);
+      
       // Calculate physics body position with collider offset for character controllers
-      let physicsPosition = this.position.clone();
+      const physicsPosition = worldPosition.clone();
       if (this.hasCharacterController && this.characterControllerConfig) {
         physicsPosition.add(this.characterControllerConfig.colliderOffset);
       }
       
+      // Use world quaternion for rotation
+      const worldQuaternion = new THREE.Quaternion();
+      this.getWorldQuaternion(worldQuaternion);
+      
       rigidBody.setTranslation(physicsPosition, true);
-      rigidBody.setRotation(this.quaternion, true);
+      rigidBody.setRotation(worldQuaternion, true);
     }
+    
+    // Recursively update child physics bodies
+    this.updateChildPhysicsTransforms();
+  }
+
+  /**
+   * Recursively updates physics transforms for all child entities.
+   * This ensures that when a parent moves, all child physics bodies are updated to their new world positions.
+   */
+  private updateChildPhysicsTransforms(): void {
+    this.children.forEach(child => {
+      if (child instanceof Entity) {
+        child.updatePhysicsTransform();
+      }
+    });
   }
 
   /**
@@ -420,17 +454,43 @@ export abstract class Entity extends THREE.Object3D {
     const rigidBodyPosition = rigidBody.translation();
     
     // Create a new Vector3 from the rigid body's position
-    const newVisualPosition = new THREE.Vector3(rigidBodyPosition.x, rigidBodyPosition.y, rigidBodyPosition.z);
+    const worldPosition = new THREE.Vector3(rigidBodyPosition.x, rigidBodyPosition.y, rigidBodyPosition.z);
 
     // If the entity has a character controller with an offset, we must subtract it
     // from the physics body's position to get the correct visual mesh position.
     // The physics body is the source of truth for position, and it's already offset.
     if (this.hasCharacterController && this.characterControllerConfig?.colliderOffset) {
-      newVisualPosition.sub(this.characterControllerConfig.colliderOffset);
+      worldPosition.sub(this.characterControllerConfig.colliderOffset);
     }
 
-    this.position.copy(newVisualPosition);
-    this.quaternion.copy(rigidBody.rotation() as THREE.Quaternion);
+    // Get world rotation from physics
+    const worldQuaternion = rigidBody.rotation() as THREE.Quaternion;
+
+    // If this entity has a parent, convert world transforms to local transforms
+    if (this.parent && !(this.parent instanceof THREE.Scene)) {
+      // Update parent's world matrix
+      this.parent.updateMatrixWorld(true);
+      
+      // Get parent's world matrix inverse
+      const parentMatrixInverse = new THREE.Matrix4();
+      parentMatrixInverse.copy(this.parent.matrixWorld).invert();
+      
+      // Convert world position to local position
+      const localPosition = worldPosition.clone();
+      localPosition.applyMatrix4(parentMatrixInverse);
+      this.position.copy(localPosition);
+      
+      // Convert world quaternion to local quaternion
+      const parentWorldQuaternion = new THREE.Quaternion();
+      this.parent.getWorldQuaternion(parentWorldQuaternion);
+      const parentQuaternionInverse = parentWorldQuaternion.clone().invert();
+      const localQuaternion = parentQuaternionInverse.multiply(worldQuaternion);
+      this.quaternion.copy(localQuaternion);
+    } else {
+      // No parent or parent is the scene - use world transforms directly
+      this.position.copy(worldPosition);
+      this.quaternion.copy(worldQuaternion);
+    }
 
     this.emitChange();
   }
@@ -440,12 +500,40 @@ export abstract class Entity extends THREE.Object3D {
     const rigidBody = this.physicsManager.getRigidBody(this.rigidBodyId);
     if (rigidBody?.isDynamic()) {
       const rigidBodyPosition = rigidBody.translation();
-      const newVisualPosition = new THREE.Vector3(rigidBodyPosition.x, rigidBodyPosition.y, rigidBodyPosition.z);
+      const worldPosition = new THREE.Vector3(rigidBodyPosition.x, rigidBodyPosition.y, rigidBodyPosition.z);
       if (this.hasCharacterController && this.characterControllerConfig?.colliderOffset) {
-        newVisualPosition.sub(this.characterControllerConfig.colliderOffset);
+        worldPosition.sub(this.characterControllerConfig.colliderOffset);
       }
-      this.position.copy(newVisualPosition);
-      this.quaternion.copy(rigidBody.rotation() as THREE.Quaternion);
+      
+      // Get world rotation from physics
+      const worldQuaternion = rigidBody.rotation() as THREE.Quaternion;
+      
+      // If this entity has a parent, convert world transforms to local transforms
+      if (this.parent && !(this.parent instanceof THREE.Scene)) {
+        // Update parent's world matrix
+        this.parent.updateMatrixWorld(true);
+        
+        // Get parent's world matrix inverse
+        const parentMatrixInverse = new THREE.Matrix4();
+        parentMatrixInverse.copy(this.parent.matrixWorld).invert();
+        
+        // Convert world position to local position
+        const localPosition = worldPosition.clone();
+        localPosition.applyMatrix4(parentMatrixInverse);
+        this.position.copy(localPosition);
+        
+        // Convert world quaternion to local quaternion
+        const parentWorldQuaternion = new THREE.Quaternion();
+        this.parent.getWorldQuaternion(parentWorldQuaternion);
+        const parentQuaternionInverse = parentWorldQuaternion.clone().invert();
+        const localQuaternion = parentQuaternionInverse.multiply(worldQuaternion);
+        this.quaternion.copy(localQuaternion);
+      } else {
+        // No parent or parent is the scene - use world transforms directly
+        this.position.copy(worldPosition);
+        this.quaternion.copy(worldQuaternion);
+      }
+      
       this.emitChange();
     }
   }
@@ -459,8 +547,16 @@ export abstract class Entity extends THREE.Object3D {
     const rigidBody = this.physicsManager.getRigidBody(this.rigidBodyId);
     if (rigidBody && !rigidBody.isDynamic()) {
       // For static and kinematic bodies, update physics to match visual transform
-      rigidBody.setTranslation(this.position, true);
-      rigidBody.setRotation(this.quaternion, true);
+      // Use world position instead of local position
+      this.updateMatrixWorld(true);
+      const worldPosition = new THREE.Vector3();
+      this.getWorldPosition(worldPosition);
+      
+      const worldQuaternion = new THREE.Quaternion();
+      this.getWorldQuaternion(worldQuaternion);
+      
+      rigidBody.setTranslation(worldPosition, true);
+      rigidBody.setRotation(worldQuaternion, true);
       this.emitChange();
     }
   }
@@ -488,6 +584,41 @@ export abstract class Entity extends THREE.Object3D {
   }
 
   addEntity(child: Entity): this { this.add(child); return this; }
+  
+  // Override Three.js add method to handle physics updates
+  add(...objects: THREE.Object3D[]): this {
+    // Call parent add method first
+    super.add(...objects);
+    
+    // Update physics transforms for any entities with physics bodies
+    objects.forEach(obj => {
+      if (obj instanceof Entity && obj.hasPhysics()) {
+        // Update the child's physics transform to account for new parent
+        obj.updatePhysicsTransform();
+      }
+    });
+    
+    return this;
+  }
+  
+  // Override Three.js remove method to handle physics updates
+  remove(...objects: THREE.Object3D[]): this {
+    // Update physics transforms before removal
+    objects.forEach(obj => {
+      if (obj instanceof Entity && obj.hasPhysics()) {
+        // Update world matrix one last time while still attached to parent
+        obj.updateMatrixWorld(true);
+        // Update physics to world position before detaching
+        obj.updatePhysicsTransform();
+      }
+    });
+    
+    // Call parent remove method
+    super.remove(...objects);
+    
+    return this;
+  }
+
   tweenTo(target: THREE.Vector3 | THREE.Quaternion, duration = 1, easing?: (t: number) => number, onComplete?: () => void): this { this.tweens.push({ target, duration, easing, onComplete }); return this; }
   updateTweens(delta: number): void { /* ... */ }
   onClick(callback: (event: any) => void): this { this.interactionCallbacks.onClick = callback; return this; }

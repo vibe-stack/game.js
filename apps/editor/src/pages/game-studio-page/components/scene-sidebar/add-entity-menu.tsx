@@ -51,6 +51,12 @@ const ENTITY_CATEGORIES: EntityCategory[] = [
     icon: <Shapes className="h-4 w-4" />,
     entities: [
       {
+        id: "group",
+        name: "Group",
+        icon: <Package className="h-4 w-4" />,
+        description: "An empty container for children",
+      },
+      {
         id: "sphere",
         name: "Sphere",
         icon: <Circle className="h-4 w-4" />,

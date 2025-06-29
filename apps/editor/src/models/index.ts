@@ -78,6 +78,7 @@ export {
 export { Sphere } from "./primitives/sphere";
 export { Box } from "./primitives/box";
 export { Mesh3D } from "./primitives/mesh-3d";
+export { Group } from "./primitives/group";
 
 // Terrain primitives
 export { Heightfield } from "./primitives/heightfield";

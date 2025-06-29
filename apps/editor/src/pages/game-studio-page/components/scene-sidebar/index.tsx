@@ -194,6 +194,7 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
             searchQuery={searchQuery}
             onSelect={setSelectedEntity}
             onToggleExpanded={toggleExpanded}
+            onEntitiesChanged={updateEntities}
           />
         </TabsContent>
 

@@ -565,46 +565,42 @@ export class CharacterController {
   }
 
   private updateCrouchAndSlide(deltaTime: number): void {
-    const wasSliding = this.state.isSliding;
     const wasCrouching = this.state.isCrouching;
-    
-    // Handle slide timer
+    const wasSliding = this.state.isSliding;
+
+    const crouchPressed = this.inputState.crouch;
+
+    // Handle sliding state
     if (this.state.isSliding) {
       this.state.slideTimer -= deltaTime;
-      if (this.state.slideTimer <= 0) {
-        this.state.isSliding = false;
-        this.state.slideTimer = 0;
-      }
-      
-      // Apply slide deceleration
       const slideDecel = this.config.slideDeceleration * deltaTime;
       const currentSpeed = this.currentVelocity.length();
+
       if (currentSpeed > slideDecel) {
         this.currentVelocity.multiplyScalar(1 - (slideDecel / currentSpeed));
       }
+
+      // Conditions to stop sliding
+      if (this.state.slideTimer <= 0 || !crouchPressed || currentSpeed < this.config.slideMinSpeed * 0.5) {
+        this.state.isSliding = false;
+      }
     }
-    
-    // Check for slide start conditions
-    if (!this.state.isSliding && this.inputState.crouch && this.state.isGrounded && 
-        this.state.isMoving && this.state.currentSpeed >= this.config.slideMinSpeed) {
-      // Start sliding
-      this.state.isSliding = true;
-      this.state.isCrouching = false;
-      this.state.slideTimer = this.config.slideDuration;
-    } 
-    // Check for crouch
-    else if (!this.state.isSliding && this.inputState.crouch && this.state.isGrounded) {
-      this.state.isCrouching = true;
-    } 
-    // Stop crouching
-    else if (!this.inputState.crouch && !this.state.isSliding) {
-      this.state.isCrouching = false;
+
+    // Check for new slide start
+    if (crouchPressed && this.state.isGrounded && !this.state.isSliding) {
+      if (this.state.isMoving && this.state.currentSpeed >= this.config.slideMinSpeed) {
+        this.state.isSliding = true;
+        this.state.slideTimer = this.config.slideDuration;
+      }
     }
+
+    // Update crouching state: can crouch if pressing crouch, on ground, and not sliding.
+    this.state.isCrouching = crouchPressed && this.state.isGrounded && !this.state.isSliding;
     
     // Update camera height based on crouch/slide state
     this.updateCameraHeight(wasCrouching, wasSliding);
-    
-    // Update collider height if crouching state changed
+
+    // Update collider height only when the crouch/slide state changes
     if (wasCrouching !== this.state.isCrouching || wasSliding !== this.state.isSliding) {
       this.updateColliderHeight();
     }
@@ -806,10 +802,10 @@ export class CharacterController {
     // Apply friction only to perpendicular component (allows smooth direction changes)
     const perpSpeed = perpendicular.length();
     if (perpSpeed > 0.01) {
-      let control = Math.max(perpSpeed, this.config.stopSpeed);
-      let drop = control * this.config.groundFriction * deltaTime;
+      const control = Math.max(perpSpeed, this.config.stopSpeed);
+      const drop = control * this.config.groundFriction * deltaTime;
       
-      let newPerpSpeed = Math.max(0, perpSpeed - drop);
+      const newPerpSpeed = Math.max(0, perpSpeed - drop);
       if (newPerpSpeed !== perpSpeed) {
         perpendicular.multiplyScalar(newPerpSpeed / perpSpeed);
       }
@@ -862,8 +858,8 @@ export class CharacterController {
     const speed = this.currentVelocity.length();
     if (speed < 0.01) return;
     
-    let control = Math.max(speed, this.config.stopSpeed);
-    let drop = control * friction * deltaTime;
+    const control = Math.max(speed, this.config.stopSpeed);
+    const drop = control * friction * deltaTime;
     
     // Scale velocity to remove the drop amount
     let newSpeed = Math.max(0, speed - drop);
@@ -875,29 +871,23 @@ export class CharacterController {
   
   private updateGroundDetection(correctedMovement: THREE.Vector3, deltaTime: number): void {
     const wasGrounded = this.state.isGrounded;
-    const verticalMovement = correctedMovement.y;
     
-    // Check surface normal and collision data
-    let groundCollision = false;
-    let surfaceNormal = new THREE.Vector3(0, 1, 0);
-    
-    for (let i = 0; i < this.rapierCharacterController!.numComputedCollisions(); i++) {
-      const collision = this.rapierCharacterController!.computedCollision(i);
-      if (collision && collision.normal2.y > 0.7) {
-        groundCollision = true;
-        surfaceNormal.set(collision.normal2.x, collision.normal2.y, collision.normal2.z);
-        break;
-      }
+    // Use Rapier's computedGrounded method for reliable ground detection
+    this.state.isGrounded = this.rapierCharacterController!.computedGrounded();
+
+    // If we are grounded, find the surface normal of the ground
+    if (this.state.isGrounded) {
+        const surfaceNormal = new THREE.Vector3(0, 1, 0);
+        for (let i = 0; i < this.rapierCharacterController!.numComputedCollisions(); i++) {
+            const collision = this.rapierCharacterController!.computedCollision(i);
+            // normal2 is the outward normal of the collider we're hitting. For ground, its y should be positive.
+            if (collision && collision.normal2.y > 0.7) {
+                surfaceNormal.set(collision.normal2.x, collision.normal2.y, collision.normal2.z);
+                break;
+            }
+        }
+        this.state.surfaceNormal.copy(surfaceNormal);
     }
-    
-    // Update surface normal
-    this.state.surfaceNormal.copy(surfaceNormal);
-    
-    // Ground detection logic
-    const hitGround = this.verticalVelocity < -0.5 && Math.abs(verticalMovement) < 0.01;
-    const stayingGrounded = wasGrounded && Math.abs(verticalMovement) < 0.02 && this.verticalVelocity <= 0.1;
-    
-    this.state.isGrounded = groundCollision || hitGround || stayingGrounded;
     
     // Landing logic
     if (this.state.isGrounded && !wasGrounded) {
@@ -907,7 +897,7 @@ export class CharacterController {
       }
       
       // Preserve momentum when landing on slopes (automatic slope slide)
-      const slopeAngle = Math.acos(surfaceNormal.y);
+      const slopeAngle = Math.acos(this.state.surfaceNormal.y);
       const isOnSlope = slopeAngle > this.config.slideThreshold;
       
       if (isOnSlope) {

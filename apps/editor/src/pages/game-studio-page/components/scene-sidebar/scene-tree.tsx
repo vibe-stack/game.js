@@ -1,7 +1,21 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverEvent,
+  DragStartEvent,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Entity } from "@/models";
 import { GameWorldService } from "../../services/game-world-service";
-import EntityItem from "./entity-item";
+import SortableEntityItem from "./sortable-entity-item";
+import { TreeUtils, FlatTreeItem, DropIndicator } from "./tree-utils";
+
 export interface SceneTreeNode {
   entity: Entity;
   children: SceneTreeNode[];
@@ -16,6 +30,7 @@ interface SceneTreeProps {
   searchQuery: string;
   onSelect: (entityId: string) => void;
   onToggleExpanded: (entityId: string) => void;
+  onEntitiesChanged?: () => void;
 }
 
 export default function SceneTree({
@@ -26,85 +41,108 @@ export default function SceneTree({
   searchQuery,
   onSelect,
   onToggleExpanded,
+  onEntitiesChanged,
 }: SceneTreeProps) {
-  // Build tree structure from flat entity list
-  const sceneTree = useMemo(() => {
-    if (!sceneEntities.length) return [];
-
-    const rootNodes: SceneTreeNode[] = [];
-    const entityMap = new Map<string, SceneTreeNode>();
-
-    // Create nodes for all entities
-    sceneEntities.forEach((entity) => {
-      entityMap.set(entity.entityId, {
-        entity,
-        children: [],
-        depth: 0,
-      });
-    });
-
-    // Build hierarchy - check if entity has a parent that's also an Entity
-    sceneEntities.forEach((entity) => {
-      const node = entityMap.get(entity.entityId)!;
-      
-      // Check if parent exists and is an Entity (not the scene itself)
-      if (entity.parent && entity.parent !== gameWorldService.current?.getGameWorld()?.getScene()) {
-        // Try to find parent in our entity list
-        const parentEntity = sceneEntities.find(e => e === entity.parent);
-        if (parentEntity) {
-          const parentNode = entityMap.get(parentEntity.entityId);
-          if (parentNode) {
-            parentNode.children.push(node);
-            node.depth = parentNode.depth + 1;
-            return; // Don't add to root
-          }
-        }
-      }
-      
-      // Add to root if no valid parent found
-      rootNodes.push(node);
-    });
-
-    return rootNodes;
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
+  // Flatten entities for DnD
+  const flatItems = useMemo(() => {
+    return TreeUtils.flattenTree(sceneEntities, gameWorldService);
   }, [sceneEntities, gameWorldService]);
 
 
 
-  // Filter tree based on search query
-  const filteredTree = useMemo(() => {
-    if (!searchQuery.trim()) return sceneTree;
+  // Filter flat items based on search query and expanded state
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) {
+      // Show all items but respect expanded state for hierarchy
+      return flatItems.filter(item => {
+        // Always show root items
+        if (item.depth === 0) return true;
+        
+        // For nested items, check if all ancestors are expanded
+        for (const ancestorId of item.ancestorIds) {
+          if (!expandedNodes.has(ancestorId)) {
+            return false;
+          }
+        }
+        return true;
+      });
+    }
 
-    const filterNode = (node: SceneTreeNode): SceneTreeNode | null => {
-      const nameMatch = node.entity.entityName.toLowerCase().includes(searchQuery.toLowerCase());
-      const filteredChildren = node.children.map(filterNode).filter(Boolean) as SceneTreeNode[];
-      
-      if (nameMatch || filteredChildren.length > 0) {
-        return {
-          ...node,
-          children: filteredChildren,
-        };
+    // When searching, show items that match or have matching descendants
+    const matchingIds = new Set<string>();
+    const query = searchQuery.toLowerCase();
+    
+    // First pass: find all items that match the search
+    flatItems.forEach(item => {
+      if (item.entity.entityName.toLowerCase().includes(query)) {
+        matchingIds.add(item.entity.entityId);
+        // Also include all ancestors so the path is visible
+        item.ancestorIds.forEach(ancestorId => matchingIds.add(ancestorId));
       }
-      return null;
-    };
+    });
 
-    return sceneTree.map(filterNode).filter(Boolean) as SceneTreeNode[];
-  }, [sceneTree, searchQuery]);
+    return flatItems.filter(item => matchingIds.has(item.entity.entityId));
+  }, [flatItems, searchQuery, expandedNodes]);
 
+  // Set up sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 3,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
 
-  const renderTreeNodes = (nodes: SceneTreeNode[]): React.ReactNode => {
-    return nodes.map((node) => (
-      <EntityItem
-        key={node.entity.entityId}
-        node={node}
-        gameWorldService={gameWorldService}
-        selectedEntity={selectedEntity}
-        expandedNodes={expandedNodes}
-        onSelect={onSelect}
-        onToggleExpanded={onToggleExpanded}
-        onRenderChildren={renderTreeNodes}
-      />
-    ));
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    
+    if (!over || !active) {
+      setOverId(null);
+      setDropIndicator(null);
+      return;
+    }
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+    
+    setOverId(overId);
+    
+    // Update drop indicator
+    const indicator = TreeUtils.getDropIndicator(activeId, overId, flatItems);
+    setDropIndicator(indicator);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    setActiveId(null);
+    setOverId(null);
+    setDropIndicator(null);
+
+    if (!over || !active) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    if (activeId === overId) return;
+
+    // Handle the drag end in the game engine
+    try {
+      const success = await TreeUtils.handleDragEnd(activeId, overId, flatItems, gameWorldService, onEntitiesChanged);
+      console.log("Drag operation result:", success);
+    } catch (error) {
+      console.error("Failed to handle drag end:", error);
+    }
   };
 
   const totalItems = sceneEntities.length;
@@ -114,9 +152,34 @@ export default function SceneTree({
       <div className="text-xs text-gray-400 px-2 py-1 border-b border-white/10">
         Scene Hierarchy ({totalItems} items)
       </div>
-      {filteredTree.length > 0 ? (
+      {filteredItems.length > 0 ? (
         <div className="py-1">
-          {renderTreeNodes(filteredTree)}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={filteredItems.map(item => item.entity.entityId)}
+              strategy={verticalListSortingStrategy}
+            >
+              {filteredItems.map((item) => (
+                <SortableEntityItem
+                  key={item.entity.entityId}
+                  item={item}
+                  gameWorldService={gameWorldService}
+                  selectedEntity={selectedEntity}
+                  expandedNodes={expandedNodes}
+                  onSelect={onSelect}
+                  onToggleExpanded={onToggleExpanded}
+                  dropIndicator={dropIndicator}
+                  isDragging={activeId === item.entity.entityId}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
       ) : (
         <div className="p-4 text-center text-gray-400 text-sm">

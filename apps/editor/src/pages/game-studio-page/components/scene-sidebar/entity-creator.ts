@@ -22,7 +22,8 @@ import {
   PerspectiveCamera,
   OrthographicCamera,
   Entity,
-  Mesh3D
+  Mesh3D,
+  Group
 } from "@/models";
 import { GameWorldService } from "../../services/game-world-service";
 import useGameStudioStore from "@/stores/game-studio-store";
@@ -41,6 +42,12 @@ export class EntityCreator {
 
     switch (entityType) {
       // Basic Shapes
+      case "group":
+        entity = new Group({
+          name: `Group ${this.entityCounter++}`,
+          position: spawnPosition,
+        });
+        break;
       case "sphere":
         entity = new Sphere({
           name: `Sphere ${this.entityCounter++}`,
