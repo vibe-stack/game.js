@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search } from "lucide-react";
+import { FileIcon, LayersIcon, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,8 +15,6 @@ import { EntityCreator } from "./entity-creator";
 interface SceneSidebarProps {
   gameWorldService: React.RefObject<GameWorldService | null>;
 }
-
-
 
 export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
   const [activeTab, setActiveTab] = useState("scene");
@@ -57,19 +55,24 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Only handle shortcuts if no input field is focused
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
 
-      if ((event.metaKey || event.ctrlKey)) {
+      if (event.metaKey || event.ctrlKey) {
         switch (event.key.toLowerCase()) {
-          case 'c':
+          case "c":
             // Copy selected entity
             if (selectedEntity) {
               event.preventDefault();
               const gameWorld = gameWorldService.current?.getGameWorld();
               if (gameWorld) {
-                const entitiesRegistry = gameWorld.getRegistryManager().getRegistry<Entity>("entities");
+                const entitiesRegistry = gameWorld
+                  .getRegistryManager()
+                  .getRegistry<Entity>("entities");
                 if (entitiesRegistry) {
                   const entity = entitiesRegistry.get(selectedEntity);
                   if (entity) {
@@ -79,7 +82,7 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
               }
             }
             break;
-          case 'v':
+          case "v":
             // Paste copied entity
             if (copiedEntity && gameWorldService.current) {
               event.preventDefault();
@@ -90,15 +93,18 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedEntity, copiedEntity, gameWorldService]);
 
   const handlePasteEntity = async () => {
     if (!copiedEntity || !gameWorldService.current) return;
-    
+
     try {
-      const duplicatedEntity = await EntityCreator.duplicateEntity(copiedEntity, gameWorldService.current);
+      const duplicatedEntity = await EntityCreator.duplicateEntity(
+        copiedEntity,
+        gameWorldService.current,
+      );
       if (duplicatedEntity) {
         // Select the newly pasted entity
         setSelectedEntity(duplicatedEntity.entityId);
@@ -144,25 +150,25 @@ export default function SceneSidebar({ gameWorldService }: SceneSidebarProps) {
             value="scene"
             className="text-white data-[state=active]:bg-white/20"
           >
-            Scene
-          </TabsTrigger>
-          <TabsTrigger
-            value="assets"
-            className="text-white data-[state=active]:bg-white/20"
-          >
-            Assets
+            <div className="flex items-center gap-2">
+              <LayersIcon className="h-4 w-4" />
+              <span className="text-sm">Scene</span>
+            </div>
           </TabsTrigger>
           <TabsTrigger
             value="files"
             className="text-white data-[state=active]:bg-white/20"
           >
-            Files
+            <div className="flex items-center gap-2">
+              <FileIcon className="h-4 w-4" />
+              <span className="text-sm">Files</span>
+            </div>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent
           value="scene"
-          className="m-2 flex flex-1 flex-col space-y-2 max-h-full overflow-hidden"
+          className="m-2 flex max-h-full flex-1 flex-col space-y-2 overflow-hidden"
         >
           <div className="flex gap-2">
             <div className="relative flex-1">
