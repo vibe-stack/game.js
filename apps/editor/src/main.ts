@@ -1,8 +1,21 @@
 import { app, BrowserWindow } from "electron";
 import registerListeners from "./helpers/ipc/listeners-register";
-// "electron-squirrel-startup" seems broken when packaging with vite
-//import started from "electron-squirrel-startup";
 import path from "path";
+
+// Handle Windows startup events for Squirrel installer
+if (process.platform === 'win32') {
+  try {
+    const squirrelStartup = require('electron-squirrel-startup');
+    if (squirrelStartup) {
+      app.quit();
+    }
+  } catch (error) {
+    // Fallback: manually handle squirrel events
+    if (require('electron-squirrel-startup')) {
+      app.quit();
+    }
+  }
+}
 import {
   installExtension,
   REACT_DEVELOPER_TOOLS,

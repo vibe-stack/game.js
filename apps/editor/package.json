@@ -1,7 +1,7 @@
 {
-  "name": "gamejs-editor",
+  "name": "game.js-editor",
   "productName": "GameJS Editor",
-  "version": "1.0.0",
+  "version": "0.0.1-alpha.1",
   "description": "Visual game development environment for GameJS Three.js framework",
   "main": ".vite/build/main.js",
   "private": true,
@@ -19,13 +19,13 @@
     "test:e2e": "playwright test",
     "test:all": "vitest run && playwright test"
   },
-  "author": "GameJS Team",
+  "author": "alightinastorm",
   "license": "MIT",
   "devDependencies": {
     "@electron-forge/cli": "^7.8.0",
     "@electron-forge/maker-deb": "^7.8.0",
     "@electron-forge/maker-rpm": "^7.8.0",
-    "@electron-forge/maker-squirrel": "^7.8.0",
+    "@electron-forge/maker-squirrel": "^7.8.1",
     "@electron-forge/maker-zip": "^7.8.0",
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
     "@electron-forge/plugin-fuses": "^7.8.0",
