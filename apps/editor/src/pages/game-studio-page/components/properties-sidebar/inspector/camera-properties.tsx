@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Vector3Input } from "./vector3-input";
 import { useEntityState } from "@/hooks/use-entity-state";
-import { Vector3 } from "three";
+import { Vector3 } from "three/webgpu";
 import { GameWorldService } from "../../../services/game-world-service";
 
 interface CameraPropertiesProps {

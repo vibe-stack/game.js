@@ -9,6 +9,7 @@ import ErrorDisplay from "./components/error-display";
 import SceneSidebar from "./components/scene-sidebar";
 import PropertiesSidebar from "./components/properties-sidebar";
 import { MaterialEditor } from "./components/material-editor";
+import { CharacterControllerEditor } from "./components/properties-sidebar/inspector/character-controller-editor";
 import ShaderEditor from "./components/shader-editor";
 import CodeEditor from "@/components/code-editor";
 import { toast } from "sonner";
@@ -170,6 +171,7 @@ export default function GameStudioPage() {
       />
       <GameCanvas gameWorldService={gameWorldServiceRef} />
       { gameState === "playing" ? null : <MaterialEditor />}
+      { gameState === "playing" ? null : <CharacterControllerEditor />}
       { gameState === "playing" ? null : <ShaderEditor />}
       
       {/* Code Editor - rendered at page level */}

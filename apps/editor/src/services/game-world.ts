@@ -1,4 +1,4 @@
-import * as THREE from "three";
+import * as THREE from "three/webgpu";
 import { SceneData, SceneEntity, Transform } from "@/types/project";
 
 // Simple browser-compatible EventEmitter implementation
@@ -96,7 +96,7 @@ export class GameWorld extends SimpleEventEmitter {
   private manipulatingObjects: Set<string> = new Set(); // Track which objects are being manipulated
 
   // Three.js viewport references
-  private threeRenderer: THREE.WebGLRenderer | null = null;
+  private threeRenderer: THREE.WebGPURenderer | null = null;
   private threeCamera: THREE.Camera | null = null;
 
   constructor() {
@@ -166,7 +166,7 @@ export class GameWorld extends SimpleEventEmitter {
   }
 
   // Three.js viewport integration
-  setThreeRenderer(renderer: THREE.WebGLRenderer): void {
+  setThreeRenderer(renderer: THREE.WebGPURenderer): void {
     this.threeRenderer = renderer;
   }
 
@@ -178,7 +178,7 @@ export class GameWorld extends SimpleEventEmitter {
     return this.threeScene;
   }
 
-  getThreeRenderer(): THREE.WebGLRenderer | null {
+  getThreeRenderer(): THREE.WebGPURenderer | null {
     return this.threeRenderer;
   }
 

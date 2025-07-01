@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Vector3Input } from "./vector3-input";
 import { useEntityState } from "@/hooks/use-entity-state";
-import { Vector3 } from "three";
+import { Vector3 } from "three/webgpu";
 
 interface LightPropertiesProps {
   entity: Light;

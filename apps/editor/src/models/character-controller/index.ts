@@ -1,91 +1,14 @@
 import * as THREE from "three/webgpu";
-import { Entity } from "./entity";
-import { CameraManager, type CameraFollowConfig } from "./camera-manager";
-import { PhysicsManager } from "./physics-manager";
-import { InputManager, type InputBinding, type InputState } from "./input-manager";
+import { Entity } from "../entity";
+import { CameraManager, type CameraFollowConfig } from "../camera-manager";
+import { PhysicsManager } from "../physics-manager";
+import { InputManager, type InputBinding, type InputState } from "../input-manager";
 import type RapierType from "@dimforge/rapier3d-compat";
+import { CharacterControllerConfig } from "./types";
 
-export interface CharacterControllerConfig {
-  // Capsule collider setup
-  capsuleHalfHeight: number;
-  capsuleRadius: number;
-  
-  // Collider positioning - offset from the entity's origin
-  colliderOffset: THREE.Vector3;
-  
-  // Movement physics
-  maxSpeed: number;
-  acceleration: number;
-  jumpForce: number;
-  sprintMultiplier: number;
-  
-  // Crouch and Slide mechanics
-  crouchSpeedMultiplier: number; // Speed reduction when crouching (0-1)
-  slideSpeedMultiplier: number; // Speed boost when sliding (usually > 1)
-  slideDuration: number; // Max time for sliding in seconds
-  slideDeceleration: number; // How quickly slide speed decreases
-  crouchHeightReduction: number; // How much to reduce capsule height when crouching (0-1)
-  slideMinSpeed: number; // Minimum speed required to start sliding
-  
-  // Advanced movement mechanics (CS-like)
-  airAcceleration: number; // Air strafe acceleration
-  airMaxSpeed: number; // Maximum air strafe speed
-  groundFriction: number; // Friction when on ground
-  airFriction: number; // Air resistance
-  stopSpeed: number; // Speed below which extra friction is applied
-  slopeFriction: number; // Friction on slopes
-  slideThreshold: number; // Angle at which sliding starts (radians)
-  momentumPreservation: number; // How much momentum is preserved (0-1)
-  strafeResponseiveness: number; // How responsive air strafing is
-  
-  // Velocity and physics
-  maxVelocity: number; // Maximum allowed velocity magnitude
-  velocityDamping: number; // General velocity damping factor
-  bounceVelocityRetention: number; // How much velocity is kept after bouncing
-  
-  // Jump mechanics
-  preSpeedBoost: number; // Speed boost before jumping
-  jumpWhileSliding: boolean; // Allow jumping while sliding on slopes
-  bunnyHopTolerance: number; // Time window for bunny hopping
-  
-  // Moving platform and collision response
-  enableMovingPlatforms: boolean; // Whether to inherit velocity from moving platforms
-  enableMovingBodyPush: boolean; // Whether moving static bodies can push the character
-  movingPlatformMaxDistance: number; // Max distance to consider for moving platform detection
-  movingBodyPushForce: number; // Multiplier for push force from moving bodies
-  
-  // Character controller settings
-  offset: number; // Gap between character and environment
-  maxSlopeClimbAngle: number; // in radians
-  minSlopeSlideAngle: number; // in radians
-  autoStepMaxHeight: number;
-  autoStepMinWidth: number;
-  autoStepIncludeDynamic: boolean;
-  snapToGroundDistance: number;
-  
-  // Physics forces
-  gravityScale: number;
-  maxFallSpeed: number;
-  
-  // Camera settings
-  cameraMode: "first-person" | "third-person";
-  cameraDistance: number;
-  cameraHeight: number;
-  cameraMinDistance: number;
-  cameraMaxDistance: number;
-  cameraUpLimit: number; // in radians
-  cameraDownLimit: number; // in radians
-  cameraSensitivity: number;
-  
-  // Animation settings
-  idleAnimation?: string;
-  walkAnimation?: string;
-  sprintAnimation?: string;
-  jumpAnimation?: string;
-  fallAnimation?: string;
-  crouchAnimation?: string;
-  slideAnimation?: string;
-}
+
+export * from "./types";
+export * from "./defaults";
 
 export interface CharacterState {
   isGrounded: boolean;
@@ -399,7 +322,7 @@ export class CharacterController {
     
     // Click to lock pointer for all character modes
     canvas.addEventListener('click', () => {
-      if (this.enabled && this.cameraManager.getActiveCameraId() === this.cameraId) {
+      if (this.isActive()) {
         canvas.requestPointerLock();
       }
     });
@@ -418,9 +341,7 @@ export class CharacterController {
 
     // Mouse move for camera look
     document.addEventListener('mousemove', (event: MouseEvent) => {
-      if (!this.enabled || 
-          this.cameraManager.getActiveCameraId() !== this.cameraId || 
-          !this.pointerLocked) return;
+      if (!this.isActive() || !this.pointerLocked) return;
 
       // Track mouse movement for air strafing
       this.lastMouseMovement.x = event.movementX;
@@ -955,7 +876,7 @@ export class CharacterController {
   
   public update(deltaTime: number): void {
     // Only update if this controller is enabled and its camera is active
-    if (!this.enabled || this.cameraManager.getActiveCameraId() !== this.cameraId) {
+    if (!this.isActive()) {
       return;
     }
     
@@ -1388,8 +1309,10 @@ export class CharacterController {
   }
   
   public activateCamera(): void {
-    this.cameraManager.setActiveCamera(this.cameraId);
-    this.enabled = true;
+    const success = this.cameraManager.setActiveCamera(this.cameraId);
+    if (success) {
+      this.enabled = true;
+    }
   }
   
   public deactivate(): void {
@@ -1398,6 +1321,10 @@ export class CharacterController {
     if (this.pointerLocked && document.pointerLockElement) {
       document.exitPointerLock();
     }
+  }
+  
+  public isActive(): boolean {
+    return this.enabled && this.cameraManager.getActiveCameraId() === this.cameraId;
   }
   
   public dispose(): void {
@@ -1489,136 +1416,3 @@ export class CharacterController {
     }
   }
 }
-
-// Default configurations for common use cases
-export const FPS_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
-  cameraMode: "first-person",
-  cameraDistance: 0,
-  cameraHeight: 1.7,
-  colliderOffset: new THREE.Vector3(0, 0, 0),
-  maxSpeed: 10.0,
-  acceleration: 80.0,
-  jumpForce: 15.0,
-  cameraSensitivity: 0.002,
-  snapToGroundDistance: 0.05,
-  
-  // Crouch and Slide mechanics for FPS
-  crouchSpeedMultiplier: 0.4,
-  slideSpeedMultiplier: 1.8,
-  slideDuration: 1.2,
-  slideDeceleration: 0.8,
-  crouchHeightReduction: 0.4,
-  slideMinSpeed: 6.0,
-  
-  // CS-style movement for FPS
-  airAcceleration: 50.0,
-  airMaxSpeed: 35.0,
-  groundFriction: 6.0,
-  airFriction: 0.02,
-  stopSpeed: 1.0,
-  slopeFriction: 3.0,
-  slideThreshold: Math.PI / 6,
-  momentumPreservation: 0.98,
-  strafeResponseiveness: 1.2,
-  maxVelocity: 60.0,
-  velocityDamping: 0.995,
-  bounceVelocityRetention: 0.9,
-  preSpeedBoost: 1.3,
-  jumpWhileSliding: true,
-  bunnyHopTolerance: 0.15,
-};
-
-export const THIRD_PERSON_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
-  cameraMode: "third-person",
-  cameraDistance: -8.0,
-  cameraHeight: 2.0,
-  colliderOffset: new THREE.Vector3(0, 0, 0),
-  maxSpeed: 6.0,
-  acceleration: 50.0,
-  jumpForce: 12.0,
-  cameraSensitivity: 0.002,
-  
-  // Crouch and Slide mechanics for third-person
-  crouchSpeedMultiplier: 0.5,
-  slideSpeedMultiplier: 1.5,
-  slideDuration: 1.0,
-  slideDeceleration: 0.6,
-  crouchHeightReduction: 0.3,
-  slideMinSpeed: 4.0,
-  
-  // CS-style movement for third-person
-  airAcceleration: 40.0,
-  airMaxSpeed: 25.0,
-  groundFriction: 8.0,
-  airFriction: 0.05,
-  stopSpeed: 1.0,
-  slopeFriction: 2.5,
-  slideThreshold: Math.PI / 6,
-  momentumPreservation: 0.95,
-  strafeResponseiveness: 0.8,
-  maxVelocity: 45.0,
-  velocityDamping: 0.98,
-  bounceVelocityRetention: 0.85,
-  preSpeedBoost: 1.2,
-  jumpWhileSliding: true,
-  bunnyHopTolerance: 0.12,
-};
-
-export const PLATFORMER_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
-  cameraMode: "third-person",
-  cameraDistance: -12.0,
-  cameraHeight: 3.0,
-  colliderOffset: new THREE.Vector3(0, 0, 0),
-  maxSpeed: 8.0,
-  acceleration: 60.0,
-  jumpForce: 18.0,
-  cameraSensitivity: 0.0015,
-  autoStepMaxHeight: 0.8,
-  snapToGroundDistance: 0.5,
-  
-  // CS-style movement for platformer
-  airAcceleration: 45.0,
-  airMaxSpeed: 30.0,
-  groundFriction: 5.0,
-  airFriction: 0.01,
-  stopSpeed: 1.0,
-  slopeFriction: 1.5,
-  slideThreshold: Math.PI / 6,
-  momentumPreservation: 0.97,
-  strafeResponseiveness: 0.9,
-  maxVelocity: 50.0,
-  velocityDamping: 0.99,
-  bounceVelocityRetention: 0.9,
-  preSpeedBoost: 1.4,
-  jumpWhileSliding: true,
-  bunnyHopTolerance: 0.18,
-};
-
-export const CS_SURF_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
-  cameraMode: "first-person",
-  cameraDistance: 0,
-  cameraHeight: 1.7,
-  colliderOffset: new THREE.Vector3(0, 0, 0),
-  maxSpeed: 12.0,
-  acceleration: 60.0,
-  jumpForce: 18.0,
-  cameraSensitivity: 0.0025,
-  snapToGroundDistance: 0.02,
-  
-  // Optimized for surfing and air strafing
-  airAcceleration: 100.0,
-  airMaxSpeed: 80.0,
-  groundFriction: 4.0,
-  airFriction: 0.001,
-  stopSpeed: 0.5,
-  slopeFriction: 0.5, // Very low for smooth sliding
-  slideThreshold: Math.PI / 8, // 22.5 degrees - allows sliding on gentler slopes
-  momentumPreservation: 0.99,
-  strafeResponseiveness: 2.0, // High for precise air control
-  maxVelocity: 120.0,
-  velocityDamping: 0.998,
-  bounceVelocityRetention: 0.95,
-  preSpeedBoost: 1.5,
-  jumpWhileSliding: true,
-  bunnyHopTolerance: 0.2,
-};

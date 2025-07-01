@@ -17,7 +17,6 @@ export class GameWorldService {
   private selectionManager: SelectionManager;
   private transformControlsManager: TransformControlsManager;
   private helperManager: HelperManager;
-  private characterControllers: Map<string, CharacterController> = new Map();
   private prePlaActiveCamera: string | null = null; // Store active camera before gameplay
   private scriptLoaderService: ScriptLoaderService;
 
@@ -308,6 +307,18 @@ play(): void {
     
     // Enable character controllers
     this.enableCharacterControllers();
+    
+    // Activate character controller cameras (this will override scene camera if character controllers exist)
+    // Get all character controllers from the game world
+    const entities = this.gameWorld.getRegistryManager().getRegistry<Entity>("entities");
+    if (entities) {
+      entities.forEach((entity: Entity) => {
+        const controller = this.gameWorld!.getCharacterController(entity.entityId);
+        if (controller) {
+          controller.activateCamera();
+        }
+      });
+    }
   }
 }
 
@@ -398,9 +409,6 @@ stop(): void {
 }
 
 dispose(): void {
-  // Disable character controllers first
-  this.disableCharacterControllers();
-
   // Stop watching project scripts
   const { currentProject } = useGameStudioStore.getState();
   if (currentProject) {
@@ -519,8 +527,14 @@ private enableCharacterControllers(): void {
             config
           );
           
-          this.characterControllers.set(entity.entityId, controller);
-          controller.activateCamera();
+          // Add controller to GameWorld instead of local map
+          this.gameWorld!.addCharacterController(entity.entityId, controller);
+          
+          // Only activate camera if we're in playing state
+          const { gameState } = useGameStudioStore.getState();
+          if (gameState === 'playing') {
+            controller.activateCamera();
+          }
         } catch (error) {
           console.error(`Failed to create character controller for entity ${entity.entityId}:`, error);
         }
@@ -530,17 +544,9 @@ private enableCharacterControllers(): void {
 }
 
 private disableCharacterControllers(): void {
-  // Dispose all character controllers
-  this.characterControllers.forEach(controller => {
-    controller.dispose();
-  });
-  this.characterControllers.clear();
-}
-
-private updateCharacterControllers(deltaTime: number): void {
-  this.characterControllers.forEach(controller => {
-    controller.update(deltaTime);
-  });
+  if (!this.gameWorld) return;
+  // Use GameWorld's method to clear all character controllers
+  this.gameWorld.clearCharacterControllers();
 }
 
   // Update method to be called in the render loop
@@ -550,14 +556,6 @@ private updateCharacterControllers(deltaTime: number): void {
       
       // Update helpers
       this.helperManager.update();
-      
-      // Update character controllers during gameplay
-      const { gameState } = useGameStudioStore.getState();
-      if (gameState === 'playing') {
-        // Calculate delta time (you might want to get this from the game world)
-        const deltaTime = 1/60; // Assuming 60fps, ideally get this from game world
-        this.updateCharacterControllers(deltaTime);
-      }
     }
   }
 

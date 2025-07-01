@@ -16,6 +16,7 @@ import { ScriptManager } from "./script-manager";
 import { ShaderManager } from './shader-manager';
 import { SoundManager } from './sound-manager';
 import { AssetManager } from './asset-manager';
+import { CharacterController } from './character-controller';
 
 export class GameWorld {
   public readonly scene: THREE.Scene;
@@ -35,6 +36,7 @@ export class GameWorld {
   private entities: Registry<Entity>;
   private cameras: Registry<THREE.Camera>;
   private controls: Registry<any>;
+  private characterControllers: Map<string, CharacterController> = new Map();
   
   private isRunning = false;
   private animationId: number | null = null;
@@ -266,6 +268,11 @@ export class GameWorld {
         }
       }
     });
+    
+    // Update character controllers
+    this.characterControllers.forEach((controller) => {
+      controller.update(delta);
+    });
 
     // Update scripts
     this.scriptManager.update(delta);
@@ -290,6 +297,29 @@ export class GameWorld {
   forceUpdatePhysicsDebugRender(): void { this.forceUpdateDebugRenderer(); }
   isRunningState(): boolean { return this.isRunning; }
   isPausedState(): boolean { return this.isPaused; }
+  
+  // Character controller management
+  addCharacterController(entityId: string, controller: CharacterController): void {
+    this.characterControllers.set(entityId, controller);
+  }
+  
+  removeCharacterController(entityId: string): void {
+    const controller = this.characterControllers.get(entityId);
+    if (controller) {
+      controller.dispose();
+      this.characterControllers.delete(entityId);
+    }
+  }
+  
+  getCharacterController(entityId: string): CharacterController | undefined {
+    return this.characterControllers.get(entityId);
+  }
+  
+  clearCharacterControllers(): void {
+    this.characterControllers.forEach(controller => controller.dispose());
+    this.characterControllers.clear();
+  }
+  
   resize(width: number, height: number): void { 
     if (width <= 0 || height <= 0) return;
     
@@ -306,6 +336,7 @@ export class GameWorld {
     if(this.renderLoopId) cancelAnimationFrame(this.renderLoopId);
     this.entities.forEach(entity => entity.destroy());
     this.registryManager.clearAll();
+    this.clearCharacterControllers(); // Clean up character controllers
     this.debugRenderer.dispose();
     this.interactionManager.dispose();
     this.cameraControlManager.dispose();

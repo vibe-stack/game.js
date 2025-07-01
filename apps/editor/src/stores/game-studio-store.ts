@@ -25,6 +25,8 @@ interface GameStudioState {
   selectedEntity: string | null;
   materialEditorOpen: boolean;
   materialEditorEntity: string | null;
+  characterControllerEditorOpen: boolean;
+  characterControllerEditorEntity: string | null;
   sceneFileName: string | null;
   shaderEditorOpen: boolean;
   shaderEditorEntity: string | null;
@@ -52,6 +54,8 @@ interface GameStudioState {
   loadDefaultScene: () => void;
   setMaterialEditorOpen: (open: boolean) => void;
   setMaterialEditorEntity: (entityId: string | null) => void;
+  setCharacterControllerEditorOpen: (open: boolean) => void;
+  setCharacterControllerEditorEntity: (entityId: string | null) => void;
   setSceneFileName: (fileName: string | null) => void;
   setShaderEditorOpen: (open: boolean) => void;
   setShaderEditorEntity: (entityId: string | null) => void;
@@ -85,6 +89,8 @@ const useGameStudioStore = create<GameStudioState>()(
     selectedEntity: null,
     materialEditorOpen: false,
     materialEditorEntity: null,
+    characterControllerEditorOpen: false,
+    characterControllerEditorEntity: null,
     sceneFileName: null,
     shaderEditorOpen: false,
     shaderEditorEntity: null,
@@ -114,6 +120,8 @@ const useGameStudioStore = create<GameStudioState>()(
     setSelectedEntity: (entityId) => set({ selectedEntity: entityId }),
     setMaterialEditorOpen: (open) => set({ materialEditorOpen: open }),
     setMaterialEditorEntity: (entityId) => set({ materialEditorEntity: entityId }),
+    setCharacterControllerEditorOpen: (open) => set({ characterControllerEditorOpen: open }),
+    setCharacterControllerEditorEntity: (entityId) => set({ characterControllerEditorEntity: entityId }),
     setSceneFileName: (fileName) => set({ sceneFileName: fileName }),
     setShaderEditorOpen: (open) => set({ shaderEditorOpen: open }),
     setShaderEditorEntity: (entityId) => set({ shaderEditorEntity: entityId }),
