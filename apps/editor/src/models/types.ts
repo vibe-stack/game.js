@@ -1,12 +1,91 @@
 import * as THREE from "three/webgpu";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
+// Advanced collision shape definitions
+export type ColliderShape = 
+  | { type: "ball"; radius: number }
+  | { type: "cuboid"; halfExtents: THREE.Vector3 }
+  | { type: "capsule"; halfHeight: number; radius: number }
+  | { type: "cylinder"; halfHeight: number; radius: number }
+  | { type: "cone"; halfHeight: number; radius: number }
+  | { type: "convexHull"; vertices: Float32Array }
+  | { type: "trimesh"; vertices: Float32Array; indices: Uint32Array }
+  | { type: "heightfield"; heights: number[][]; scale: THREE.Vector3 }
+  | { type: "compound"; shapes: Array<{ shape: ColliderShape; position?: THREE.Vector3; rotation?: THREE.Quaternion }> };
+
+// Collision groups for filtering
+export interface CollisionGroups {
+  memberships: number;  // What groups this collider belongs to
+  filter: number;       // What groups this collider can interact with
+}
+
+// Advanced collider configuration
+export interface ColliderConfig {
+  shape: ColliderShape;
+  isSensor?: boolean;
+  density?: number;
+  friction?: number;
+  restitution?: number;
+  offset?: THREE.Vector3;
+  rotation?: THREE.Quaternion;
+  collisionGroups?: CollisionGroups;
+  activeCollisionTypes?: number; // Bitmask of ActiveCollisionTypes
+  activeEvents?: number; // Bitmask of ActiveEvents
+  contactForceEventThreshold?: number;
+  solverGroups?: CollisionGroups;
+}
+
+// Physics mode enum
+export enum PhysicsMode {
+  Simple = "simple",
+  Advanced = "advanced"
+}
+
+// Extended physics configuration
 export interface PhysicsConfig {
+  // Common properties
+  type?: "dynamic" | "static" | "kinematic";
+  mode?: PhysicsMode;
+  
+  // Simple mode properties
   mass?: number;
   restitution?: number;
   friction?: number;
-  type?: "dynamic" | "static" | "kinematic";
+  
+  // Advanced mode properties
+  colliders?: ColliderConfig[]; // Multiple colliders support
+  linearDamping?: number;
+  angularDamping?: number;
+  gravityScale?: number;
+  canSleep?: boolean;
+  ccd?: boolean; // Continuous collision detection
+  dominanceGroup?: number;
+  additionalSolverIterations?: number;
+  
+  // Constraints
+  lockTranslationX?: boolean;
+  lockTranslationY?: boolean;
+  lockTranslationZ?: boolean;
+  lockRotationX?: boolean;
+  lockRotationY?: boolean;
+  lockRotationZ?: boolean;
+  
+  // Initial velocities
+  linearVelocity?: THREE.Vector3;
+  angularVelocity?: THREE.Vector3;
 }
+
+// Predefined collision groups
+export const CollisionGroupPresets = {
+  Default: { memberships: 0x0001, filter: 0xFFFF },
+  Static: { memberships: 0x0002, filter: 0xFFFF },
+  Dynamic: { memberships: 0x0004, filter: 0xFFFF },
+  Player: { memberships: 0x0008, filter: 0xFFFF & ~0x0008 }, // Collides with everything except other players
+  Enemy: { memberships: 0x0010, filter: 0xFFFF },
+  Projectile: { memberships: 0x0020, filter: 0xFFFF & ~0x0020 }, // Don't collide with other projectiles
+  Trigger: { memberships: 0x0040, filter: 0xFFFF },
+  NoCollision: { memberships: 0x0080, filter: 0x0000 }, // Doesn't collide with anything
+} as const;
 
 export interface TweenConfig {
   target: THREE.Vector3 | THREE.Quaternion;

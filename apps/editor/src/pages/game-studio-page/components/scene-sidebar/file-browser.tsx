@@ -364,7 +364,8 @@ export default function FileBrowser({ gameWorldService }: FileBrowserProps) {
       await toggleDirectory(node);
     } else {
       // Try to add 3D model to scene if it's a supported format
-      if (node.extension?.toLowerCase() === '.glb') {
+      const ext = node.extension?.toLowerCase();
+      if (ext === '.glb' || ext === '.gltf') {
         await addModelToScene(node);
       }
     }
@@ -379,25 +380,27 @@ export default function FileBrowser({ gameWorldService }: FileBrowserProps) {
         throw new Error("Game world not initialized");
       }
 
-      // Get the asset as data URL instead of HTTP URL to avoid CORS issues
-      const assetDataUrl = await window.projectAPI.getAssetDataUrl(currentProject.path, node.path);
-      if (!assetDataUrl) {
-        throw new Error("Failed to get asset data");
+      // Convert absolute path to relative path from project root
+      let relativePath = node.path.startsWith(currentProject.path) 
+        ? node.path.substring(currentProject.path.length + 1) // +1 removes original slash
+        : node.path;
+      // Remove any leading slash so the path is truly relative
+      if (relativePath.startsWith('/')) {
+        relativePath = relativePath.substring(1);
       }
 
-      // Convert data URL to blob URL for GLTFLoader
-      const response = await fetch(assetDataUrl);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      // Get the asset URL through the HTTP server to support external assets
+      const assetUrl = await window.projectAPI.getAssetUrl(currentProject.path, relativePath);
+      if (!assetUrl) { 
+        throw new Error("Failed to get asset URL");
+      }
 
-      // Load the GLB file using the blob URL
+      // Load the GLTF/GLB file using the HTTP URL
+      // This allows relative paths in GLTF files to work correctly
       const loader = new GLTFLoader();
       const gltf = await new Promise<GLTF>((resolve, reject) => {
-        loader.load(blobUrl, resolve, undefined, reject);
+        loader.load(assetUrl, resolve, undefined, reject);
       });
-
-      // Clean up the blob URL
-      URL.revokeObjectURL(blobUrl);
 
       // Find the first mesh in the loaded model
       let meshFound = false;
@@ -407,14 +410,14 @@ export default function FileBrowser({ gameWorldService }: FileBrowserProps) {
           
           // Create a Mesh3D entity
           const mesh = new Mesh3D({
-            name: node.name.replace('.glb', ''),
+            name: node.name.replace(/\.(glb|gltf)$/, ''),
             position: new THREE.Vector3(0, 2, 0),
             geometry: child.geometry,
             material: child.material,
             castShadow: true,
             receiveShadow: true,
-            modelPath: node.path,
-            modelUrl: assetDataUrl,
+            modelPath: relativePath,
+            modelUrl: assetUrl,
           });
 
           // Add physics configuration
@@ -694,7 +697,7 @@ export default function FileBrowser({ gameWorldService }: FileBrowserProps) {
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent>
-            {node.extension?.toLowerCase() === '.glb' && (
+            {(node.extension?.toLowerCase() === '.glb' || node.extension?.toLowerCase() === '.gltf') && (
               <>
                 <ContextMenuItem onClick={() => addModelToScene(node)}>
                   <Plus className="h-4 w-4 mr-2" />

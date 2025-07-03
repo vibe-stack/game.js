@@ -139,29 +139,42 @@ export class Mesh3D extends Entity {
     this.modelPath = modelPath;
     
     // Get the asset data URL using the project service to avoid CORS issues
+    let sanitizedPath = modelPath;
+    // If the modelPath is absolute and inside the project directory, convert to relative
+    if (sanitizedPath.startsWith('/') && sanitizedPath.startsWith(projectPath)) {
+      sanitizedPath = sanitizedPath.substring(projectPath.length);
+    }
+    // Remove any leading slash to ensure truly relative
+    if (sanitizedPath.startsWith('/')) {
+      sanitizedPath = sanitizedPath.substring(1);
+    }
+    // At this point sanitizedPath should look like "assets/....gltf"
     let modelUrl: string;
     
     try {
       // Use window.projectAPI if available (in renderer context)
       if (typeof window !== 'undefined' && (window as any).projectAPI) {
-        const dataUrl = await (window as any).projectAPI.getAssetDataUrl(projectPath, modelPath);
-        if (!dataUrl) {
-          throw new Error(`Failed to get asset data for ${modelPath}`);
+        const assetUrl = await (window as any).projectAPI.getAssetUrl(projectPath, sanitizedPath);
+        if (!assetUrl) {
+          throw new Error(`Failed to get asset for ${modelPath}`);
         }
-        
-        // Convert data URL to blob URL for GLTFLoader
-        const response = await fetch(dataUrl);
-        const blob = await response.blob();
-        modelUrl = URL.createObjectURL(blob);
-        
-        // Store the blob URL for cleanup later
-        this.modelUrl = modelUrl;
+
+        if (assetUrl.startsWith('data:')) {
+          // For data URLs, convert to a blob URL so GLTFLoader can fetch it
+          const response = await fetch(assetUrl);
+          const blob = await response.blob();
+          modelUrl = URL.createObjectURL(blob);
+        } else {
+          // HTTP URL can be used directly (keeps relative paths intact)
+          modelUrl = assetUrl;
+        }
+
+        this.modelUrl = modelUrl; // Store for serialization/debugging
       } else {
-        // Fallback for other contexts
         throw new Error("Project API not available");
       }
     } catch (error) {
-      console.error("Failed to get asset data:", error);
+      console.error("Failed to get asset URL:", error);
       throw new Error(`Cannot load model from path: ${modelPath}`);
     }
 

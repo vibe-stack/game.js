@@ -1,5 +1,5 @@
 import * as THREE from "three/webgpu";
-import { PhysicsConfig } from "./types";
+import { PhysicsConfig, ColliderConfig, ColliderShape, CollisionGroups, PhysicsMode } from "./types";
 import * as RAPIER from "@dimforge/rapier3d-compat";
 import type RapierType from "@dimforge/rapier3d-compat";
 
@@ -8,6 +8,7 @@ export class PhysicsManager {
   private enabled = false;
   private bodyMap = new Map<string, RapierType.RigidBody>();
   private colliderMap = new Map<string, RapierType.Collider>();
+  private collidersByBody = new Map<string, string[]>(); // Track multiple colliders per body
   private gravity = new THREE.Vector3(0, -9.81, 0);
   private rapierModule: typeof RAPIER | null = null;
   private debugRenderEnabled = false;
@@ -66,11 +67,62 @@ export class PhysicsManager {
       });
     }
 
+    // Apply advanced properties
+    if (config.mode === PhysicsMode.Advanced) {
+      if (config.linearDamping !== undefined) {
+        bodyDesc.setLinearDamping(config.linearDamping);
+      }
+      if (config.angularDamping !== undefined) {
+        bodyDesc.setAngularDamping(config.angularDamping);
+      }
+      if (config.gravityScale !== undefined) {
+        bodyDesc.setGravityScale(config.gravityScale);
+      }
+      if (config.canSleep !== undefined) {
+        bodyDesc.setCanSleep(config.canSleep);
+      }
+      if (config.ccd !== undefined) {
+        bodyDesc.setCcdEnabled(config.ccd);
+      }
+      if (config.dominanceGroup !== undefined) {
+        bodyDesc.setDominanceGroup(config.dominanceGroup);
+      }
+      if (config.additionalSolverIterations !== undefined) {
+        bodyDesc.setAdditionalSolverIterations(config.additionalSolverIterations);
+      }
+    }
+
     const rigidBody = this.world!.createRigidBody(bodyDesc);
+    
+    // Apply translation/rotation locks
+    if (config.mode === PhysicsMode.Advanced) {
+      const locks = {
+        x: config.lockTranslationX || false,
+        y: config.lockTranslationY || false,
+        z: config.lockTranslationZ || false,
+      };
+      const rotLocks = {
+        x: config.lockRotationX || false,
+        y: config.lockRotationY || false,
+        z: config.lockRotationZ || false,
+      };
+      
+      rigidBody.setEnabledTranslations(!locks.x, !locks.y, !locks.z, true);
+      rigidBody.setEnabledRotations(!rotLocks.x, !rotLocks.y, !rotLocks.z, true);
+    }
+    
+    // Set initial velocities
+    if (config.linearVelocity) {
+      rigidBody.setLinvel(config.linearVelocity, true);
+    }
+    if (config.angularVelocity) {
+      rigidBody.setAngvel(config.angularVelocity, true);
+    }
     
     // Track the body ID
     this.bodyMap.set(id, rigidBody);
     this.bodyIdMap.set(rigidBody, id);
+    this.collidersByBody.set(id, []); // Initialize collider tracking
     
     return rigidBody;
   }
@@ -240,6 +292,13 @@ export class PhysicsManager {
   removeRigidBody(id: string): boolean {
     const rigidBody = this.bodyMap.get(id);
     if (!rigidBody || !this.world) return false;
+
+    // Remove all colliders associated with this body first
+    const colliderIds = this.collidersByBody.get(id) || [];
+    for (const colliderId of colliderIds) {
+      this.removeCollider(colliderId);
+    }
+    this.collidersByBody.delete(id);
 
     this.world.removeRigidBody(rigidBody);
     this.bodyMap.delete(id);
@@ -443,5 +502,201 @@ export class PhysicsManager {
         break;
     }
     return true;
+  }
+
+  // New method to create colliders from advanced config
+  createCollidersFromConfig(
+    bodyId: string,
+    colliderConfigs: ColliderConfig[]
+  ): string[] {
+    const createdColliderIds: string[] = [];
+    const rigidBody = this.bodyMap.get(bodyId);
+    if (!rigidBody) return createdColliderIds;
+
+    colliderConfigs.forEach((config, index) => {
+      const colliderId = `${bodyId}_collider_${index}`;
+      const collider = this.createColliderFromShape(
+        colliderId,
+        rigidBody,
+        config.shape,
+        config
+      );
+      
+      if (collider) {
+        createdColliderIds.push(colliderId);
+      }
+    });
+
+    return createdColliderIds;
+  }
+
+  createColliderFromShape(
+    id: string,
+    rigidBody: RapierType.RigidBody,
+    shape: ColliderShape,
+    config: ColliderConfig
+  ): RapierType.Collider | null {
+    if (!this.rapierModule) return null;
+
+    let colliderDesc: RapierType.ColliderDesc | null = null;
+
+    switch (shape.type) {
+      case "ball":
+        colliderDesc = this.rapierModule.ColliderDesc.ball(shape.radius);
+        break;
+      
+      case "cuboid":
+        colliderDesc = this.rapierModule.ColliderDesc.cuboid(
+          shape.halfExtents.x,
+          shape.halfExtents.y,
+          shape.halfExtents.z
+        );
+        break;
+      
+      case "capsule":
+        colliderDesc = this.rapierModule.ColliderDesc.capsule(
+          shape.halfHeight,
+          shape.radius
+        );
+        break;
+      
+      case "cylinder":
+        colliderDesc = this.rapierModule.ColliderDesc.cylinder(
+          shape.halfHeight,
+          shape.radius
+        );
+        break;
+      
+      case "cone":
+        colliderDesc = this.rapierModule.ColliderDesc.cone(
+          shape.halfHeight,
+          shape.radius
+        );
+        break;
+      
+      case "convexHull":
+        colliderDesc = this.rapierModule.ColliderDesc.convexHull(shape.vertices);
+        if (!colliderDesc) {
+          console.warn("Failed to create convex hull");
+          return null;
+        }
+        break;
+      
+      case "trimesh":
+        colliderDesc = this.rapierModule.ColliderDesc.trimesh(
+          shape.vertices,
+          shape.indices
+        );
+        break;
+      
+      case "heightfield":
+        const { heights, scale } = shape;
+        const nrows = heights.length;
+        const ncols = heights[0]?.length || 0;
+        
+        if (nrows === 0 || ncols === 0) {
+          console.error("Invalid heightfield data");
+          return null;
+        }
+        
+        const flatHeights = new Float32Array(nrows * ncols);
+        for (let row = 0; row < nrows; row++) {
+          for (let col = 0; col < ncols; col++) {
+            flatHeights[row * ncols + col] = heights[row][col];
+          }
+        }
+        
+        colliderDesc = this.rapierModule.ColliderDesc.heightfield(
+          nrows - 1,
+          ncols - 1,
+          flatHeights,
+          { x: scale.x, y: scale.y, z: scale.z }
+        );
+        break;
+      
+      case "compound":
+        // For compound shapes, create multiple colliders
+        shape.shapes.forEach((subShape, index) => {
+          const subColliderId = `${id}_sub_${index}`;
+          this.createColliderFromShape(
+            subColliderId,
+            rigidBody,
+            subShape.shape,
+            {
+              ...config,
+              offset: subShape.position,
+              rotation: subShape.rotation
+            }
+          );
+        });
+        return null; // Compound doesn't create a single collider
+    }
+
+    if (!colliderDesc) return null;
+
+    // Apply collider properties
+    if (config.offset) {
+      colliderDesc.setTranslation(config.offset.x, config.offset.y, config.offset.z);
+    }
+    
+    if (config.rotation) {
+      colliderDesc.setRotation(config.rotation);
+    }
+    
+    if (config.density !== undefined) {
+      colliderDesc.setDensity(config.density);
+    }
+    
+    if (config.friction !== undefined) {
+      colliderDesc.setFriction(config.friction);
+    }
+    
+    if (config.restitution !== undefined) {
+      colliderDesc.setRestitution(config.restitution);
+    }
+    
+    if (config.isSensor !== undefined) {
+      colliderDesc.setSensor(config.isSensor);
+    }
+    
+    if (config.collisionGroups) {
+      colliderDesc.setCollisionGroups(
+        (config.collisionGroups.memberships << 16) | config.collisionGroups.filter
+      );
+    }
+    
+    if (config.solverGroups) {
+      colliderDesc.setSolverGroups(
+        (config.solverGroups.memberships << 16) | config.solverGroups.filter
+      );
+    }
+    
+    if (config.activeCollisionTypes !== undefined) {
+      colliderDesc.setActiveCollisionTypes(config.activeCollisionTypes);
+    }
+    
+    if (config.activeEvents !== undefined) {
+      colliderDesc.setActiveEvents(config.activeEvents);
+    }
+    
+    if (config.contactForceEventThreshold !== undefined) {
+      colliderDesc.setContactForceEventThreshold(config.contactForceEventThreshold);
+    }
+
+    const collider = this.world!.createCollider(colliderDesc, rigidBody);
+    
+    // Track the collider
+    this.colliderMap.set(id, collider);
+    this.colliderIdMap.set(collider, id);
+    
+    // Track collider association with body
+    const bodyId = this.bodyIdMap.get(rigidBody);
+    if (bodyId) {
+      const colliders = this.collidersByBody.get(bodyId) || [];
+      colliders.push(id);
+      this.collidersByBody.set(bodyId, colliders);
+    }
+    
+    return collider;
   }
 } 

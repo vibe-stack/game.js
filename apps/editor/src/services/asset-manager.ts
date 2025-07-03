@@ -17,12 +17,18 @@ export interface GameScene {
 export class AssetManager {
   private static assetServer: any = null;
   private static assetServerPort: number = 0;
+  private static assetServerProjectPath: string = "";
 
   private constructor() {} // Prevent instantiation
 
   private static async startAssetServer(projectPath: string): Promise<number> {
     if (AssetManager.assetServer) {
-      return AssetManager.assetServerPort;
+      // If the server is already serving the same project, reuse it
+      if (AssetManager.assetServerProjectPath === path.resolve(projectPath)) {
+        return AssetManager.assetServerPort;
+      }
+      // Otherwise stop existing server and start a new one for new project
+      AssetManager.stopAssetServer();
     }
 
     const app = express();
@@ -44,6 +50,15 @@ export class AssetManager {
       next();
     }, express.static(path.join(projectPath, '.gamejs')));
 
+    // Serve entire project directory for GLTF files and other assets
+    // This should be last to avoid conflicts with specific routes above
+    app.use('/', (req: Request, res: Response, next: NextFunction) => {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET');
+      res.header('Access-Control-Allow-Headers', 'Content-Type');
+      next();
+    }, express.static(projectPath));
+
     const server = createServer(app);
     
     // Find available port
@@ -60,6 +75,7 @@ export class AssetManager {
 
     AssetManager.assetServer = server;
     AssetManager.assetServerPort = port;
+    AssetManager.assetServerProjectPath = path.resolve(projectPath);
     return port;
   }
 
@@ -77,7 +93,8 @@ export class AssetManager {
 
   static async getAssetUrl(projectPath: string, assetPath: string): Promise<string | null> {
     try {
-      const fullAssetPath = path.resolve(projectPath, assetPath);
+      const sanitizedAssetPath = assetPath.startsWith(path.sep) ? assetPath.substring(1) : assetPath;
+      const fullAssetPath = path.resolve(projectPath, sanitizedAssetPath);
       const projectDir = path.resolve(projectPath);
 
       if (!fullAssetPath.startsWith(projectDir)) {
@@ -94,11 +111,11 @@ export class AssetManager {
       // For 3D model formats, use HTTP server
       if (['.gltf', '.glb'].includes(extension)) {
         const port = await AssetManager.startAssetServer(projectPath);
-        return `http://localhost:${port}/${assetPath}`;
+        return `http://localhost:${port}/${sanitizedAssetPath}`;
       }
       
       // For other formats, use data URL
-      return AssetManager.getAssetDataUrl(projectPath, assetPath);
+      return AssetManager.getAssetDataUrl(projectPath, sanitizedAssetPath);
     } catch (error) {
       console.error("Error getting asset URL:", error);
       return null;
@@ -344,7 +361,8 @@ export class AssetManager {
   ): Promise<string | null> {
     try {
       // Ensure the asset path is within the project directory for security
-      const fullAssetPath = path.resolve(projectPath, assetPath);
+      const sanitizedAssetPath = assetPath.startsWith(path.sep) ? assetPath.substring(1) : assetPath;
+      const fullAssetPath = path.resolve(projectPath, sanitizedAssetPath);
       const projectDir = path.resolve(projectPath);
 
       if (!fullAssetPath.startsWith(projectDir)) {

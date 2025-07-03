@@ -1,4 +1,3 @@
-
 // Vector3 utility type
 export interface Vector3 {
   x: number;
@@ -153,6 +152,11 @@ export interface SceneData {
         type: "basic" | "pcf" | "pcfsoft" | "vsm";
       };
       antialias: boolean;
+      targetResolution?: {
+        width: number;
+        height: number;
+        maintainAspectRatio: boolean;
+      };
       pixelRatio?: number;
     };
   };
@@ -161,6 +165,11 @@ export interface SceneData {
   editor: {
     showGrid: boolean;
     gridSize: number;
+    gridDivisions: number;
+    gridColor: string;
+    gridOpacity: number;
+    gridCenter: { x: number; y: number; z: number };
+    gridInfinite: boolean;
     showHelpers: boolean;
     showWireframe: boolean;
     debugPhysics: boolean;

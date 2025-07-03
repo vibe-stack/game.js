@@ -179,6 +179,11 @@ async loadScene(sceneData: any): Promise<void> {
       if (this.gameWorld?.isPhysicsDebugRenderEnabled()) {
         this.gameWorld.enablePhysicsDebugRender(); // This will trigger an update
       }
+
+      // Load grid settings from scene data
+      if (sceneData.editor) {
+        this.helperManager.loadGridSettings(sceneData.editor);
+      }
     } else {
       throw new Error("Invalid scene data format");
     }
@@ -557,6 +562,47 @@ private disableCharacterControllers(): void {
       // Update helpers
       this.helperManager.update();
     }
+  }
+
+  // Grid Management Methods
+  getGridSettings(): any {
+    return this.helperManager.getGridSettings();
+  }
+
+  setGridVisible(visible: boolean): void {
+    this.helperManager.setGridVisible(visible);
+  }
+
+  isGridVisible(): boolean {
+    return this.helperManager.isGridVisible();
+  }
+
+  setGridSize(size: number): void {
+    this.helperManager.setGridSize(size);
+  }
+
+  setGridDivisions(divisions: number): void {
+    this.helperManager.setGridDivisions(divisions);
+  }
+
+  setGridColor(color: string): void {
+    this.helperManager.setGridColor(color);
+  }
+
+  setGridOpacity(opacity: number): void {
+    this.helperManager.setGridOpacity(opacity);
+  }
+
+  setGridCenter(center: { x: number; y: number; z: number }): void {
+    this.helperManager.setGridCenter(center);
+  }
+
+  setGridInfinite(infinite: boolean): void {
+    this.helperManager.setGridInfinite(infinite);
+  }
+
+  setGridSettings(settings: any): void {
+    this.helperManager.setGridSettings(settings);
   }
 
   // Resize method to handle window/canvas resize

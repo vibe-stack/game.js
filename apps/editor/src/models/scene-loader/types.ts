@@ -30,15 +30,7 @@ export interface EntityData {
   userData: Record<string, any>;
   tags: string[];
   layer: number;
-  physics?: {
-    enabled: boolean;
-    type: "static" | "dynamic" | "kinematic";
-    mass?: number;
-    restitution?: number;
-    friction?: number;
-    colliderShape?: string;
-    colliderSize?: [number, number, number];
-  };
+  physics?: any; // Support both simple and advanced physics configurations
   characterController?: {
     capsuleHalfHeight: number;
     capsuleRadius: number;

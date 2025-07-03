@@ -44,9 +44,21 @@ export class GameWorld {
   private renderLoopId: number | null = null;
   
   private sceneSnapshot: Map<string, any> | null = null;
+  
+  // Target resolution settings
+  private targetResolution: {
+    width: number;
+    height: number;
+    maintainAspectRatio: boolean;
+  } = {
+    width: 1920,
+    height: 1080,
+    maintainAspectRatio: true
+  };
 
   constructor(config: GameConfig) {
     this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color("#2a2a2a"); // Default dark gray background
     this.clock = new THREE.Clock();
     
     this.renderer = new THREE.WebGPURenderer({
@@ -323,12 +335,56 @@ export class GameWorld {
   resize(width: number, height: number): void { 
     if (width <= 0 || height <= 0) return;
     
+    // Calculate pixel ratio based on target resolution
+    const pixelRatio = this.calculatePixelRatio(width, height);
+    
     // Update renderer size
     this.renderer.setSize(width, height, false); // false = don't update CSS styles
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setPixelRatio(pixelRatio);
     
     // Update camera aspect ratios
     this.cameraManager.resize(width, height); 
+  }
+  
+  private calculatePixelRatio(canvasWidth: number, canvasHeight: number): number {
+    const { width: targetWidth, height: targetHeight, maintainAspectRatio } = this.targetResolution;
+    
+    if (!maintainAspectRatio) {
+      // Calculate pixel ratio to match target resolution as closely as possible
+      const widthRatio = targetWidth / canvasWidth;
+      const heightRatio = targetHeight / canvasHeight;
+      return Math.min(widthRatio, heightRatio);
+    }
+    
+    // Maintain aspect ratio - calculate based on the smaller dimension
+    const targetAspectRatio = targetWidth / targetHeight;
+    const canvasAspectRatio = canvasWidth / canvasHeight;
+    
+    if (canvasAspectRatio > targetAspectRatio) {
+      // Canvas is wider than target, use height as reference
+      return targetHeight / canvasHeight;
+    } else {
+      // Canvas is taller than target, use width as reference
+      return targetWidth / canvasWidth;
+    }
+  }
+  
+  setTargetResolution(width: number, height: number, maintainAspectRatio: boolean = true): void {
+    this.targetResolution = { width, height, maintainAspectRatio };
+    
+    // Apply the new target resolution immediately
+    const canvas = this.renderer.domElement as HTMLCanvasElement;
+    const rect = canvas.getBoundingClientRect();
+    const canvasWidth = rect.width || canvas.clientWidth;
+    const canvasHeight = rect.height || canvas.clientHeight;
+    
+    if (canvasWidth > 0 && canvasHeight > 0) {
+      this.resize(canvasWidth, canvasHeight);
+    }
+  }
+  
+  getTargetResolution(): { width: number; height: number; maintainAspectRatio: boolean } {
+    return { ...this.targetResolution };
   }
 
   dispose(): void {

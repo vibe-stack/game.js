@@ -76,20 +76,29 @@ export class SceneSerializer {
           maxSubSteps: 10,
         },
         rendering: {
-          backgroundColor: "#87CEEB",
+          backgroundColor: gameWorld.scene.background instanceof THREE.Color ? '#' + gameWorld.scene.background.getHexString() : "#2a2a2a",
           environment: "",
-          fog: {
+          fog: gameWorld.scene.fog ? {
+            enabled: true,
+            color: gameWorld.scene.fog instanceof THREE.Fog ? '#' + gameWorld.scene.fog.color.getHexString() : "#ffffff",
+            near: gameWorld.scene.fog instanceof THREE.Fog ? gameWorld.scene.fog.near : 10,
+            far: gameWorld.scene.fog instanceof THREE.Fog ? gameWorld.scene.fog.far : 100,
+          } : {
             enabled: false,
             color: "#ffffff",
             near: 10,
             far: 100,
           },
           shadows: {
-            enabled: true,
-            type: "pcfsoft",
+            enabled: gameWorld.getRenderer().shadowMap.enabled,
+            type: gameWorld.getRenderer().shadowMap.type === THREE.PCFSoftShadowMap ? "pcfsoft" : 
+                  gameWorld.getRenderer().shadowMap.type === THREE.PCFShadowMap ? "pcf" :
+                  gameWorld.getRenderer().shadowMap.type === THREE.BasicShadowMap ? "basic" :
+                  gameWorld.getRenderer().shadowMap.type === THREE.VSMShadowMap ? "vsm" : "pcf",
           },
           antialias: true,
-          pixelRatio: 1,
+          targetResolution: gameWorld.getTargetResolution(),
+          pixelRatio: 1, // Keep for backwards compatibility
         },
       },
       activeCamera: gameWorld.getCameraManager().getActiveCameraId() || undefined,
@@ -111,6 +120,11 @@ export class SceneSerializer {
       editor: {
         showGrid: true,
         gridSize: 1,
+        gridDivisions: 10,
+        gridColor: "#888888",
+        gridOpacity: 0.5,
+        gridCenter: { x: 0, y: 0, z: 0 },
+        gridInfinite: false,
         showHelpers: true,
         showWireframe: false,
         debugPhysics: gameWorld.isPhysicsDebugRenderEnabled(),

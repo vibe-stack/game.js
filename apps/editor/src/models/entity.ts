@@ -1,6 +1,6 @@
 import * as THREE from "three/webgpu";
 import { PhysicsManager } from "./physics-manager";
-import { EntityConfig, TweenConfig, InteractionCallbacks, EntityMetadata, EntityType, PhysicsConfig } from "./types";
+import { EntityConfig, TweenConfig, InteractionCallbacks, EntityMetadata, EntityType, PhysicsConfig, PhysicsMode, ColliderConfig, ColliderShape } from "./types";
 import { EntityData } from "./scene-loader";
 import { CharacterControllerConfig } from "./character-controller";
 import type { ScriptManager } from "./script-manager";
@@ -13,6 +13,7 @@ export abstract class Entity extends THREE.Object3D {
   protected physicsManager: PhysicsManager | null = null;
   protected rigidBodyId: string | null = null;
   protected colliderId: string | null = null;
+  protected colliderIds: string[] = []; // Support multiple colliders in advanced mode
   public physicsConfig: PhysicsConfig | null = null;
   private tweens: TweenConfig[] = [];
   private interactionCallbacks: InteractionCallbacks = {};
@@ -149,13 +150,119 @@ export abstract class Entity extends THREE.Object3D {
   protected serializePhysics() {
     if (!this.physicsConfig) return undefined;
     
-    return {
+    const baseConfig = {
       enabled: true,
       type: this.physicsConfig.type || "static",
+      mode: this.physicsConfig.mode,
       mass: this.physicsConfig.mass,
       restitution: this.physicsConfig.restitution,
       friction: this.physicsConfig.friction
     };
+    
+    // Add advanced physics properties if in advanced mode
+    if (this.physicsConfig.mode === PhysicsMode.Advanced) {
+      return {
+        ...baseConfig,
+        colliders: this.physicsConfig.colliders?.map(collider => ({
+          ...collider,
+          // Serialize Vector3 objects
+          offset: collider.offset ? {
+            x: collider.offset.x,
+            y: collider.offset.y,
+            z: collider.offset.z
+          } : undefined,
+          rotation: collider.rotation ? {
+            x: collider.rotation.x,
+            y: collider.rotation.y,
+            z: collider.rotation.z,
+            w: collider.rotation.w
+          } : undefined,
+          // Serialize shape-specific Vector3s
+          shape: this.serializeColliderShape(collider.shape)
+        })),
+        linearDamping: this.physicsConfig.linearDamping,
+        angularDamping: this.physicsConfig.angularDamping,
+        gravityScale: this.physicsConfig.gravityScale,
+        canSleep: this.physicsConfig.canSleep,
+        ccd: this.physicsConfig.ccd,
+        dominanceGroup: this.physicsConfig.dominanceGroup,
+        additionalSolverIterations: this.physicsConfig.additionalSolverIterations,
+        lockTranslationX: this.physicsConfig.lockTranslationX,
+        lockTranslationY: this.physicsConfig.lockTranslationY,
+        lockTranslationZ: this.physicsConfig.lockTranslationZ,
+        lockRotationX: this.physicsConfig.lockRotationX,
+        lockRotationY: this.physicsConfig.lockRotationY,
+        lockRotationZ: this.physicsConfig.lockRotationZ,
+        linearVelocity: this.physicsConfig.linearVelocity ? {
+          x: this.physicsConfig.linearVelocity.x,
+          y: this.physicsConfig.linearVelocity.y,
+          z: this.physicsConfig.linearVelocity.z
+        } : undefined,
+        angularVelocity: this.physicsConfig.angularVelocity ? {
+          x: this.physicsConfig.angularVelocity.x,
+          y: this.physicsConfig.angularVelocity.y,
+          z: this.physicsConfig.angularVelocity.z
+        } : undefined
+      };
+    }
+    
+    return baseConfig;
+  }
+  
+  private serializeColliderShape(shape: any): any {
+    const baseShape = { type: shape.type };
+    
+    switch (shape.type) {
+      case "ball":
+        return { ...baseShape, radius: shape.radius };
+      case "cuboid":
+        return { 
+          ...baseShape, 
+          halfExtents: { 
+            x: shape.halfExtents.x, 
+            y: shape.halfExtents.y, 
+            z: shape.halfExtents.z 
+          }
+        };
+      case "capsule":
+      case "cylinder":
+      case "cone":
+        return { 
+          ...baseShape, 
+          halfHeight: shape.halfHeight, 
+          radius: shape.radius 
+        };
+      case "heightfield":
+        return {
+          ...baseShape,
+          heights: shape.heights,
+          scale: {
+            x: shape.scale.x,
+            y: shape.scale.y,
+            z: shape.scale.z
+          }
+        };
+      case "compound":
+        return {
+          ...baseShape,
+          shapes: shape.shapes.map((subShape: any) => ({
+            shape: this.serializeColliderShape(subShape.shape),
+            position: subShape.position ? {
+              x: subShape.position.x,
+              y: subShape.position.y,
+              z: subShape.position.z
+            } : undefined,
+            rotation: subShape.rotation ? {
+              x: subShape.rotation.x,
+              y: subShape.rotation.y,
+              z: subShape.rotation.z,
+              w: subShape.rotation.w
+            } : undefined
+          }))
+        };
+      default:
+        return shape;
+    }
   }
 
   dispatchEvent(event: any): void {
@@ -173,7 +280,7 @@ export abstract class Entity extends THREE.Object3D {
     return this;
   }
 
-  private updatePhysicsConfig(config: PhysicsConfig): this {
+  updatePhysicsConfig(config: PhysicsConfig): this {
     if (!this.physicsManager) return this;
 
     // If a rigid body already exists, remove it before creating a new one.
@@ -181,18 +288,19 @@ export abstract class Entity extends THREE.Object3D {
       this.physicsManager.removeRigidBody(this.rigidBodyId);
       this.rigidBodyId = null;
     }
+    
+    // Remove all existing colliders
     if (this.colliderId) {
       this.physicsManager.removeCollider(this.colliderId);
       this.colliderId = null;
     }
+    this.colliderIds.forEach(id => this.physicsManager!.removeCollider(id));
+    this.colliderIds = [];
 
     this.setupPhysics(config);
 
     if (this.physicsConfig) {
-      this.physicsConfig.friction = config.friction;
-      this.physicsConfig.mass = config.mass;
-      this.physicsConfig.restitution = config.restitution;
-      this.physicsConfig.type = config.type;
+      this.physicsConfig = { ...this.physicsConfig, ...config };
     } else {
       this.physicsConfig = config;
     }
@@ -202,20 +310,44 @@ export abstract class Entity extends THREE.Object3D {
   }
 
   enableDynamicPhysics(mass = 1, restitution = 0.5, friction = 0.7): this {
-    const config = { type: "dynamic" as const, mass, restitution, friction };
+    const config: PhysicsConfig = { 
+      type: "dynamic" as const, 
+      mass, 
+      restitution, 
+      friction,
+      mode: PhysicsMode.Simple 
+    };
     this.updatePhysicsConfig(config);
     return this;
   }
 
   enableStaticPhysics(restitution = 0.5, friction = 0.7): this {
-    const config = { type: "static" as const, restitution, friction };
+    const config: PhysicsConfig = { 
+      type: "static" as const, 
+      restitution, 
+      friction,
+      mode: PhysicsMode.Simple 
+    };
     this.updatePhysicsConfig(config);
     return this;
   }
 
   enableKinematicPhysics(): this {
-    const config = { type: "kinematic" as const };
+    const config: PhysicsConfig = { 
+      type: "kinematic" as const,
+      mode: PhysicsMode.Simple 
+    };
     this.updatePhysicsConfig(config);
+    return this;
+  }
+
+  // New method for advanced physics
+  enableAdvancedPhysics(config: PhysicsConfig): this {
+    const advancedConfig: PhysicsConfig = {
+      ...config,
+      mode: PhysicsMode.Advanced
+    };
+    this.updatePhysicsConfig(advancedConfig);
     return this;
   }
 
@@ -335,8 +467,17 @@ export abstract class Entity extends THREE.Object3D {
     
     const rigidBody = this.physicsManager.createRigidBody(this.rigidBodyId, config, physicsPosition, worldQuaternion);
     if (rigidBody) {
-      this.colliderId = `${this.entityId}_collider`;
-      this.createCollider(config);
+      if (config.mode === PhysicsMode.Advanced && config.colliders) {
+        // Advanced mode: create multiple colliders
+        this.colliderIds = this.physicsManager.createCollidersFromConfig(
+          this.rigidBodyId,
+          config.colliders
+        );
+      } else {
+        // Simple mode: create single collider
+        this.colliderId = `${this.entityId}_collider`;
+        this.createCollider(config);
+      }
     }
   }
 
@@ -710,6 +851,14 @@ export abstract class Entity extends THREE.Object3D {
       jumpForce: 12.0,
       sprintMultiplier: 1.8,
       
+      // Crouch and Slide mechanics
+      crouchSpeedMultiplier: 0.5,
+      slideSpeedMultiplier: 1.5,
+      slideDuration: 1.5,
+      slideDeceleration: 10.0,
+      crouchHeightReduction: 0.5,
+      slideMinSpeed: 5.0,
+      
       // Advanced movement mechanics (CS-like defaults)
       airAcceleration: 40.0,
       airMaxSpeed: 30.0,
@@ -730,6 +879,12 @@ export abstract class Entity extends THREE.Object3D {
       preSpeedBoost: 1.2,
       jumpWhileSliding: true,
       bunnyHopTolerance: 0.1,
+      
+      // Moving platform and collision response
+      enableMovingPlatforms: true,
+      enableMovingBodyPush: true,
+      movingPlatformMaxDistance: 0.2,
+      movingBodyPushForce: 1.0,
       
       offset: 0.01,
       maxSlopeClimbAngle: Math.PI / 4,
@@ -879,6 +1034,164 @@ export abstract class Entity extends THREE.Object3D {
     for (const scriptId of scriptsToDetach) {
       this.detachScript(scriptId);
     }
+    return this;
+  }
+
+  // New methods for managing colliders in advanced mode
+  addCollider(colliderConfig: ColliderConfig): string | null {
+    if (!this.physicsConfig || this.physicsConfig.mode !== PhysicsMode.Advanced) {
+      console.warn("Cannot add collider: entity is not in advanced physics mode");
+      return null;
+    }
+    
+    if (!this.physicsManager || !this.rigidBodyId) return null;
+    
+    const colliderId = `${this.entityId}_collider_${this.colliderIds.length}`;
+    const rigidBody = this.physicsManager.getRigidBody(this.rigidBodyId);
+    if (!rigidBody) return null;
+    
+    const collider = this.physicsManager.createColliderFromShape(
+      colliderId,
+      rigidBody,
+      colliderConfig.shape,
+      colliderConfig
+    );
+    
+    if (collider) {
+      this.colliderIds.push(colliderId);
+      
+      // Update physics config
+      if (!this.physicsConfig.colliders) {
+        this.physicsConfig.colliders = [];
+      }
+      this.physicsConfig.colliders.push(colliderConfig);
+      
+      this.emitChange();
+      return colliderId;
+    }
+    
+    return null;
+  }
+
+  removeColliderById(colliderId: string): boolean {
+    if (!this.physicsManager) return false;
+    
+    const index = this.colliderIds.indexOf(colliderId);
+    if (index === -1) return false;
+    
+    if (this.physicsManager.removeCollider(colliderId)) {
+      this.colliderIds.splice(index, 1);
+      
+      // Update physics config
+      if (this.physicsConfig?.colliders) {
+        this.physicsConfig.colliders.splice(index, 1);
+      }
+      
+      this.emitChange();
+      return true;
+    }
+    
+    return false;
+  }
+
+  getColliderIds(): string[] {
+    if (this.physicsConfig?.mode === PhysicsMode.Advanced) {
+      return [...this.colliderIds];
+    } else if (this.colliderId) {
+      return [this.colliderId];
+    }
+    return [];
+  }
+
+  // New method to update advanced physics properties
+  updateAdvancedPhysicsProperty(property: string, value: any): this {
+    if (!this.hasPhysics() || !this.physicsConfig || this.physicsConfig.mode !== PhysicsMode.Advanced) return this;
+    
+    // Update the config
+    (this.physicsConfig as any)[property] = value;
+    
+    // Apply specific updates based on property
+    if (this.physicsManager && this.rigidBodyId) {
+      const rigidBody = this.physicsManager.getRigidBody(this.rigidBodyId);
+      if (rigidBody) {
+        switch (property) {
+          case 'linearDamping':
+            rigidBody.setLinearDamping(value);
+            break;
+          case 'angularDamping':
+            rigidBody.setAngularDamping(value);
+            break;
+          case 'gravityScale':
+            rigidBody.setGravityScale(value, true);
+            break;
+          case 'lockTranslationX':
+          case 'lockTranslationY':
+          case 'lockTranslationZ':
+            const locks = {
+              x: this.physicsConfig.lockTranslationX || false,
+              y: this.physicsConfig.lockTranslationY || false,
+              z: this.physicsConfig.lockTranslationZ || false,
+            };
+            rigidBody.setEnabledTranslations(!locks.x, !locks.y, !locks.z, true);
+            break;
+          case 'lockRotationX':
+          case 'lockRotationY':
+          case 'lockRotationZ':
+            const rotLocks = {
+              x: this.physicsConfig.lockRotationX || false,
+              y: this.physicsConfig.lockRotationY || false,
+              z: this.physicsConfig.lockRotationZ || false,
+            };
+            rigidBody.setEnabledRotations(!rotLocks.x, !rotLocks.y, !rotLocks.z, true);
+            break;
+        }
+      }
+    }
+    
+    this.emitChange();
+    return this;
+  }
+
+  // New method to update entire collider without recreating physics bodies
+  updateColliderConfig(colliderIndex: number, newColliderConfig: ColliderConfig): this {
+    if (!this.hasPhysics() || !this.physicsConfig || this.physicsConfig.mode !== PhysicsMode.Advanced) return this;
+    if (!this.physicsConfig.colliders || colliderIndex >= this.physicsConfig.colliders.length) return this;
+    
+    // Update the collider config
+    const updatedColliders = [...this.physicsConfig.colliders];
+    updatedColliders[colliderIndex] = { ...newColliderConfig };
+    
+    // Update the physics config without recreating bodies
+    this.physicsConfig = {
+      ...this.physicsConfig,
+      colliders: updatedColliders
+    };
+    
+    // For now, we'll need to recreate the specific collider if it exists
+    // This is more efficient than recreating all physics bodies
+    if (this.physicsManager && this.colliderIds[colliderIndex]) {
+      const colliderId = this.colliderIds[colliderIndex];
+      const rigidBody = this.physicsManager.getRigidBody(this.rigidBodyId!);
+      
+      if (rigidBody) {
+        // Remove the old collider
+        this.physicsManager.removeCollider(colliderId);
+        
+        // Create new collider with updated config
+        const newCollider = this.physicsManager.createColliderFromShape(
+          colliderId,
+          rigidBody,
+          newColliderConfig.shape,
+          newColliderConfig
+        );
+        
+        if (!newCollider) {
+          console.warn('Failed to recreate collider:', colliderId);
+        }
+      }
+    }
+    
+    this.emitChange();
     return this;
   }
 }

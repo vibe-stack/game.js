@@ -9,6 +9,17 @@ export class HelperManager {
   private helpers: Map<string, THREE.Object3D> = new Map();
   private isEnabled = true;
   private isVisible = true; // Controls visibility based on game state
+  
+  // Grid configuration
+  private gridSettings = {
+    showGrid: true,
+    gridSize: 1,
+    gridDivisions: 10,
+    gridColor: "#888888",
+    gridOpacity: 0.5,
+    gridCenter: { x: 0, y: 0, z: 0 },
+    gridInfinite: false,
+  };
 
   constructor() {}
 
@@ -55,6 +66,11 @@ export class HelperManager {
 
     // Create helpers for lights
     this.createLightHelpers();
+
+    // Create grid if enabled
+    if (this.gridSettings.showGrid) {
+      this.createGrid();
+    }
   }
 
   private createCameraHelpers(): void {
@@ -262,5 +278,128 @@ export class HelperManager {
   dispose(): void {
     this.clearAllHelpers();
     this.gameWorld = null;
+  }
+
+  // Grid Management Methods
+  setGridSettings(settings: Partial<typeof this.gridSettings>): void {
+    this.gridSettings = { ...this.gridSettings, ...settings };
+    this.updateGrid();
+  }
+
+  loadGridSettings(editorSettings: any): void {
+    if (!editorSettings) return;
+    
+    this.gridSettings = {
+      showGrid: editorSettings.showGrid ?? true,
+      gridSize: editorSettings.gridSize ?? 1,
+      gridDivisions: editorSettings.gridDivisions ?? 10,
+      gridColor: editorSettings.gridColor ?? "#888888",
+      gridOpacity: editorSettings.gridOpacity ?? 0.5,
+      gridCenter: editorSettings.gridCenter ?? { x: 0, y: 0, z: 0 },
+      gridInfinite: editorSettings.gridInfinite ?? false,
+    };
+    
+    this.updateGrid();
+  }
+
+  getGridSettings(): typeof this.gridSettings {
+    return { ...this.gridSettings };
+  }
+
+  setGridVisible(visible: boolean): void {
+    this.gridSettings.showGrid = visible;
+    this.updateGrid();
+  }
+
+  isGridVisible(): boolean {
+    return this.gridSettings.showGrid;
+  }
+
+  setGridSize(size: number): void {
+    this.gridSettings.gridSize = size;
+    this.updateGrid();
+  }
+
+  setGridDivisions(divisions: number): void {
+    this.gridSettings.gridDivisions = divisions;
+    this.updateGrid();
+  }
+
+  setGridColor(color: string): void {
+    this.gridSettings.gridColor = color;
+    this.updateGrid();
+  }
+
+  setGridOpacity(opacity: number): void {
+    this.gridSettings.gridOpacity = opacity;
+    this.updateGrid();
+  }
+
+  setGridCenter(center: { x: number; y: number; z: number }): void {
+    this.gridSettings.gridCenter = center;
+    this.updateGrid();
+  }
+
+  setGridInfinite(infinite: boolean): void {
+    this.gridSettings.gridInfinite = infinite;
+    this.updateGrid();
+  }
+
+  private updateGrid(): void {
+    if (!this.gameWorld || !this.isEnabled || !this.isVisible) return;
+
+    // Remove existing grid
+    this.removeHelper('grid');
+
+    // Create new grid if enabled
+    if (this.gridSettings.showGrid) {
+      this.createGrid();
+    }
+  }
+
+  private createGrid(): void {
+    if (!this.gameWorld) return;
+
+    const grid = this.gridSettings.gridInfinite 
+      ? this.createInfiniteGrid() 
+      : this.createFiniteGrid();
+
+    if (grid) {
+      grid.name = 'grid-helper';
+      this.helpers.set('grid', grid);
+      this.gameWorld.getScene().add(grid);
+    }
+  }
+
+  private createFiniteGrid(): THREE.Object3D {
+    const { gridSize, gridDivisions, gridColor, gridOpacity, gridCenter } = this.gridSettings;
+    
+    const grid = new THREE.GridHelper(
+      gridSize * gridDivisions, 
+      gridDivisions, 
+      gridColor, 
+      gridColor
+    );
+    
+    grid.position.set(gridCenter.x, gridCenter.y, gridCenter.z);
+    grid.material.opacity = gridOpacity;
+    grid.material.transparent = true;
+    
+    return grid;
+  }
+
+  private createInfiniteGrid(): THREE.Object3D {
+    const { gridSize, gridColor, gridOpacity, gridCenter } = this.gridSettings;
+    
+    // Create a large grid that appears infinite
+    const size = 1000;
+    const divisions = Math.floor(size / gridSize);
+    
+    const grid = new THREE.GridHelper(size, divisions, gridColor, gridColor);
+    grid.position.set(gridCenter.x, gridCenter.y, gridCenter.z);
+    grid.material.opacity = gridOpacity;
+    grid.material.transparent = true;
+    
+    return grid;
   }
 } 

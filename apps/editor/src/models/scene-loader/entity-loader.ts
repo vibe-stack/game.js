@@ -269,11 +269,135 @@ export class EntityLoader {
 
   private applyPhysicsToEntity(entity: Entity, data: EntityData): void {
     if (!data.physics || !data.physics.enabled) return;
-    switch (data.physics.type) {
-      case "dynamic": entity.enableDynamicPhysics(data.physics.mass, data.physics.restitution, data.physics.friction); break;
-      case "static": entity.enableStaticPhysics(data.physics.restitution, data.physics.friction); break;
-      case "kinematic": entity.enableKinematicPhysics(); break;
+    
+    // Check if it's advanced mode physics
+    if (data.physics.mode === "advanced") {
+      // Reconstruct collider configurations with proper THREE.js objects
+      const reconstructedConfig: any = { ...data.physics };
+      
+      // Reconstruct colliders
+      if (data.physics.colliders) {
+        reconstructedConfig.colliders = data.physics.colliders.map((collider: any) => {
+          const reconstructedCollider: any = { ...collider };
+          
+          // Reconstruct Vector3 for offset
+          if (collider.offset) {
+            reconstructedCollider.offset = new THREE.Vector3(
+              collider.offset.x,
+              collider.offset.y,
+              collider.offset.z
+            );
+          }
+          
+          // Reconstruct Quaternion for rotation
+          if (collider.rotation) {
+            reconstructedCollider.rotation = new THREE.Quaternion(
+              collider.rotation.x,
+              collider.rotation.y,
+              collider.rotation.z,
+              collider.rotation.w
+            );
+          }
+          
+          // Reconstruct shape-specific properties
+          if (collider.shape) {
+            reconstructedCollider.shape = this.reconstructColliderShape(collider.shape);
+          }
+          
+          return reconstructedCollider;
+        });
+      }
+      
+      // Reconstruct velocity vectors
+      if (data.physics.linearVelocity) {
+        reconstructedConfig.linearVelocity = new THREE.Vector3(
+          data.physics.linearVelocity.x,
+          data.physics.linearVelocity.y,
+          data.physics.linearVelocity.z
+        );
+      }
+      
+      if (data.physics.angularVelocity) {
+        reconstructedConfig.angularVelocity = new THREE.Vector3(
+          data.physics.angularVelocity.x,
+          data.physics.angularVelocity.y,
+          data.physics.angularVelocity.z
+        );
+      }
+      
+      entity.enableAdvancedPhysics(reconstructedConfig);
+    } else {
+      // Simple physics mode
+      switch (data.physics.type) {
+        case "dynamic": entity.enableDynamicPhysics(data.physics.mass, data.physics.restitution, data.physics.friction); break;
+        case "static": entity.enableStaticPhysics(data.physics.restitution, data.physics.friction); break;
+        case "kinematic": entity.enableKinematicPhysics(); break;
+      }
     }
+  }
+  
+  private reconstructColliderShape(shape: any): any {
+    if (!shape) return shape;
+    
+    const reconstructed: any = { type: shape.type };
+    
+    switch (shape.type) {
+      case "ball":
+        reconstructed.radius = shape.radius;
+        break;
+      case "cuboid":
+        if (shape.halfExtents) {
+          reconstructed.halfExtents = new THREE.Vector3(
+            shape.halfExtents.x,
+            shape.halfExtents.y,
+            shape.halfExtents.z
+          );
+        }
+        break;
+      case "capsule":
+      case "cylinder":
+      case "cone":
+        reconstructed.halfHeight = shape.halfHeight;
+        reconstructed.radius = shape.radius;
+        break;
+      case "heightfield":
+        reconstructed.heights = shape.heights;
+        if (shape.scale) {
+          reconstructed.scale = new THREE.Vector3(
+            shape.scale.x,
+            shape.scale.y,
+            shape.scale.z
+          );
+        }
+        break;
+      case "compound":
+        if (shape.shapes) {
+          reconstructed.shapes = shape.shapes.map((subShape: any) => ({
+            shape: this.reconstructColliderShape(subShape.shape),
+            position: subShape.position ? new THREE.Vector3(
+              subShape.position.x,
+              subShape.position.y,
+              subShape.position.z
+            ) : undefined,
+            rotation: subShape.rotation ? new THREE.Quaternion(
+              subShape.rotation.x,
+              subShape.rotation.y,
+              subShape.rotation.z,
+              subShape.rotation.w
+            ) : undefined
+          }));
+        }
+        break;
+      case "convexHull":
+        reconstructed.vertices = shape.vertices;
+        break;
+      case "trimesh":
+        reconstructed.vertices = shape.vertices;
+        reconstructed.indices = shape.indices;
+        break;
+    }
+    
+    return reconstructed;
   }
 
   private createMaterialFromData(context: LoaderContext, materialData: any): THREE.Material {

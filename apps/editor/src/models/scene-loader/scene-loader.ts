@@ -31,6 +31,9 @@ export class SceneLoader {
     try {
       gameWorld.scene.clear();
       
+      // Load rendering settings first
+      await this.loadRenderingSettings(context, sceneData);
+      
       // Load materials first
       await this.loadMaterials(context, sceneData);
       
@@ -53,9 +56,87 @@ export class SceneLoader {
       const entityData = sceneData.entities as any[];
       await this.entityLoader.load(context, entityData);
 
+      // Load editor settings (including grid settings)
+      await this.loadEditorSettings(context, sceneData);
+
     } catch (error) {
       console.error(`Failed to load scene "${sceneData.name}":`, error);
       throw error;
+    }
+  }
+
+  private async loadEditorSettings(context: LoaderContext, sceneData: SceneData): Promise<void> {
+    // Note: This method is called from GameWorldService which has access to the HelperManager
+    // The actual grid settings loading is handled in GameWorldService.loadScene
+  }
+
+  private async loadRenderingSettings(context: LoaderContext, sceneData: SceneData): Promise<void> {
+    const { gameWorld } = context;
+    const renderingSettings = sceneData.world.rendering;
+    
+    if (!renderingSettings) return;
+    
+    // Load target resolution settings
+    if (renderingSettings.targetResolution) {
+      gameWorld.setTargetResolution(
+        renderingSettings.targetResolution.width,
+        renderingSettings.targetResolution.height,
+        renderingSettings.targetResolution.maintainAspectRatio
+      );
+    } else if (renderingSettings.pixelRatio) {
+      // Backwards compatibility: convert pixel ratio to target resolution
+      const canvas = gameWorld.getCanvas();
+      const rect = canvas.getBoundingClientRect();
+      const width = rect.width || canvas.clientWidth || 800;
+      const height = rect.height || canvas.clientHeight || 600;
+      
+      // Calculate target resolution based on pixel ratio
+      const targetWidth = Math.round(width * renderingSettings.pixelRatio);
+      const targetHeight = Math.round(height * renderingSettings.pixelRatio);
+      
+      gameWorld.setTargetResolution(targetWidth, targetHeight, true);
+    }
+    
+    // Load shadow settings
+    if (renderingSettings.shadows) {
+      const renderer = gameWorld.getRenderer();
+      renderer.shadowMap.enabled = renderingSettings.shadows.enabled;
+      
+      // Set shadow map type if specified
+      if (renderingSettings.shadows.type) {
+        switch (renderingSettings.shadows.type) {
+          case "basic":
+            renderer.shadowMap.type = THREE.BasicShadowMap;
+            break;
+          case "pcf":
+            renderer.shadowMap.type = THREE.PCFShadowMap;
+            break;
+          case "pcfsoft":
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            break;
+          case "vsm":
+            renderer.shadowMap.type = THREE.VSMShadowMap;
+            break;
+          default:
+            renderer.shadowMap.type = THREE.PCFShadowMap;
+        }
+      }
+    }
+    
+    // Load background color
+    if (renderingSettings.backgroundColor) {
+      gameWorld.scene.background = new THREE.Color(renderingSettings.backgroundColor);
+    }
+    
+    // Load fog settings
+    if (renderingSettings.fog && renderingSettings.fog.enabled) {
+      gameWorld.scene.fog = new THREE.Fog(
+        renderingSettings.fog.color,
+        renderingSettings.fog.near,
+        renderingSettings.fog.far
+      );
+    } else {
+      gameWorld.scene.fog = null;
     }
   }
 
@@ -509,15 +590,28 @@ export class SceneLoader {
         gravity: { x: 0, y: -9.81, z: 0 },
         physics: { enabled: true, timeStep: 1/60, maxSubSteps: 10 },
         rendering: {
-          backgroundColor: "#87CEEB", environment: "",
+          backgroundColor: "#2a2a2a", environment: "",
           fog: { enabled: false, color: "#ffffff", near: 10, far: 100 },
           shadows: { enabled: true, type: "pcfsoft" },
-          antialias: true, pixelRatio: 1,
+          antialias: true, 
+          targetResolution: { width: 1920, height: 1080, maintainAspectRatio: true },
+          pixelRatio: 1, // Keep for backwards compatibility
         },
       },
       activeCamera: "main-camera",
       assets: [],
-      editor: { showGrid: true, gridSize: 1, showHelpers: true, showWireframe: false, debugPhysics: false },
+      editor: { 
+        showGrid: true, 
+        gridSize: 1, 
+        gridDivisions: 10,
+        gridColor: "#888888",
+        gridOpacity: 0.5,
+        gridCenter: { x: 0, y: 0, z: 0 },
+        gridInfinite: false,
+        showHelpers: true, 
+        showWireframe: false, 
+        debugPhysics: false 
+      },
       metadata: { created: now, modified: now, version: "1.0.0" },
     };
   }
