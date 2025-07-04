@@ -31,8 +31,11 @@ export abstract class Light extends Entity {
     this.light.name = this.entityName;
     this.add(this.light);
     
-    if (config.castShadow && 'castShadow' in this.light) {
-      (this.light as any).castShadow = true;
+    if ('castShadow' in this.light) {
+      (this.light as any).castShadow = this.castShadow;
+    }
+    
+    if (this.castShadow) {
       this.configureShadows(config);
     }
   }
@@ -64,16 +67,10 @@ export abstract class Light extends Entity {
   protected createCollider() {} // Lights don't have physics colliders
   
   serialize(): EntityData {
+    const baseData = this.serializeBase();
     return {
-      id: this.entityId, name: this.entityName, type: "light",
-      transform: {
-        position: { x: this.position.x, y: this.position.y, z: this.position.z },
-        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
-        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
-      },
-      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
-      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
-      scripts: this.serializeScripts(),
+      ...baseData,
+      type: "light",
       properties: {
         type: this.lightType,
         color: `#${this.light.color.getHexString()}`,

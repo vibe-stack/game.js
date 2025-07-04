@@ -158,6 +158,13 @@ export interface SceneData {
         maintainAspectRatio: boolean;
       };
       pixelRatio?: number;
+      postProcessing?: {
+        bloom: {
+          strength: number;
+          radius: number;
+        };
+        toneMappingExposure: number;
+      };
     };
   };
   activeCamera?: string;

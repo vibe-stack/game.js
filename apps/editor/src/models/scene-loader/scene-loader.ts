@@ -138,6 +138,24 @@ export class SceneLoader {
     } else {
       gameWorld.scene.fog = null;
     }
+    
+    // Load post-processing settings
+    if (renderingSettings.postProcessing) {
+      const { bloom, toneMappingExposure } = renderingSettings.postProcessing;
+      
+      // Set bloom settings
+      if (bloom) {
+        gameWorld.setBloomSettings(bloom.strength, bloom.radius);
+      }
+      
+      // Set tone mapping exposure
+      if (toneMappingExposure !== undefined) {
+        gameWorld.setToneMappingExposure(toneMappingExposure);
+      }
+      
+      // Ensure post-processing is initialized with the new settings
+      gameWorld.ensurePostProcessingInitialized();
+    }
   }
 
   private async loadMaterials(context: LoaderContext, sceneData: SceneData): Promise<void> {
@@ -596,6 +614,10 @@ export class SceneLoader {
           antialias: true, 
           targetResolution: { width: 1920, height: 1080, maintainAspectRatio: true },
           pixelRatio: 1, // Keep for backwards compatibility
+          postProcessing: {
+            bloom: { strength: 0.7, radius: 0.5 },
+            toneMappingExposure: 1.0,
+          },
         },
       },
       activeCamera: "main-camera",

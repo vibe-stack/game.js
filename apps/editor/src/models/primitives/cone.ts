@@ -26,71 +26,47 @@ export interface ConeConfig extends EntityConfig {
 }
 
 export class Cone extends Entity {
-  public readonly dimensions: { radius: number; height: number };
-  public readonly segmentConfig: {
-    radial: number;
-    height: number;
-    openEnded: boolean;
-    thetaStart: number;
-    thetaLength: number;
-  };
+  public radius: number;
+  public height: number;
+  public radialSegments: number;
+  public heightSegments: number;
+  public openEnded: boolean;
+  public thetaStart: number;
+  public thetaLength: number;
   private mesh: THREE.Mesh;
   private geometry: THREE.ConeGeometry;
+  private material: THREE.Material;
 
   constructor(config: ConeConfig = {}) {
-    super(config);
-    
-    this.dimensions = {
-      radius: config.radius ?? 1,
-      height: config.height ?? 1
-    };
-    
-    this.segmentConfig = {
-      radial: config.radialSegments ?? 32,
-      height: config.heightSegments ?? 1,
-      openEnded: config.openEnded ?? false,
-      thetaStart: config.thetaStart ?? 0,
-      thetaLength: config.thetaLength ?? Math.PI * 2
-    };
-    
-    const material = config.material ?? new THREE.MeshStandardMaterial({ color: 0x88ff00 });
-    
-    this.geometry = new THREE.ConeGeometry(
-      this.dimensions.radius,
-      this.dimensions.height,
-      this.segmentConfig.radial,
-      this.segmentConfig.height,
-      this.segmentConfig.openEnded,
-      this.segmentConfig.thetaStart,
-      this.segmentConfig.thetaLength
-    );
-    
-    this.mesh = new THREE.Mesh(this.geometry, material);
-    this.mesh.castShadow = config.castShadow ?? true;
-    this.mesh.receiveShadow = config.receiveShadow ?? true;
+    super({
+      ...config,
+      castShadow: config.castShadow ?? true,
+      receiveShadow: config.receiveShadow ?? true
+    });
+    this.radius = config.radius ?? 1;
+    this.height = config.height ?? 2;
+    this.radialSegments = config.radialSegments ?? 16;
+    this.heightSegments = config.heightSegments ?? 1;
+    this.openEnded = config.openEnded ?? false;
+    this.thetaStart = config.thetaStart ?? 0;
+    this.thetaLength = config.thetaLength ?? Math.PI * 2;
+    this.material = config.material ?? new THREE.MeshStandardMaterial({ color: 0xff9900 });
+    this.geometry = new THREE.ConeGeometry(this.radius, this.height, this.radialSegments, this.heightSegments, this.openEnded, this.thetaStart, this.thetaLength);
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.mesh.castShadow = this.castShadow;
+    this.mesh.receiveShadow = this.receiveShadow;
     this.add(this.mesh);
-    
     this.metadata.type = "primitive";
     this.addTag("cone");
   }
 
-  protected createCollider(): void {
-    if (!this.physicsManager || !this.rigidBodyId) return;
-    
-    // Use scaled dimensions to ensure collider matches visual size
-    const scaledDimensions = new THREE.Vector3(
-      this.dimensions.radius * Math.max(this.scale.x, this.scale.z),
-      this.dimensions.height * this.scale.y,
-      this.dimensions.radius * Math.max(this.scale.x, this.scale.z)
-    );
-    
-    // Use proper cone collider
-    this.physicsManager.createCollider(
-      this.colliderId!,
-      this.rigidBodyId,
-      "cone",
-      scaledDimensions
-    );
+  protected createCollider(config: any): void {
+    if (this.physicsManager && this.rigidBodyId) {
+      const scaledHeight = this.height * this.scale.y;
+      const scaledRadius = this.radius * Math.max(this.scale.x, this.scale.z);
+      const dimensions = new THREE.Vector3(scaledRadius, scaledHeight, 0);
+      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "cone", dimensions, config);
+    }
   }
 
   setDimensions(radius: number, height: number): this {
@@ -98,15 +74,15 @@ export class Cone extends Entity {
     this.geometry = new THREE.ConeGeometry(
       radius,
       height,
-      this.segmentConfig.radial,
-      this.segmentConfig.height,
-      this.segmentConfig.openEnded,
-      this.segmentConfig.thetaStart,
-      this.segmentConfig.thetaLength
+      this.radialSegments,
+      this.heightSegments,
+      this.openEnded,
+      this.thetaStart,
+      this.thetaLength
     );
     this.mesh.geometry = this.geometry;
-    (this.dimensions as any).radius = radius;
-    (this.dimensions as any).height = height;
+    this.radius = radius;
+    this.height = height;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
@@ -114,17 +90,17 @@ export class Cone extends Entity {
   setSegments(radialSegments: number, heightSegments: number): this {
     this.geometry.dispose();
     this.geometry = new THREE.ConeGeometry(
-      this.dimensions.radius,
-      this.dimensions.height,
+      this.radius,
+      this.height,
       radialSegments,
       heightSegments,
-      this.segmentConfig.openEnded,
-      this.segmentConfig.thetaStart,
-      this.segmentConfig.thetaLength
+      this.openEnded,
+      this.thetaStart,
+      this.thetaLength
     );
     this.mesh.geometry = this.geometry;
-    (this.segmentConfig as any).radial = radialSegments;
-    (this.segmentConfig as any).height = heightSegments;
+    this.radialSegments = radialSegments;
+    this.heightSegments = heightSegments;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
@@ -132,17 +108,17 @@ export class Cone extends Entity {
   setAngularConfig(thetaStart: number, thetaLength: number): this {
     this.geometry.dispose();
     this.geometry = new THREE.ConeGeometry(
-      this.dimensions.radius,
-      this.dimensions.height,
-      this.segmentConfig.radial,
-      this.segmentConfig.height,
-      this.segmentConfig.openEnded,
+      this.radius,
+      this.height,
+      this.radialSegments,
+      this.heightSegments,
+      this.openEnded,
       thetaStart,
       thetaLength
     );
     this.mesh.geometry = this.geometry;
-    (this.segmentConfig as any).thetaStart = thetaStart;
-    (this.segmentConfig as any).thetaLength = thetaLength;
+    this.thetaStart = thetaStart;
+    this.thetaLength = thetaLength;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
@@ -150,31 +126,34 @@ export class Cone extends Entity {
   setOpenEnded(openEnded: boolean): this {
     this.geometry.dispose();
     this.geometry = new THREE.ConeGeometry(
-      this.dimensions.radius,
-      this.dimensions.height,
-      this.segmentConfig.radial,
-      this.segmentConfig.height,
+      this.radius,
+      this.height,
+      this.radialSegments,
+      this.heightSegments,
       openEnded,
-      this.segmentConfig.thetaStart,
-      this.segmentConfig.thetaLength
+      this.thetaStart,
+      this.thetaLength
     );
     this.mesh.geometry = this.geometry;
-    (this.segmentConfig as any).openEnded = openEnded;
+    this.openEnded = openEnded;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
   setMaterial(material: THREE.Material): this {
+    this.material = material;
     this.mesh.material = material;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
   getMaterial(): THREE.Material {
-    return this.mesh.material as THREE.Material;
+    return this.material;
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
+    this.castShadow = castShadow;
+    this.receiveShadow = receiveShadow;
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
     this.emitChange(); // Trigger change event for UI updates
@@ -189,47 +168,23 @@ export class Cone extends Entity {
     return this.geometry;
   }
 
-  // Convenience getters
-  get radius(): number { return this.dimensions.radius; }
-  get height(): number { return this.dimensions.height; }
-
-  // Create common cone variations
-  static createPyramid(config: Omit<ConeConfig, 'radialSegments'> = {}): Cone {
-    return new Cone({
-      ...config,
-      radialSegments: 4
-    });
-  }
-
-  static createSpike(config: ConeConfig = {}): Cone {
-    return new Cone({
-      radius: 0.2,
-      height: 2,
-      ...config
-    });
-  }
-
-  static createFunnel(config: ConeConfig = {}): Cone {
-    return new Cone({
-      ...config,
-      openEnded: true
-    });
-  }
-
   serialize(): EntityData {
+    const baseData = this.serializeBase();
     return {
-      id: this.entityId, name: this.entityName, type: "cone",
-      transform: {
-        position: { x: this.position.x, y: this.position.y, z: this.position.z },
-        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
-        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
-      },
-      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
-      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
-      physics: this.serializePhysics(),
-      characterController: this.serializeCharacterController(),
-      scripts: this.serializeScripts(),
-      geometry: { type: "ConeGeometry", parameters: { radius: this.radius, height: this.height, radialSegments: this.segmentConfig.radial, heightSegments: this.segmentConfig.height, openEnded: this.segmentConfig.openEnded, thetaStart: this.segmentConfig.thetaStart, thetaLength: this.segmentConfig.thetaLength } }
+      ...baseData,
+      type: "cone",
+      geometry: {
+        type: "ConeGeometry",
+        parameters: {
+          radius: this.radius,
+          height: this.height,
+          radialSegments: this.radialSegments,
+          heightSegments: this.heightSegments,
+          openEnded: this.openEnded,
+          thetaStart: this.thetaStart,
+          thetaLength: this.thetaLength
+        }
+      }
     };
   }
 } 

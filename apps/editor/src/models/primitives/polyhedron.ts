@@ -24,7 +24,11 @@ abstract class Polyhedron extends Entity {
   protected geometry: THREE.PolyhedronGeometry;
 
   constructor(config: PolyhedronConfig = {}) {
-    super(config);
+    super({
+      ...config,
+      castShadow: config.castShadow ?? true,
+      receiveShadow: config.receiveShadow ?? true,
+    });
     
     this.radius = config.radius ?? 1;
     this.detail = config.detail ?? 0;
@@ -33,8 +37,8 @@ abstract class Polyhedron extends Entity {
     
     this.geometry = this.createGeometry();
     this.mesh = new THREE.Mesh(this.geometry, material);
-    this.mesh.castShadow = config.castShadow ?? true;
-    this.mesh.receiveShadow = config.receiveShadow ?? true;
+    this.mesh.castShadow = this.castShadow;
+    this.mesh.receiveShadow = this.receiveShadow;
     this.add(this.mesh);
     
     this.metadata.type = "primitive";
@@ -79,6 +83,8 @@ abstract class Polyhedron extends Entity {
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
+    this.castShadow = castShadow;
+    this.receiveShadow = receiveShadow;
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
     this.emitChange(); // Trigger change event for UI updates
@@ -94,17 +100,10 @@ abstract class Polyhedron extends Entity {
   }
 
   serialize(): EntityData {
+    const baseData = this.serializeBase();
     return {
-      id: this.entityId, name: this.entityName, type: "polyhedron",
-      transform: {
-        position: { x: this.position.x, y: this.position.y, z: this.position.z },
-        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
-        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
-      },
-      characterController: this.serializeCharacterController(),
-      scripts: this.serializeScripts(),
-      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
-      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
+      ...baseData,
+      type: "polyhedron",
       geometry: { type: "PolyhedronGeometry", parameters: { radius: this.radius, detail: this.detail } }
     };
   }

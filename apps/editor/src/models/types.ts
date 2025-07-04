@@ -99,6 +99,8 @@ export interface EntityConfig {
   position?: THREE.Vector3;
   rotation?: THREE.Euler;
   scale?: THREE.Vector3;
+  castShadow?: boolean;
+  receiveShadow?: boolean;
   physics?: PhysicsConfig;
 }
 

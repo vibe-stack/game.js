@@ -557,24 +557,10 @@ export class Mesh3D extends Entity {
    * Serialize the entity including model path
    */
   serialize(): EntityData {
+    const baseData = this.serializeBase();
     return {
-      id: this.entityId,
-      name: this.entityName,
+      ...baseData,
       type: "mesh3d",
-      transform: {
-        position: { x: this.position.x, y: this.position.y, z: this.position.z },
-        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
-        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
-      },
-      visible: this.visible,
-      castShadow: this.config.castShadow,
-      receiveShadow: this.config.receiveShadow,
-      userData: { ...this.userData },
-      tags: [...this.metadata.tags],
-      layer: this.metadata.layer,
-      physics: this.serializePhysics(),
-      characterController: this.serializeCharacterController(),
-      scripts: this.serializeScripts(),
       properties: {
         modelPath: this.modelPath,
         modelUrl: this.modelUrl,

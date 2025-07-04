@@ -27,94 +27,48 @@ export interface CylinderConfig extends EntityConfig {
 }
 
 export class Cylinder extends Entity {
-  public readonly dimensions: {
-    radiusTop: number;
-    radiusBottom: number;
-    height: number;
-  };
-  public readonly segmentConfig: {
-    radial: number;
-    height: number;
-    openEnded: boolean;
-    thetaStart: number;
-    thetaLength: number;
-  };
+  public radiusTop: number;
+  public radiusBottom: number;
+  public height: number;
+  public radialSegments: number;
+  public heightSegments: number;
+  public openEnded: boolean;
+  public thetaStart: number;
+  public thetaLength: number;
   private mesh: THREE.Mesh;
   private geometry: THREE.CylinderGeometry;
+  private material: THREE.Material;
 
   constructor(config: CylinderConfig = {}) {
-    super(config);
-    
-    this.dimensions = {
-      radiusTop: config.radiusTop ?? 1,
-      radiusBottom: config.radiusBottom ?? 1,
-      height: config.height ?? 1
-    };
-    
-    this.segmentConfig = {
-      radial: config.radialSegments ?? 32,
-      height: config.heightSegments ?? 1,
-      openEnded: config.openEnded ?? false,
-      thetaStart: config.thetaStart ?? 0,
-      thetaLength: config.thetaLength ?? Math.PI * 2
-    };
-    
-    const material = config.material ?? new THREE.MeshStandardMaterial({ color: 0x0088ff });
-    
-    this.geometry = new THREE.CylinderGeometry(
-      this.dimensions.radiusTop,
-      this.dimensions.radiusBottom,
-      this.dimensions.height,
-      this.segmentConfig.radial,
-      this.segmentConfig.height,
-      this.segmentConfig.openEnded,
-      this.segmentConfig.thetaStart,
-      this.segmentConfig.thetaLength
-    );
-    
-    this.mesh = new THREE.Mesh(this.geometry, material);
-    this.mesh.castShadow = config.castShadow ?? true;
-    this.mesh.receiveShadow = config.receiveShadow ?? true;
+    super({
+      ...config,
+      castShadow: config.castShadow ?? true,
+      receiveShadow: config.receiveShadow ?? true
+    });
+    this.radiusTop = config.radiusTop ?? 1;
+    this.radiusBottom = config.radiusBottom ?? 1;
+    this.height = config.height ?? 1;
+    this.radialSegments = config.radialSegments ?? 16;
+    this.heightSegments = config.heightSegments ?? 1;
+    this.openEnded = config.openEnded ?? false;
+    this.thetaStart = config.thetaStart ?? 0;
+    this.thetaLength = config.thetaLength ?? Math.PI * 2;
+    this.material = config.material ?? new THREE.MeshStandardMaterial({ color: 0x00ffff });
+    this.geometry = new THREE.CylinderGeometry(this.radiusTop, this.radiusBottom, this.height, this.radialSegments, this.heightSegments, this.openEnded, this.thetaStart, this.thetaLength);
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.mesh.castShadow = this.castShadow;
+    this.mesh.receiveShadow = this.receiveShadow;
     this.add(this.mesh);
-    
     this.metadata.type = "primitive";
     this.addTag("cylinder");
   }
 
   protected createCollider(config: any): void {
-    if (!this.physicsManager || !this.rigidBodyId) return;
-    
-    // Use proper cylinder collider for regular cylinders (equal radii)
-    if (this.dimensions.radiusTop === this.dimensions.radiusBottom) {
-      // Use scaled dimensions to ensure collider matches visual size
-      const scaledDimensions = new THREE.Vector3(
-        this.dimensions.radiusTop * Math.max(this.scale.x, this.scale.z),
-        this.dimensions.height * this.scale.y,
-        this.dimensions.radiusTop * Math.max(this.scale.x, this.scale.z)
-      );
-      
-      this.physicsManager.createCollider(
-        this.colliderId!,
-        this.rigidBodyId,
-        "cylinder",
-        scaledDimensions,
-        config
-      );
-    } else {
-      // For truncated cones (different radii), use cone collider with the bottom radius
-      const scaledDimensions = new THREE.Vector3(
-        this.dimensions.radiusBottom * Math.max(this.scale.x, this.scale.z),
-        this.dimensions.height * this.scale.y,
-        this.dimensions.radiusBottom * Math.max(this.scale.x, this.scale.z)
-      );
-      
-      this.physicsManager.createCollider(
-        this.colliderId!,
-        this.rigidBodyId,
-        "cone",
-        scaledDimensions,
-        config
-      );
+    if (this.physicsManager && this.rigidBodyId) {
+      const scaledHeight = this.height * this.scale.y;
+      const scaledRadius = Math.max(this.radiusTop, this.radiusBottom) * Math.max(this.scale.x, this.scale.z);
+      const dimensions = new THREE.Vector3(scaledRadius, scaledHeight, 0);
+      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "cylinder", dimensions, config);
     }
   }
 
@@ -124,16 +78,16 @@ export class Cylinder extends Entity {
       radiusTop,
       radiusBottom,
       height,
-      this.segmentConfig.radial,
-      this.segmentConfig.height,
-      this.segmentConfig.openEnded,
-      this.segmentConfig.thetaStart,
-      this.segmentConfig.thetaLength
+      this.radialSegments,
+      this.heightSegments,
+      this.openEnded,
+      this.thetaStart,
+      this.thetaLength
     );
     this.mesh.geometry = this.geometry;
-    (this.dimensions as any).radiusTop = radiusTop;
-    (this.dimensions as any).radiusBottom = radiusBottom;
-    (this.dimensions as any).height = height;
+    this.radiusTop = radiusTop;
+    this.radiusBottom = radiusBottom;
+    this.height = height;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
@@ -141,18 +95,18 @@ export class Cylinder extends Entity {
   setSegments(radialSegments: number, heightSegments: number): this {
     this.geometry.dispose();
     this.geometry = new THREE.CylinderGeometry(
-      this.dimensions.radiusTop,
-      this.dimensions.radiusBottom,
-      this.dimensions.height,
+      this.radiusTop,
+      this.radiusBottom,
+      this.height,
       radialSegments,
       heightSegments,
-      this.segmentConfig.openEnded,
-      this.segmentConfig.thetaStart,
-      this.segmentConfig.thetaLength
+      this.openEnded,
+      this.thetaStart,
+      this.thetaLength
     );
     this.mesh.geometry = this.geometry;
-    (this.segmentConfig as any).radial = radialSegments;
-    (this.segmentConfig as any).height = heightSegments;
+    this.radialSegments = radialSegments;
+    this.heightSegments = heightSegments;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
@@ -160,18 +114,18 @@ export class Cylinder extends Entity {
   setAngularConfig(thetaStart: number, thetaLength: number): this {
     this.geometry.dispose();
     this.geometry = new THREE.CylinderGeometry(
-      this.dimensions.radiusTop,
-      this.dimensions.radiusBottom,
-      this.dimensions.height,
-      this.segmentConfig.radial,
-      this.segmentConfig.height,
-      this.segmentConfig.openEnded,
+      this.radiusTop,
+      this.radiusBottom,
+      this.height,
+      this.radialSegments,
+      this.heightSegments,
+      this.openEnded,
       thetaStart,
       thetaLength
     );
     this.mesh.geometry = this.geometry;
-    (this.segmentConfig as any).thetaStart = thetaStart;
-    (this.segmentConfig as any).thetaLength = thetaLength;
+    this.thetaStart = thetaStart;
+    this.thetaLength = thetaLength;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
@@ -179,32 +133,35 @@ export class Cylinder extends Entity {
   setOpenEnded(openEnded: boolean): this {
     this.geometry.dispose();
     this.geometry = new THREE.CylinderGeometry(
-      this.dimensions.radiusTop,
-      this.dimensions.radiusBottom,
-      this.dimensions.height,
-      this.segmentConfig.radial,
-      this.segmentConfig.height,
+      this.radiusTop,
+      this.radiusBottom,
+      this.height,
+      this.radialSegments,
+      this.heightSegments,
       openEnded,
-      this.segmentConfig.thetaStart,
-      this.segmentConfig.thetaLength
+      this.thetaStart,
+      this.thetaLength
     );
     this.mesh.geometry = this.geometry;
-    (this.segmentConfig as any).openEnded = openEnded;
+    this.openEnded = openEnded;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
   setMaterial(material: THREE.Material): this {
+    this.material = material;
     this.mesh.material = material;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
   getMaterial(): THREE.Material {
-    return this.mesh.material as THREE.Material;
+    return this.material;
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
+    this.castShadow = castShadow;
+    this.receiveShadow = receiveShadow;
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
     this.emitChange(); // Trigger change event for UI updates
@@ -220,10 +177,7 @@ export class Cylinder extends Entity {
   }
 
   // Convenience getters
-  get radiusTop(): number { return this.dimensions.radiusTop; }
-  get radiusBottom(): number { return this.dimensions.radiusBottom; }
-  get height(): number { return this.dimensions.height; }
-  get radius(): number { return Math.max(this.dimensions.radiusTop, this.dimensions.radiusBottom); }
+  get radius(): number { return Math.max(this.radiusTop, this.radiusBottom); }
 
   // Create common cylinder variations
   static createCone(config: Omit<CylinderConfig, 'radiusTop'> = {}): Cylinder {
@@ -249,22 +203,23 @@ export class Cylinder extends Entity {
   }
 
   serialize(): EntityData {
+    const baseData = this.serializeBase();
     return {
-      id: this.entityId, name: this.entityName, type: "cylinder",
-      transform: {
-        position: { x: this.position.x, y: this.position.y, z: this.position.z },
-        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
-        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
-      },
-      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
-      userData: { ...this.userData },
-      tags: [...this.metadata.tags],
-      layer: this.metadata.layer,
-      physics: this.serializePhysics(),
-      characterController: this.serializeCharacterController(),
-      scripts: this.serializeScripts(),
-      geometry: { type: "CylinderGeometry", parameters: { radiusTop: this.dimensions.radiusTop, radiusBottom: this.dimensions.radiusBottom, height: this.dimensions.height, radialSegments: this.segmentConfig.radial, heightSegments: this.segmentConfig.height, openEnded: this.segmentConfig.openEnded, thetaStart: this.segmentConfig.thetaStart, thetaLength: this.segmentConfig.thetaLength } }
+      ...baseData,
+      type: "cylinder",
+      geometry: {
+        type: "CylinderGeometry",
+        parameters: {
+          radiusTop: this.radiusTop,
+          radiusBottom: this.radiusBottom,
+          height: this.height,
+          radialSegments: this.radialSegments,
+          heightSegments: this.heightSegments,
+          openEnded: this.openEnded,
+          thetaStart: this.thetaStart,
+          thetaLength: this.thetaLength
+        }
+      }
     };
   }
-
 } 

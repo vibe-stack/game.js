@@ -21,59 +21,43 @@ export interface CapsuleConfig extends EntityConfig {
 }
 
 export class Capsule extends Entity {
-  public readonly dimensions: { radius: number; length: number };
-  public readonly segments: { cap: number; radial: number };
+  public radius: number;
+  public length: number;
+  public capSegments: number;
+  public radialSegments: number;
   private mesh: THREE.Mesh;
   private geometry: THREE.CapsuleGeometry;
+  private material: THREE.Material;
 
   constructor(config: CapsuleConfig = {}) {
-    super(config);
-
-    this.dimensions = {
-      radius: config.radius ?? 1,
-      length: config.length ?? 1,
-    };
-
-    this.segments = {
-      cap: config.capSegments ?? 4,
-      radial: config.radialSegments ?? 8,
-    };
-
-    const material =
-      config.material ?? new THREE.MeshStandardMaterial({ color: 0xff0088 });
-
-    this.geometry = new THREE.CapsuleGeometry(
-      this.dimensions.radius,
-      this.dimensions.length,
-      this.segments.cap,
-      this.segments.radial,
-    );
-
-    this.mesh = new THREE.Mesh(this.geometry, material);
-    this.mesh.castShadow = config.castShadow ?? true;
-    this.mesh.receiveShadow = config.receiveShadow ?? true;
+    super({
+      ...config,
+      castShadow: config.castShadow ?? true,
+      receiveShadow: config.receiveShadow ?? true
+    });
+    
+    this.radius = config.radius ?? 0.5;
+    this.length = config.length ?? 1;
+    this.capSegments = config.capSegments ?? 8;
+    this.radialSegments = config.radialSegments ?? 16;
+    
+    this.material = config.material ?? new THREE.MeshStandardMaterial({ color: 0xffff00 });
+    this.geometry = new THREE.CapsuleGeometry(this.radius, this.length, this.capSegments, this.radialSegments);
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.mesh.castShadow = this.castShadow;
+    this.mesh.receiveShadow = this.receiveShadow;
     this.add(this.mesh);
-
     this.metadata.type = "primitive";
     this.addTag("capsule");
   }
 
-  protected createCollider(): void {
-    if (!this.physicsManager || !this.rigidBodyId) return;
-
-    // Use scaled dimensions to ensure collider matches visual size
-    const scaledDimensions = new THREE.Vector3(
-      this.dimensions.radius * this.scale.x,
-      this.dimensions.length * this.scale.y,
-      this.dimensions.radius * this.scale.z
-    );
-
-    this.physicsManager.createCollider(
-      this.colliderId!,
-      this.rigidBodyId,
-      "capsule",
-      scaledDimensions,
-    );
+  protected createCollider(config: any): void {
+    if (this.physicsManager && this.rigidBodyId) {
+      const scaledLength = this.length * this.scale.y;
+      const scaledRadius = this.radius * Math.max(this.scale.x, this.scale.z);
+      const dimensions = new THREE.Vector3(scaledRadius * 2, scaledLength, 0);
+      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "capsule", dimensions, config);
+    }
   }
 
   setDimensions(radius: number, length: number): this {
@@ -81,12 +65,12 @@ export class Capsule extends Entity {
     this.geometry = new THREE.CapsuleGeometry(
       radius,
       length,
-      this.segments.cap,
-      this.segments.radial,
+      this.capSegments,
+      this.radialSegments,
     );
     this.mesh.geometry = this.geometry;
-    this.dimensions.radius = radius;
-    this.dimensions.length = length;
+    this.radius = radius;
+    this.length = length;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
@@ -94,37 +78,40 @@ export class Capsule extends Entity {
   setSegments(capSegments: number, radialSegments: number): this {
     this.geometry.dispose();
     this.geometry = new THREE.CapsuleGeometry(
-      this.dimensions.radius,
-      this.dimensions.length,
+      this.radius,
+      this.length,
       capSegments,
       radialSegments,
     );
     this.mesh.geometry = this.geometry;
-    this.segments.cap = capSegments;
-    this.segments.radial = radialSegments;
+    this.capSegments = capSegments;
+    this.radialSegments = radialSegments;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
   setRadius(radius: number): this {
-    return this.setDimensions(radius, this.dimensions.length);
+    return this.setDimensions(radius, this.length);
   }
 
   setLength(length: number): this {
-    return this.setDimensions(this.dimensions.radius, length);
+    return this.setDimensions(this.radius, length);
   }
 
   setMaterial(material: THREE.Material): this {
+    this.material = material;
     this.mesh.material = material;
     this.emitChange(); // Trigger change event for UI updates
     return this;
   }
 
   getMaterial(): THREE.Material {
-    return this.mesh.material as THREE.Material;
+    return this.material;
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
+    this.castShadow = castShadow;
+    this.receiveShadow = receiveShadow;
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
     this.emitChange(); // Trigger change event for UI updates
@@ -140,14 +127,8 @@ export class Capsule extends Entity {
   }
 
   // Convenience getters
-  get radius(): number {
-    return this.dimensions.radius;
-  }
-  get length(): number {
-    return this.dimensions.length;
-  }
   get totalHeight(): number {
-    return this.dimensions.length + this.dimensions.radius * 2;
+    return this.length + this.radius * 2;
   }
 
   // Create common capsule variations
@@ -168,41 +149,19 @@ export class Capsule extends Entity {
   }
 
   serialize(): EntityData {
+    const baseData = this.serializeBase();
     return {
-      id: this.entityId,
-      name: this.entityName,
+      ...baseData,
       type: "capsule",
-      transform: {
-        position: {
-          x: this.position.x,
-          y: this.position.y,
-          z: this.position.z,
-        },
-        rotation: {
-          x: this.rotation.x,
-          y: this.rotation.y,
-          z: this.rotation.z,
-        },
-        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
-      },
-      visible: this.visible,
-      castShadow: this.mesh.castShadow,
-      receiveShadow: this.mesh.receiveShadow,
-      userData: { ...this.userData },
-      tags: [...this.metadata.tags],
-      layer: this.metadata.layer,
-      physics: this.serializePhysics(),
-      characterController: this.serializeCharacterController(),
-      scripts: this.serializeScripts(),
       geometry: {
         type: "CapsuleGeometry",
         parameters: {
           radius: this.radius,
           length: this.length,
-          capSegments: this.segments.cap,
-          radialSegments: this.segments.radial,
-        },
-      },
+          capSegments: this.capSegments,
+          radialSegments: this.radialSegments
+        }
+      }
     };
   }
 }

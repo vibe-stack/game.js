@@ -24,111 +24,87 @@ export interface TorusConfig extends EntityConfig {
 }
 
 export class Torus extends Entity {
-  public readonly dimensions: { radius: number; tube: number };
-  public readonly segmentConfig: {
-    radial: number;
-    tubular: number;
-    arc: number;
-  };
+  public radius: number;
+  public tube: number;
+  public radialSegments: number;
+  public tubularSegments: number;
+  public arc: number;
   private mesh: THREE.Mesh;
   private geometry: THREE.TorusGeometry;
+  private material: THREE.Material;
 
   constructor(config: TorusConfig = {}) {
-    super(config);
-    
-    this.dimensions = {
-      radius: config.radius ?? 1,
-      tube: config.tube ?? 0.4
-    };
-    
-    this.segmentConfig = {
-      radial: config.radialSegments ?? 16,
-      tubular: config.tubularSegments ?? 100,
-      arc: config.arc ?? Math.PI * 2
-    };
-    
-    const material = config.material ?? new THREE.MeshStandardMaterial({ color: 0xff8800 });
-    
-    this.geometry = new THREE.TorusGeometry(
-      this.dimensions.radius,
-      this.dimensions.tube,
-      this.segmentConfig.radial,
-      this.segmentConfig.tubular,
-      this.segmentConfig.arc
-    );
-    
-    this.mesh = new THREE.Mesh(this.geometry, material);
-    this.mesh.castShadow = config.castShadow ?? true;
-    this.mesh.receiveShadow = config.receiveShadow ?? true;
+    super({
+      ...config,
+      castShadow: config.castShadow ?? true,
+      receiveShadow: config.receiveShadow ?? true
+    });
+    this.radius = config.radius ?? 1;
+    this.tube = config.tube ?? 0.4;
+    this.radialSegments = config.radialSegments ?? 8;
+    this.tubularSegments = config.tubularSegments ?? 6;
+    this.arc = config.arc ?? Math.PI * 2;
+    this.material = config.material ?? new THREE.MeshStandardMaterial({ color: 0xffff00 });
+    this.geometry = new THREE.TorusGeometry(this.radius, this.tube, this.radialSegments, this.tubularSegments, this.arc);
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.mesh.castShadow = this.castShadow;
+    this.mesh.receiveShadow = this.receiveShadow;
     this.add(this.mesh);
-    
     this.metadata.type = "primitive";
     this.addTag("torus");
   }
 
-  protected createCollider(): void {
-    if (!this.physicsManager || !this.rigidBodyId) return;
-    
-    // For torus, we'll use a convex hull approximation
-    // In a more sophisticated implementation, you might want to use compound colliders
-    // Use scaled radius to ensure collider matches visual size
-    const baseRadius = this.dimensions.radius + this.dimensions.tube;
-    const scaledRadius = baseRadius * Math.max(this.scale.x, this.scale.y, this.scale.z);
-    
-    this.physicsManager.createCollider(
-      this.colliderId!,
-      this.rigidBodyId,
-      "ball",
-      scaledRadius
-    );
+  protected createCollider(config: any): void {
+    if (this.physicsManager && this.rigidBodyId) {
+      // For a torus, a convex hull of its geometry is a good approximation
+      const vertices = this.geometry.attributes.position.array as Float32Array;
+      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "convexhull", { vertices }, config);
+    }
   }
 
   protected rebuildGeometry(): void {
     this.geometry.dispose();
-    this.geometry = new THREE.TorusGeometry(
-      this.dimensions.radius,
-      this.dimensions.tube,
-      this.segmentConfig.radial,
-      this.segmentConfig.tubular,
-      this.segmentConfig.arc
-    );
+    this.geometry = new THREE.TorusGeometry(this.radius, this.tube, this.radialSegments, this.tubularSegments, this.arc);
     this.mesh.geometry = this.geometry;
   }
 
   setDimensions(radius: number, tube: number): this {
-    (this.dimensions as any).radius = radius;
-    (this.dimensions as any).tube = tube;
+    this.radius = radius;
+    this.tube = tube;
     this.rebuildGeometry();
     this.emitChange();
     return this;
   }
 
   setSegments(radial: number, tubular: number): this {
-    this.segmentConfig.radial = Math.max(3, Math.round(radial));
-    this.segmentConfig.tubular = Math.max(3, Math.round(tubular));
+    this.radialSegments = Math.max(3, Math.round(radial));
+    this.tubularSegments = Math.max(3, Math.round(tubular));
     this.rebuildGeometry();
     this.emitChange();
     return this;
   }
 
   setArc(arc: number): this {
-    this.segmentConfig.arc = Math.max(0.1, Math.min(Math.PI * 2, arc));
+    this.arc = Math.max(0.1, Math.min(Math.PI * 2, arc));
     this.rebuildGeometry();
     this.emitChange();
     return this;
   }
 
   setMaterial(material: THREE.Material): this {
+    this.material = material;
     this.mesh.material = material;
-    this.emitChange(); // Trigger change event for UI updates
+    this.emitChange();
     return this;
   }
 
   getMaterial(): THREE.Material {
-    return this.mesh.material as THREE.Material;
+    return this.material;
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
+    this.castShadow = castShadow;
+    this.receiveShadow = receiveShadow;
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
     this.emitChange();
@@ -144,10 +120,8 @@ export class Torus extends Entity {
   }
 
   // Convenience getters
-  get radius(): number { return this.dimensions.radius; }
-  get tube(): number { return this.dimensions.tube; }
-  get outerRadius(): number { return this.dimensions.radius + this.dimensions.tube; }
-  get innerRadius(): number { return this.dimensions.radius - this.dimensions.tube; }
+  get outerRadius(): number { return this.radius + this.tube; }
+  get innerRadius(): number { return this.radius - this.tube; }
 
   // Create common torus variations
   static createDonut(config: TorusConfig = {}): Torus {
@@ -174,19 +148,20 @@ export class Torus extends Entity {
   }
 
   serialize(): EntityData {
+    const baseData = this.serializeBase();
     return {
-      id: this.entityId, name: this.entityName, type: "torus",
-      transform: {
-        position: { x: this.position.x, y: this.position.y, z: this.position.z },
-        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
-        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
-      },
-      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
-      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
-      physics: this.serializePhysics(),
-      characterController: this.serializeCharacterController(),
-      scripts: this.getAttachedScripts(),
-      geometry: { type: "TorusGeometry", parameters: { radius: this.dimensions.radius, tube: this.dimensions.tube, radialSegments: this.segmentConfig.radial, tubularSegments: this.segmentConfig.tubular, arc: this.segmentConfig.arc } }
+      ...baseData,
+      type: "torus",
+      geometry: {
+        type: "TorusGeometry",
+        parameters: {
+          radius: this.radius,
+          tube: this.tube,
+          radialSegments: this.radialSegments,
+          tubularSegments: this.tubularSegments,
+          arc: this.arc
+        }
+      }
     };
   }
 } 

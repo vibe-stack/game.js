@@ -99,6 +99,10 @@ export class SceneSerializer {
           antialias: true,
           targetResolution: gameWorld.getTargetResolution(),
           pixelRatio: 1, // Keep for backwards compatibility
+          postProcessing: {
+            bloom: gameWorld.getBloomSettings(),
+            toneMappingExposure: gameWorld.getToneMappingExposure(),
+          },
         },
       },
       activeCamera: gameWorld.getCameraManager().getActiveCameraId() || undefined,

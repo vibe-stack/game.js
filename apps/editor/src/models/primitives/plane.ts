@@ -21,63 +21,39 @@ export interface PlaneConfig extends EntityConfig {
 }
 
 export class Plane extends Entity {
-  public readonly dimensions: { width: number; height: number };
-  public readonly segments: { width: number; height: number };
+  public width: number;
+  public height: number;
+  public widthSegments: number;
+  public heightSegments: number;
   private mesh: THREE.Mesh;
   private geometry: THREE.PlaneGeometry;
+  private material: THREE.Material;
 
   constructor(config: PlaneConfig = {}) {
-    super(config);
-    
-    this.dimensions = {
-      width: config.width ?? 1,
-      height: config.height ?? 1
-    };
-    
-    this.segments = {
-      width: config.widthSegments ?? 1,
-      height: config.heightSegments ?? 1
-    };
-    
-    const material = config.material ?? new THREE.MeshStandardMaterial({ 
-      color: 0xffffff,
-      side: THREE.DoubleSide
+    super({
+      ...config,
+      castShadow: config.castShadow ?? true,
+      receiveShadow: config.receiveShadow ?? true
     });
-    
-    this.geometry = new THREE.PlaneGeometry(
-      this.dimensions.width,
-      this.dimensions.height,
-      this.segments.width,
-      this.segments.height
-    );
-    
-    this.mesh = new THREE.Mesh(this.geometry, material);
-    this.mesh.castShadow = config.castShadow ?? false;
-    this.mesh.receiveShadow = config.receiveShadow ?? true;
+    this.width = config.width ?? 1;
+    this.height = config.height ?? 1;
+    this.widthSegments = config.widthSegments ?? 1;
+    this.heightSegments = config.heightSegments ?? 1;
+    this.material = config.material ?? new THREE.MeshStandardMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
+    this.geometry = new THREE.PlaneGeometry(this.width, this.height, this.widthSegments, this.heightSegments);
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.mesh.castShadow = this.castShadow;
+    this.mesh.receiveShadow = this.receiveShadow;
     this.add(this.mesh);
-    
     this.metadata.type = "primitive";
     this.addTag("plane");
   }
 
   protected createCollider(config: any): void {
-    if (!this.physicsManager || !this.rigidBodyId) return;
-    
-    // Use scaled dimensions to ensure collider matches visual size
-    const scaledDimensions = new THREE.Vector3(
-      this.dimensions.width * this.scale.x,
-      0.01 * this.scale.y, // Keep thin but allow Y scaling
-      this.dimensions.height * this.scale.z
-    );
-    
-    // Create a thin box collider for the plane
-    this.physicsManager.createCollider(
-      this.colliderId!,
-      this.rigidBodyId,
-      "cuboid",
-      scaledDimensions,
-      config
-    );
+    if (this.physicsManager && this.rigidBodyId) {
+      const scaledDimensions = this.getScaledDimensions(new THREE.Vector3(this.width, this.height, 0.1));
+      this.physicsManager.createCollider(this.colliderId!, this.rigidBodyId, "cuboid", scaledDimensions, config);
+    }
   }
 
   setDimensions(width: number, height: number): this {
@@ -85,43 +61,45 @@ export class Plane extends Entity {
     this.geometry = new THREE.PlaneGeometry(
       width,
       height,
-      this.segments.width,
-      this.segments.height
+      this.widthSegments,
+      this.heightSegments
     );
     this.mesh.geometry = this.geometry;
-    (this.dimensions as any).width = width;
-    (this.dimensions as any).height = height;
+    this.width = width;
+    this.height = height;
     return this;
   }
 
   setSegments(widthSegments: number, heightSegments: number): this {
     this.geometry.dispose();
     this.geometry = new THREE.PlaneGeometry(
-      this.dimensions.width,
-      this.dimensions.height,
+      this.width,
+      this.height,
       widthSegments,
       heightSegments
     );
     this.mesh.geometry = this.geometry;
-    (this.segments as any).width = widthSegments;
-    (this.segments as any).height = heightSegments;
+    this.widthSegments = widthSegments;
+    this.heightSegments = heightSegments;
     return this;
   }
 
-  setMaterial(material: THREE.Material): this {
+  setMaterial(material: THREE.Material): void {
+    this.material = material;
     this.mesh.material = material;
-    this.emitChange(); // Trigger change event for UI updates
-    return this;
+    this.emitChange();
   }
 
   getMaterial(): THREE.Material {
-    return this.mesh.material as THREE.Material;
+    return this.material;
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
+    this.castShadow = castShadow;
+    this.receiveShadow = receiveShadow;
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
-    this.emitChange(); // Trigger change event for UI updates
+    this.emitChange();
     return this;
   }
 
@@ -132,10 +110,6 @@ export class Plane extends Entity {
   getGeometry(): THREE.PlaneGeometry {
     return this.geometry;
   }
-
-  // Convenience getters
-  get width(): number { return this.dimensions.width; }
-  get height(): number { return this.dimensions.height; }
 
   // Create common plane variations
   static createGround(config: Omit<PlaneConfig, 'widthSegments' | 'heightSegments'> = {}): Plane {
@@ -167,19 +141,19 @@ export class Plane extends Entity {
   }
 
   serialize(): EntityData {
+    const baseData = this.serializeBase();
     return {
-      id: this.entityId, name: this.entityName, type: "plane",
-      transform: {
-        position: { x: this.position.x, y: this.position.y, z: this.position.z },
-        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
-        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
-      },
-      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
-      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
-      physics: this.serializePhysics(),
-      characterController: this.serializeCharacterController(),
-      scripts: this.serializeScripts(),
-      geometry: { type: "PlaneGeometry", parameters: { width: this.dimensions.width, height: this.dimensions.height, widthSegments: this.segments.width, heightSegments: this.segments.height } }
+      ...baseData,
+      type: "plane",
+      geometry: {
+        type: "PlaneGeometry",
+        parameters: {
+          width: this.width,
+          height: this.height,
+          widthSegments: this.widthSegments,
+          heightSegments: this.heightSegments
+        }
+      }
     };
   }
 } 

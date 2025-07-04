@@ -49,6 +49,9 @@ export abstract class Entity extends THREE.Object3D {
     if (config.rotation) this.rotation.copy(config.rotation);
     if (config.scale) this.scale.copy(config.scale);
     
+    this.castShadow = config.castShadow ?? false;
+    this.receiveShadow = config.receiveShadow ?? false;
+    
     // Store initial physics config if provided
     if (config.physics) {
       this.physicsConfig = { ...config.physics };
@@ -143,6 +146,30 @@ export abstract class Entity extends THREE.Object3D {
   }
 
   abstract serialize(): EntityData;
+  
+  protected serializeBase(): Omit<EntityData, 'type' | 'properties' | 'geometry' | 'material' | 'materialId'> {
+    return {
+      id: this.entityId,
+      name: this.entityName,
+      transform: {
+        position: { x: this.position.x, y: this.position.y, z: this.position.z },
+        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
+        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
+      },
+      visible: this.visible,
+      castShadow: this.castShadow,
+      receiveShadow: this.receiveShadow,
+      userData: this.userData,
+      tags: this.metadata.tags,
+      layer: this.metadata.layer,
+      physics: this.serializePhysics(),
+      characterController: this.serializeCharacterController(),
+      scripts: this.serializeScripts(),
+      children: this.children
+        .filter(child => child instanceof Entity)
+        .map(child => (child as Entity).serialize())
+    };
+  }
 
   /**
    * Helper method to serialize physics properties that all entities can use

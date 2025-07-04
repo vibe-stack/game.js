@@ -110,7 +110,6 @@ export class GameWorld {
     
     // Set up callback to initialize post-processing when first camera is added
     this.cameraManager.setFirstCameraAddedCallback(() => {
-      console.log("First camera added, ensuring post-processing is initialized...");
       this.ensurePostProcessingInitialized();
     });
     
@@ -531,15 +530,11 @@ export class GameWorld {
     const camera = this.cameraManager.getActiveCamera();
     if (!camera) {
       // If no camera is available yet, we'll initialize post-processing later
-      console.warn("No active camera available for post-processing initialization");
       return;
     }
 
-    console.log("Initializing post-processing with camera:", camera);
-
     try {
       // Scene pass with MRT (output + emissive)
-      console.log("Creating scene pass...");
       this.scenePass = pass(this.scene, camera);
       this.scenePass.setMRT(
         mrt({
@@ -547,30 +542,19 @@ export class GameWorld {
           emissive,
         }),
       );
-      console.log("Scene pass created:", this.scenePass);
 
       const outputPass = this.scenePass.getTextureNode();
       const emissivePass = this.scenePass.getTextureNode("emissive");
-      console.log("Output pass:", outputPass);
-      console.log("Emissive pass:", emissivePass);
 
       // Bloom pass driven by emissive buffer
-      console.log("Creating bloom pass...");
       this.bloomPass = bloom(
         emissivePass,
         this.bloomSettings.strength,
         this.bloomSettings.radius,
       );
-      console.log("Bloom pass created:", this.bloomPass);
-      console.log("Bloom pass strength:", this.bloomPass.strength);
-      console.log("Bloom pass radius:", this.bloomPass.radius);
 
-      console.log("Creating PostProcessing...");
       this.postProcessing = new THREE.PostProcessing(this.renderer);
       this.postProcessing.outputNode = outputPass.add(this.bloomPass);
-      console.log("PostProcessing created:", this.postProcessing);
-      
-      console.log("Post-processing initialized successfully");
     } catch (error) {
       console.error("Failed to initialize post-processing:", error);
       // Fallback to regular rendering
@@ -597,7 +581,6 @@ export class GameWorld {
    */
   public ensurePostProcessingInitialized(): void {
     if (!this.postProcessing) {
-      console.log("Manually initializing post-processing...");
       this.initializePostProcessing();
     }
   }
@@ -614,30 +597,18 @@ export class GameWorld {
   /* ------------------------------------------------------------------ */
 
   setBloomSettings(strength: number, radius: number): void {
-    console.log(`Setting bloom settings: strength=${strength}, radius=${radius}`);
     this.bloomSettings.strength = strength;
     this.bloomSettings.radius = radius;
     
     if (this.bloomPass) {
-      console.log("Bloom pass exists, updating values...");
-      console.log("Bloom pass object:", this.bloomPass);
-      
       // Access bloom node properties correctly
       if (this.bloomPass.strength && typeof this.bloomPass.strength === 'object' && 'value' in this.bloomPass.strength) {
-        console.log(`Updating bloom strength from ${this.bloomPass.strength.value} to ${strength}`);
         this.bloomPass.strength.value = strength;
-      } else {
-        console.warn("Bloom pass strength property not accessible:", this.bloomPass.strength);
       }
       
       if (this.bloomPass.radius && typeof this.bloomPass.radius === 'object' && 'value' in this.bloomPass.radius) {
-        console.log(`Updating bloom radius from ${this.bloomPass.radius.value} to ${radius}`);
         this.bloomPass.radius.value = radius;
-      } else {
-        console.warn("Bloom pass radius property not accessible:", this.bloomPass.radius);
       }
-    } else {
-      console.warn("No bloom pass available to update");
     }
   }
 
@@ -681,7 +652,6 @@ export class GameWorld {
     });
     
     this.createEntity(glowingSphere);
-    console.log("Created test glowing object to verify bloom effect");
     return glowingSphere;
   }
 }

@@ -25,71 +25,41 @@ export interface RingConfig extends EntityConfig {
 }
 
 export class Ring extends Entity {
-  public readonly dimensions: { innerRadius: number; outerRadius: number };
-  public readonly segmentConfig: {
-    theta: number;
-    phi: number;
-    thetaStart: number;
-    thetaLength: number;
-  };
+  public innerRadius: number;
+  public outerRadius: number;
+  public thetaSegments: number;
+  public phiSegments: number;
+  public thetaStart: number;
+  public thetaLength: number;
   private mesh: THREE.Mesh;
   private geometry: THREE.RingGeometry;
+  private material: THREE.Material;
 
   constructor(config: RingConfig = {}) {
-    super(config);
-    
-    this.dimensions = {
-      innerRadius: config.innerRadius ?? 0.5,
-      outerRadius: config.outerRadius ?? 1
-    };
-    
-    this.segmentConfig = {
-      theta: config.thetaSegments ?? 32,
-      phi: config.phiSegments ?? 1,
-      thetaStart: config.thetaStart ?? 0,
-      thetaLength: config.thetaLength ?? Math.PI * 2
-    };
-    
-    const material = config.material ?? new THREE.MeshStandardMaterial({ 
-      color: 0xffaa00,
-      side: THREE.DoubleSide
+    super({
+      ...config,
+      castShadow: config.castShadow ?? true,
+      receiveShadow: config.receiveShadow ?? true
     });
-    
-    this.geometry = new THREE.RingGeometry(
-      this.dimensions.innerRadius,
-      this.dimensions.outerRadius,
-      this.segmentConfig.theta,
-      this.segmentConfig.phi,
-      this.segmentConfig.thetaStart,
-      this.segmentConfig.thetaLength
-    );
-    
-    this.mesh = new THREE.Mesh(this.geometry, material);
-    this.mesh.castShadow = config.castShadow ?? false;
-    this.mesh.receiveShadow = config.receiveShadow ?? true;
+    this.innerRadius = config.innerRadius ?? 0.5;
+    this.outerRadius = config.outerRadius ?? 1;
+    this.thetaSegments = config.thetaSegments ?? 32;
+    this.phiSegments = config.phiSegments ?? 1;
+    this.thetaStart = config.thetaStart ?? 0;
+    this.thetaLength = config.thetaLength ?? Math.PI * 2;
+    this.material = config.material ?? new THREE.MeshStandardMaterial({ color: 0xffff00, side: THREE.DoubleSide });
+    this.geometry = new THREE.RingGeometry(this.innerRadius, this.outerRadius, this.thetaSegments, this.phiSegments, this.thetaStart, this.thetaLength);
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.mesh.castShadow = this.castShadow;
+    this.mesh.receiveShadow = this.receiveShadow;
     this.add(this.mesh);
-    
     this.metadata.type = "primitive";
     this.addTag("ring");
   }
 
   protected createCollider(): void {
-    if (!this.physicsManager || !this.rigidBodyId) return;
-    
-    // Create a thin torus-like collider for the ring
-    const avgRadius = (this.dimensions.innerRadius + this.dimensions.outerRadius) / 2;
-    const thickness = (this.dimensions.outerRadius - this.dimensions.innerRadius) / 2;
-    
-    // Use scaled radius to ensure collider matches visual size
-    const baseRadius = avgRadius + thickness;
-    const scaledRadius = baseRadius * Math.max(this.scale.x, this.scale.y, this.scale.z);
-    
-    this.physicsManager.createCollider(
-      this.colliderId!,
-      this.rigidBodyId,
-      "ball",
-      scaledRadius
-    );
+    // A ring is 2D, so a simple box collider might not be ideal.
+    // For now, we don't create a collider for a ring.
   }
 
   setDimensions(innerRadius: number, outerRadius: number): this {
@@ -97,63 +67,66 @@ export class Ring extends Entity {
     this.geometry = new THREE.RingGeometry(
       innerRadius,
       outerRadius,
-      this.segmentConfig.theta,
-      this.segmentConfig.phi,
-      this.segmentConfig.thetaStart,
-      this.segmentConfig.thetaLength
+      this.thetaSegments,
+      this.phiSegments,
+      this.thetaStart,
+      this.thetaLength
     );
     this.mesh.geometry = this.geometry;
-    (this.dimensions as any).innerRadius = innerRadius;
-    (this.dimensions as any).outerRadius = outerRadius;
+    this.innerRadius = innerRadius;
+    this.outerRadius = outerRadius;
     return this;
   }
 
   setSegments(thetaSegments: number, phiSegments: number): this {
     this.geometry.dispose();
     this.geometry = new THREE.RingGeometry(
-      this.dimensions.innerRadius,
-      this.dimensions.outerRadius,
+      this.innerRadius,
+      this.outerRadius,
       thetaSegments,
       phiSegments,
-      this.segmentConfig.thetaStart,
-      this.segmentConfig.thetaLength
+      this.thetaStart,
+      this.thetaLength
     );
     this.mesh.geometry = this.geometry;
-    (this.segmentConfig as any).theta = thetaSegments;
-    (this.segmentConfig as any).phi = phiSegments;
+    this.thetaSegments = thetaSegments;
+    this.phiSegments = phiSegments;
     return this;
   }
 
   setAngularConfig(thetaStart: number, thetaLength: number): this {
     this.geometry.dispose();
     this.geometry = new THREE.RingGeometry(
-      this.dimensions.innerRadius,
-      this.dimensions.outerRadius,
-      this.segmentConfig.theta,
-      this.segmentConfig.phi,
+      this.innerRadius,
+      this.outerRadius,
+      this.thetaSegments,
+      this.phiSegments,
       thetaStart,
       thetaLength
     );
     this.mesh.geometry = this.geometry;
-    (this.segmentConfig as any).thetaStart = thetaStart;
-    (this.segmentConfig as any).thetaLength = thetaLength;
+    this.thetaStart = thetaStart;
+    this.thetaLength = thetaLength;
     return this;
   }
 
   setMaterial(material: THREE.Material): this {
+    this.material = material;
     this.mesh.material = material;
-    this.emitChange(); // Trigger change event for UI updates
+    this.emitChange();
     return this;
   }
 
   getMaterial(): THREE.Material {
-    return this.mesh.material as THREE.Material;
+    return this.material;
   }
 
   setShadowSettings(castShadow: boolean, receiveShadow: boolean): this {
+    this.castShadow = castShadow;
+    this.receiveShadow = receiveShadow;
     this.mesh.castShadow = castShadow;
     this.mesh.receiveShadow = receiveShadow;
-    this.emitChange(); // Trigger change event for UI updates
+    this.emitChange();
     return this;
   }
 
@@ -166,10 +139,8 @@ export class Ring extends Entity {
   }
 
   // Convenience getters
-  get innerRadius(): number { return this.dimensions.innerRadius; }
-  get outerRadius(): number { return this.dimensions.outerRadius; }
-  get thickness(): number { return this.dimensions.outerRadius - this.dimensions.innerRadius; }
-  get centerRadius(): number { return (this.dimensions.innerRadius + this.dimensions.outerRadius) / 2; }
+  get thickness(): number { return this.outerRadius - this.innerRadius; }
+  get centerRadius(): number { return (this.innerRadius + this.outerRadius) / 2; }
 
   // Create common ring variations
   static createWasher(config: RingConfig = {}): Ring {
@@ -195,19 +166,21 @@ export class Ring extends Entity {
   }
 
   serialize(): EntityData {
+    const baseData = this.serializeBase();
     return {
-      id: this.entityId, name: this.entityName, type: "ring",
-      transform: {
-        position: { x: this.position.x, y: this.position.y, z: this.position.z },
-        rotation: { x: this.rotation.x, y: this.rotation.y, z: this.rotation.z },
-        scale: { x: this.scale.x, y: this.scale.y, z: this.scale.z },
-      },
-      visible: this.visible, castShadow: this.castShadow, receiveShadow: this.receiveShadow,
-      userData: { ...this.userData }, tags: [...this.metadata.tags], layer: this.metadata.layer,
-      physics: this.serializePhysics(),
-      characterController: this.serializeCharacterController(),
-      scripts: this.serializeScripts(),
-      geometry: { type: "RingGeometry", parameters: { innerRadius: this.dimensions.innerRadius, outerRadius: this.dimensions.outerRadius, thetaSegments: this.segmentConfig.theta, phiSegments: this.segmentConfig.phi, thetaStart: this.segmentConfig.thetaStart, thetaLength: this.segmentConfig.thetaLength } }
+      ...baseData,
+      type: "ring",
+      geometry: {
+        type: "RingGeometry",
+        parameters: {
+          innerRadius: this.innerRadius,
+          outerRadius: this.outerRadius,
+          thetaSegments: this.thetaSegments,
+          phiSegments: this.phiSegments,
+          thetaStart: this.thetaStart,
+          thetaLength: this.thetaLength
+        }
+      }
     };
   }
 } 
