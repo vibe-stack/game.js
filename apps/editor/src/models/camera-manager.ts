@@ -54,6 +54,10 @@ export class CameraManager {
 
   // Camera following system
   private followConfigs = new Map<string, CameraFollowConfig>();
+  
+  // Callback for when active camera changes
+  private onActiveCameraChange?: (camera: THREE.Camera | null) => void;
+  private onFirstCameraAdded?: () => void;
 
   constructor(
     cameras: Registry<THREE.Camera>,
@@ -65,6 +69,14 @@ export class CameraManager {
     this.stateManager = stateManager;
     this.scene = scene;
     this.defaultAspect = defaultAspect;
+  }
+
+  setActiveCameraChangeCallback(callback: (camera: THREE.Camera | null) => void): void {
+    this.onActiveCameraChange = callback;
+  }
+
+  setFirstCameraAddedCallback(callback: () => void): void {
+    this.onFirstCameraAdded = callback;
   }
 
   createPerspectiveCamera(
@@ -124,11 +136,18 @@ export class CameraManager {
   }
 
   private addCameraWithMetadata(id: string, name: string, camera: THREE.Camera, metadata: any): void {
+    const wasEmpty = this.cameras.getAllRegistryItems().length === 0;
+    
     this.cameras.add(id, name, camera, metadata);
     
     // Set as active if it's the first camera
     if (!this.activeCamera) {
       this.setActiveCamera(id);
+    }
+    
+    // Notify if this was the first camera added
+    if (wasEmpty && this.onFirstCameraAdded) {
+      this.onFirstCameraAdded();
     }
     
     this.updateState();
@@ -144,6 +163,10 @@ export class CameraManager {
       } else {
         this.activeCamera = null;
         this.activeCameraId = "";
+        // Notify callback of camera change
+        if (this.onActiveCameraChange) {
+          this.onActiveCameraChange(null);
+        }
       }
     }
     
@@ -167,9 +190,16 @@ export class CameraManager {
       this.resetCameraToOriginal(id);
     }
 
+    const previousCamera = this.activeCamera;
     this.activeCamera = camera;
     this.activeCameraId = id;
     this.updateState();
+    
+    // Notify callback if camera actually changed
+    if (previousCamera !== camera && this.onActiveCameraChange) {
+      this.onActiveCameraChange(camera);
+    }
+    
     return true;
   }
 

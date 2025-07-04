@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { PhysicsSettings } from "./physics-settings";
 import { RenderSettings } from "./render-settings";
 import { DebugSettings } from "./debug-settings";
+import { PostProcessingSettings } from "./post-processing-settings";
 
 interface WorldSettingsProps {
   gameWorldService: React.RefObject<GameWorldService | null>;
@@ -25,6 +26,8 @@ export function WorldSettings({ gameWorldService }: WorldSettingsProps) {
         <Separator className="bg-white/10" />
         
         <RenderSettings gameWorldService={gameWorldService} />
+        <Separator className="bg-white/10" />
+        <PostProcessingSettings gameWorldService={gameWorldService} />
       </div>
     </ScrollArea>
   );

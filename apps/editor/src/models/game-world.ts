@@ -9,20 +9,19 @@ import { DebugRenderer } from "./debug-renderer";
 import { InputManager } from "./input-manager";
 import { Entity } from "./entity";
 import { GameConfig } from "./types";
-import { SceneData } from "../types/project";
-import { SceneLoader } from "./scene-loader";
-import { SceneSerializer } from "./scene-loader/scene-serializer";
 import { ScriptManager } from "./script-manager";
-import { ShaderManager } from './shader-manager';
-import { SoundManager } from './sound-manager';
-import { AssetManager } from './asset-manager';
-import { CharacterController } from './character-controller';
+import { CharacterController } from "./character-controller";
+import { Sphere } from "./primitives/sphere";
+
+// New TSL post-processing imports
+import { pass, mrt, output, emissive } from "three/tsl";
+import { bloom } from "three/addons/tsl/display/BloomNode.js";
 
 export class GameWorld {
   public readonly scene: THREE.Scene;
   public readonly renderer: THREE.WebGPURenderer;
   public readonly clock: THREE.Clock;
-  
+
   private registryManager: RegistryManager;
   private stateManager: StateManager;
   private physicsManager: PhysicsManager;
@@ -32,19 +31,19 @@ export class GameWorld {
   private debugRenderer: DebugRenderer;
   private inputManager: InputManager;
   private scriptManager: ScriptManager;
-  
+
   private entities: Registry<Entity>;
   private cameras: Registry<THREE.Camera>;
   private controls: Registry<any>;
   private characterControllers: Map<string, CharacterController> = new Map();
-  
+
   private isRunning = false;
   private animationId: number | null = null;
   private isPaused = false;
   private renderLoopId: number | null = null;
-  
+
   private sceneSnapshot: Map<string, any> | null = null;
-  
+
   // Target resolution settings
   private targetResolution: {
     width: number;
@@ -53,23 +52,32 @@ export class GameWorld {
   } = {
     width: 1920,
     height: 1080,
-    maintainAspectRatio: true
+    maintainAspectRatio: true,
+  };
+
+  private postProcessing?: any;
+  private scenePass?: any;
+  private bloomPass?: any;
+
+  private bloomSettings = {
+    strength: 0.7,
+    radius: 0.5,
   };
 
   constructor(config: GameConfig) {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color("#2a2a2a"); // Default dark gray background
     this.clock = new THREE.Clock();
-    
+
     this.renderer = new THREE.WebGPURenderer({
       canvas: config.canvas,
       antialias: config.antialias ?? true,
     });
-    
+
     // Don't set initial size here - let React/CSS handle it first
     // We'll set the proper size during initialization
     this.renderer.setPixelRatio(config.pixelRatio ?? window.devicePixelRatio);
-    
+
     if (config.shadowMapEnabled) {
       this.renderer.shadowMap.enabled = true;
       // Use PCFShadowMap for better WebGPU compatibility
@@ -79,24 +87,53 @@ export class GameWorld {
     this.registryManager = new RegistryManager();
     this.stateManager = new StateManager();
     this.physicsManager = new PhysicsManager();
-    
+
     this.entities = this.registryManager.createRegistry<Entity>("entities");
     this.cameras = this.registryManager.createRegistry<THREE.Camera>("cameras");
     this.controls = this.registryManager.createRegistry<any>("controls");
 
     // Use default aspect ratio initially - will be updated during initialization
-    this.cameraManager = new CameraManager(this.cameras, this.stateManager, this.scene, 16/9);
-    this.cameraControlManager = new CameraControlManager(this.controls, this.stateManager);
-    // this.setupDefaultCamera(1920, 1080); // Default size, will be updated
+    this.cameraManager = new CameraManager(
+      this.cameras,
+      this.stateManager,
+      this.scene,
+      16 / 9,
+    );
     
-    this.interactionManager = new InteractionManager(this.renderer as any, this.cameraManager, config.canvas);
+    // Set up callback to reinitialize post-processing when camera changes
+    this.cameraManager.setActiveCameraChangeCallback((camera) => {
+      if (camera && this.postProcessing) {
+        // Reinitialize post-processing with the new camera
+        this.reinitializePostProcessing();
+      }
+    });
+    
+    // Set up callback to initialize post-processing when first camera is added
+    this.cameraManager.setFirstCameraAddedCallback(() => {
+      console.log("First camera added, ensuring post-processing is initialized...");
+      this.ensurePostProcessingInitialized();
+    });
+    
+    this.cameraControlManager = new CameraControlManager(
+      this.controls,
+      this.stateManager,
+    );
+    // this.setupDefaultCamera(1920, 1080); // Default size, will be updated
+
+    this.interactionManager = new InteractionManager(
+      this.renderer as any,
+      this.cameraManager,
+      config.canvas,
+    );
     this.debugRenderer = new DebugRenderer(this.scene, this.physicsManager);
     this.inputManager = new InputManager(config.canvas);
     this.scriptManager = new ScriptManager(this);
-    
+
     if (config.enablePhysics !== false) {
       this.initializePhysics(config.gravity);
     }
+
+    // Post-processing will be initialized after renderer is ready
   }
 
   async initialize(): Promise<void> {
@@ -112,6 +149,9 @@ export class GameWorld {
       this.renderer.setSize(width, height, false);
       this.cameraManager.resize(width, height);
     }
+    
+    // Setup post-processing after renderer is initialized
+    this.initializePostProcessing();
     
     this.startRenderLoop();
   }
@@ -131,7 +171,11 @@ export class GameWorld {
   public createEntity(entity: Entity): Entity {
     entity.setPhysicsManager(this.physicsManager);
     entity.setScriptManager(this.scriptManager);
-    const metadata = { type: entity.metadata.type, tags: entity.metadata.tags, created: entity.metadata.created };
+    const metadata = {
+      type: entity.metadata.type,
+      tags: entity.metadata.tags,
+      created: entity.metadata.created,
+    };
     this.entities.add(entity.entityId, entity.entityName, entity, metadata);
     this.scene.add(entity);
     this.interactionManager.add(entity);
@@ -145,8 +189,18 @@ export class GameWorld {
       this.debugRenderer.update();
       this.cameraManager.update();
       this.cameraControlManager.update();
-      if (this.cameraManager.getActiveCamera()) {
-        this.renderer.render(this.scene, this.cameraManager.getActiveCamera()!);
+      const activeCamera = this.cameraManager.getActiveCamera();
+      if (activeCamera) {
+        // Keep scene pass camera in sync
+        if (this.scenePass && this.scenePass.camera !== activeCamera) {
+          this.scenePass.camera = activeCamera;
+        }
+
+        if (this.postProcessing) {
+          this.postProcessing.render();
+        } else {
+          this.renderer.render(this.scene, activeCamera);
+        }
       }
     };
     render();
@@ -157,7 +211,7 @@ export class GameWorld {
     this.isRunning = true;
     this.isPaused = false;
     this.clock.start();
-    
+
     // Take a snapshot of entity states for reset
     this.takeEntitySnapshot();
 
@@ -202,7 +256,7 @@ export class GameWorld {
 
   private restoreEntitySnapshot(): void {
     if (!this.sceneSnapshot) return;
-    
+
     this.entities.forEach((entity) => {
       const snapshot = this.sceneSnapshot!.get(entity.entityId);
       if (snapshot) {
@@ -211,26 +265,29 @@ export class GameWorld {
         entity.rotation.copy(snapshot.rotation);
         entity.scale.copy(snapshot.scale);
         entity.visible = snapshot.visible;
-        
+
         // Update physics body position if it exists
         if (this.physicsManager && entity.getRigidBodyId()) {
-          const rigidBody = this.physicsManager.getRigidBody(entity.getRigidBodyId()!);
+          const rigidBody = this.physicsManager.getRigidBody(
+            entity.getRigidBodyId()!,
+          );
           if (rigidBody) {
             rigidBody.setTranslation(entity.position, true);
             rigidBody.setRotation(entity.quaternion, true);
             // Reset velocities
-            if (rigidBody.bodyType() === 0) { // Dynamic body
+            if (rigidBody.bodyType() === 0) {
+              // Dynamic body
               rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
               rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
             }
           }
         }
-        
+
         // Force update
         entity.updateMatrixWorld(true);
       }
     });
-    
+
     // Force update debug renderer to sync with new physics positions
     this.forceUpdateDebugRenderer();
   }
@@ -261,7 +318,7 @@ export class GameWorld {
   private animate = (): void => {
     if (!this.isRunning) return;
     this.animationId = requestAnimationFrame(this.animate);
-    
+
     if (this.isPaused) return;
 
     const delta = this.clock.getDelta();
@@ -273,14 +330,17 @@ export class GameWorld {
       if (!entity.isDestroyed()) {
         entity.syncPhysics();
         entity.updateTweens(delta);
-        
+
         // Update animations for Mesh3D entities
-        if (entity.metadata.type === "mesh3d" && (entity as any).updateAnimations) {
+        if (
+          entity.metadata.type === "mesh3d" &&
+          (entity as any).updateAnimations
+        ) {
           (entity as any).updateAnimations(delta);
         }
       }
     });
-    
+
     // Update character controllers
     this.characterControllers.forEach((controller) => {
       controller.update(delta);
@@ -291,30 +351,69 @@ export class GameWorld {
   };
 
   // ... (getters and other methods)
-  getScene(): THREE.Scene { return this.scene; }
-  getRenderer(): THREE.WebGPURenderer { return this.renderer; }
-  getCanvas(): HTMLCanvasElement { return this.renderer.domElement as HTMLCanvasElement; }
-  getStateManager(): StateManager { return this.stateManager; }
-  getPhysicsManager(): PhysicsManager { return this.physicsManager; }
-  getRegistryManager(): RegistryManager { return this.registryManager; }
-  getCameraManager(): CameraManager { return this.cameraManager; }
-  getCameraControlManager(): CameraControlManager { return this.cameraControlManager; }
-  getInputManager(): InputManager { return this.inputManager; }
-  getScriptManager(): ScriptManager { return this.scriptManager; }
-  getEntitiesByTag(tag: string): Entity[] { return this.entities.getByTag(tag); }
-  isPhysicsDebugRenderEnabled(): boolean { return this.debugRenderer.isEnabled(); }
-  togglePhysicsDebugRender(): void { this.debugRenderer.toggle(); }
-  enablePhysicsDebugRender(): void { this.debugRenderer.enable(); }
-  disablePhysicsDebugRender(): void { this.debugRenderer.disable(); }
-  forceUpdatePhysicsDebugRender(): void { this.forceUpdateDebugRenderer(); }
-  isRunningState(): boolean { return this.isRunning; }
-  isPausedState(): boolean { return this.isPaused; }
-  
+  getScene(): THREE.Scene {
+    return this.scene;
+  }
+  getRenderer(): THREE.WebGPURenderer {
+    return this.renderer;
+  }
+  getCanvas(): HTMLCanvasElement {
+    return this.renderer.domElement as HTMLCanvasElement;
+  }
+  getStateManager(): StateManager {
+    return this.stateManager;
+  }
+  getPhysicsManager(): PhysicsManager {
+    return this.physicsManager;
+  }
+  getRegistryManager(): RegistryManager {
+    return this.registryManager;
+  }
+  getCameraManager(): CameraManager {
+    return this.cameraManager;
+  }
+  getCameraControlManager(): CameraControlManager {
+    return this.cameraControlManager;
+  }
+  getInputManager(): InputManager {
+    return this.inputManager;
+  }
+  getScriptManager(): ScriptManager {
+    return this.scriptManager;
+  }
+  getEntitiesByTag(tag: string): Entity[] {
+    return this.entities.getByTag(tag);
+  }
+  isPhysicsDebugRenderEnabled(): boolean {
+    return this.debugRenderer.isEnabled();
+  }
+  togglePhysicsDebugRender(): void {
+    this.debugRenderer.toggle();
+  }
+  enablePhysicsDebugRender(): void {
+    this.debugRenderer.enable();
+  }
+  disablePhysicsDebugRender(): void {
+    this.debugRenderer.disable();
+  }
+  forceUpdatePhysicsDebugRender(): void {
+    this.forceUpdateDebugRenderer();
+  }
+  isRunningState(): boolean {
+    return this.isRunning;
+  }
+  isPausedState(): boolean {
+    return this.isPaused;
+  }
+
   // Character controller management
-  addCharacterController(entityId: string, controller: CharacterController): void {
+  addCharacterController(
+    entityId: string,
+    controller: CharacterController,
+  ): void {
     this.characterControllers.set(entityId, controller);
   }
-  
+
   removeCharacterController(entityId: string): void {
     const controller = this.characterControllers.get(entityId);
     if (controller) {
@@ -322,44 +421,51 @@ export class GameWorld {
       this.characterControllers.delete(entityId);
     }
   }
-  
+
   getCharacterController(entityId: string): CharacterController | undefined {
     return this.characterControllers.get(entityId);
   }
-  
+
   clearCharacterControllers(): void {
-    this.characterControllers.forEach(controller => controller.dispose());
+    this.characterControllers.forEach((controller) => controller.dispose());
     this.characterControllers.clear();
   }
-  
-  resize(width: number, height: number): void { 
+
+  resize(width: number, height: number): void {
     if (width <= 0 || height <= 0) return;
-    
+
     // Calculate pixel ratio based on target resolution
     const pixelRatio = this.calculatePixelRatio(width, height);
-    
+
     // Update renderer size
     this.renderer.setSize(width, height, false); // false = don't update CSS styles
     this.renderer.setPixelRatio(pixelRatio);
-    
+
     // Update camera aspect ratios
-    this.cameraManager.resize(width, height); 
+    this.cameraManager.resize(width, height);
   }
-  
-  private calculatePixelRatio(canvasWidth: number, canvasHeight: number): number {
-    const { width: targetWidth, height: targetHeight, maintainAspectRatio } = this.targetResolution;
-    
+
+  private calculatePixelRatio(
+    canvasWidth: number,
+    canvasHeight: number,
+  ): number {
+    const {
+      width: targetWidth,
+      height: targetHeight,
+      maintainAspectRatio,
+    } = this.targetResolution;
+
     if (!maintainAspectRatio) {
       // Calculate pixel ratio to match target resolution as closely as possible
       const widthRatio = targetWidth / canvasWidth;
       const heightRatio = targetHeight / canvasHeight;
       return Math.min(widthRatio, heightRatio);
     }
-    
+
     // Maintain aspect ratio - calculate based on the smaller dimension
     const targetAspectRatio = targetWidth / targetHeight;
     const canvasAspectRatio = canvasWidth / canvasHeight;
-    
+
     if (canvasAspectRatio > targetAspectRatio) {
       // Canvas is wider than target, use height as reference
       return targetHeight / canvasHeight;
@@ -368,29 +474,37 @@ export class GameWorld {
       return targetWidth / canvasWidth;
     }
   }
-  
-  setTargetResolution(width: number, height: number, maintainAspectRatio: boolean = true): void {
+
+  setTargetResolution(
+    width: number,
+    height: number,
+    maintainAspectRatio: boolean = true,
+  ): void {
     this.targetResolution = { width, height, maintainAspectRatio };
-    
+
     // Apply the new target resolution immediately
     const canvas = this.renderer.domElement as HTMLCanvasElement;
     const rect = canvas.getBoundingClientRect();
     const canvasWidth = rect.width || canvas.clientWidth;
     const canvasHeight = rect.height || canvas.clientHeight;
-    
+
     if (canvasWidth > 0 && canvasHeight > 0) {
       this.resize(canvasWidth, canvasHeight);
     }
   }
-  
-  getTargetResolution(): { width: number; height: number; maintainAspectRatio: boolean } {
+
+  getTargetResolution(): {
+    width: number;
+    height: number;
+    maintainAspectRatio: boolean;
+  } {
     return { ...this.targetResolution };
   }
 
   dispose(): void {
     this.stop();
-    if(this.renderLoopId) cancelAnimationFrame(this.renderLoopId);
-    this.entities.forEach(entity => entity.destroy());
+    if (this.renderLoopId) cancelAnimationFrame(this.renderLoopId);
+    this.entities.forEach((entity) => entity.destroy());
     this.registryManager.clearAll();
     this.clearCharacterControllers(); // Clean up character controllers
     this.debugRenderer.dispose();
@@ -400,7 +514,174 @@ export class GameWorld {
     this.physicsManager.dispose();
     this.inputManager.dispose();
     this.scriptManager.dispose();
+    if (
+      this.postProcessing &&
+      typeof this.postProcessing.dispose === "function"
+    ) {
+      this.postProcessing.dispose();
+    }
     this.renderer.dispose();
     this.scene.clear();
+  }
+
+  /**
+   * Initializes post-processing using Three TSL with bloom.
+   */
+  private initializePostProcessing(): void {
+    const camera = this.cameraManager.getActiveCamera();
+    if (!camera) {
+      // If no camera is available yet, we'll initialize post-processing later
+      console.warn("No active camera available for post-processing initialization");
+      return;
+    }
+
+    console.log("Initializing post-processing with camera:", camera);
+
+    try {
+      // Scene pass with MRT (output + emissive)
+      console.log("Creating scene pass...");
+      this.scenePass = pass(this.scene, camera);
+      this.scenePass.setMRT(
+        mrt({
+          output,
+          emissive,
+        }),
+      );
+      console.log("Scene pass created:", this.scenePass);
+
+      const outputPass = this.scenePass.getTextureNode();
+      const emissivePass = this.scenePass.getTextureNode("emissive");
+      console.log("Output pass:", outputPass);
+      console.log("Emissive pass:", emissivePass);
+
+      // Bloom pass driven by emissive buffer
+      console.log("Creating bloom pass...");
+      this.bloomPass = bloom(
+        emissivePass,
+        this.bloomSettings.strength,
+        this.bloomSettings.radius,
+      );
+      console.log("Bloom pass created:", this.bloomPass);
+      console.log("Bloom pass strength:", this.bloomPass.strength);
+      console.log("Bloom pass radius:", this.bloomPass.radius);
+
+      console.log("Creating PostProcessing...");
+      this.postProcessing = new THREE.PostProcessing(this.renderer);
+      this.postProcessing.outputNode = outputPass.add(this.bloomPass);
+      console.log("PostProcessing created:", this.postProcessing);
+      
+      console.log("Post-processing initialized successfully");
+    } catch (error) {
+      console.error("Failed to initialize post-processing:", error);
+      // Fallback to regular rendering
+      this.postProcessing = null;
+    }
+  }
+
+  /**
+   * Reinitialize post-processing when camera changes
+   */
+  public reinitializePostProcessing(): void {
+    if (this.postProcessing && typeof this.postProcessing.dispose === "function") {
+      this.postProcessing.dispose();
+    }
+    this.postProcessing = null;
+    this.scenePass = null;
+    this.bloomPass = null;
+    
+    this.initializePostProcessing();
+  }
+
+  /**
+   * Manually initialize post-processing - useful when cameras become available
+   */
+  public ensurePostProcessingInitialized(): void {
+    if (!this.postProcessing) {
+      console.log("Manually initializing post-processing...");
+      this.initializePostProcessing();
+    }
+  }
+
+  /**
+   * Check if post-processing is available
+   */
+  public isPostProcessingAvailable(): boolean {
+    return !!this.postProcessing && !!this.bloomPass;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Bloom & Tone Mapping                                               */
+  /* ------------------------------------------------------------------ */
+
+  setBloomSettings(strength: number, radius: number): void {
+    console.log(`Setting bloom settings: strength=${strength}, radius=${radius}`);
+    this.bloomSettings.strength = strength;
+    this.bloomSettings.radius = radius;
+    
+    if (this.bloomPass) {
+      console.log("Bloom pass exists, updating values...");
+      console.log("Bloom pass object:", this.bloomPass);
+      
+      // Access bloom node properties correctly
+      if (this.bloomPass.strength && typeof this.bloomPass.strength === 'object' && 'value' in this.bloomPass.strength) {
+        console.log(`Updating bloom strength from ${this.bloomPass.strength.value} to ${strength}`);
+        this.bloomPass.strength.value = strength;
+      } else {
+        console.warn("Bloom pass strength property not accessible:", this.bloomPass.strength);
+      }
+      
+      if (this.bloomPass.radius && typeof this.bloomPass.radius === 'object' && 'value' in this.bloomPass.radius) {
+        console.log(`Updating bloom radius from ${this.bloomPass.radius.value} to ${radius}`);
+        this.bloomPass.radius.value = radius;
+      } else {
+        console.warn("Bloom pass radius property not accessible:", this.bloomPass.radius);
+      }
+    } else {
+      console.warn("No bloom pass available to update");
+    }
+  }
+
+  getBloomSettings(): { strength: number; radius: number } {
+    return { ...this.bloomSettings };
+  }
+
+  /**
+   * Set renderer tone mapping exposure.
+   */
+  setToneMappingExposure(exposure: number): void {
+    // WebGPURenderer inherits from WebGLRenderer and supports this property
+    // The cast avoids type mismatch in @types/three.
+    this.renderer.toneMappingExposure = exposure;
+  }
+
+  getToneMappingExposure(): number {
+    return this.renderer.toneMappingExposure ?? 1.0;
+  }
+
+  /**
+   * Create a test glowing object to verify bloom is working
+   */
+  createTestGlowingObject(): Entity {
+    // Create an emissive material
+    const glowMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4444ff,
+      emissive: 0x0066ff,
+      emissiveIntensity: 2.0,
+      roughness: 0.1,
+      metalness: 0.1
+    });
+    
+    const glowingSphere = new Sphere({
+      name: "Test Glow Sphere",
+      position: new THREE.Vector3(0, 2, 0),
+      radius: 0.5,
+      material: glowMaterial,
+      castShadow: true,
+      receiveShadow: false
+    });
+    
+    this.createEntity(glowingSphere);
+    console.log("Created test glowing object to verify bloom effect");
+    return glowingSphere;
   }
 }
