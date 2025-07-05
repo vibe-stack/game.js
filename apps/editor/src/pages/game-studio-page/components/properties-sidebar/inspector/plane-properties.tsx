@@ -22,9 +22,9 @@ export function PlaneProperties({ entity }: PlanePropertiesProps) {
   const handleSegmentChange = (field: 'width' | 'height', value: number) => {
     const intValue = Math.max(1, Math.round(value));
     if (field === 'width') {
-      entity.setSegments(intValue, entity.segments.height);
+      entity.setSegments(intValue, entity.heightSegments);
     } else {
-      entity.setSegments(entity.segments.width, intValue);
+      entity.setSegments(entity.widthSegments, intValue);
     }
   };
 
@@ -77,7 +77,7 @@ export function PlaneProperties({ entity }: PlanePropertiesProps) {
            <div>
              <Label htmlFor="plane-width-segments" className="text-xs text-gray-400">Width Segments</Label>
              <DragInput
-               value={entity.segments.width}
+               value={entity.widthSegments}
                onChange={(value) => handleSegmentChange('width', value)}
                min={1}
                max={200}
@@ -88,7 +88,7 @@ export function PlaneProperties({ entity }: PlanePropertiesProps) {
            <div>
              <Label htmlFor="plane-height-segments" className="text-xs text-gray-400">Height Segments</Label>
              <DragInput
-               value={entity.segments.height}
+              value={entity.heightSegments}
                onChange={(value) => handleSegmentChange('height', value)}
                min={1}
                max={200}
@@ -106,7 +106,7 @@ export function PlaneProperties({ entity }: PlanePropertiesProps) {
           <div className="flex items-center space-x-2">
             <Checkbox
               id="plane-cast-shadow"
-              checked={entity.getMesh().castShadow}
+              checked={entity.getMesh()?.castShadow ?? false}
               onCheckedChange={(checked) => handleShadowChange('cast', checked as boolean)}
             />
             <Label htmlFor="plane-cast-shadow" className="text-xs text-gray-400">Cast Shadow</Label>
@@ -114,7 +114,7 @@ export function PlaneProperties({ entity }: PlanePropertiesProps) {
           <div className="flex items-center space-x-2">
             <Checkbox
               id="plane-receive-shadow"
-              checked={entity.getMesh().receiveShadow}
+              checked={entity.getMesh()?.receiveShadow ?? false}
               onCheckedChange={(checked) => handleShadowChange('receive', checked as boolean)}
             />
             <Label htmlFor="plane-receive-shadow" className="text-xs text-gray-400">Receive Shadow</Label>

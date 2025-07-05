@@ -14,9 +14,9 @@ export function CylinderProperties({ entity }: CylinderPropertiesProps) {
 
   const handleDimensionChange = (field: 'radiusTop' | 'radiusBottom' | 'height', value: number) => {
     if (field === 'radiusTop') {
-      entity.setDimensions(value, entity.radiusBottom, entity.dimensions.height);
+      entity.setDimensions(value, entity.radiusBottom, entity.height);
     } else if (field === 'radiusBottom') {
-      entity.setDimensions(entity.radiusTop, value, entity.dimensions.height);
+      entity.setDimensions(entity.radiusTop, value, entity.height);
     } else {
       entity.setDimensions(entity.radiusTop, entity.radiusBottom, value);
     }
@@ -25,17 +25,17 @@ export function CylinderProperties({ entity }: CylinderPropertiesProps) {
   const handleSegmentChange = (field: 'radial' | 'height', value: number) => {
     const intValue = Math.max(1, Math.round(value));
     if (field === 'radial') {
-      entity.setSegments(intValue, entity.segmentConfig.height);
+      entity.setSegments(intValue, entity.heightSegments);
     } else {
-      entity.setSegments(entity.segmentConfig.radial, intValue);
+      entity.setSegments(entity.radialSegments, intValue);
     }
   };
 
   const handleAngularChange = (field: 'thetaStart' | 'thetaLength', value: number) => {
     if (field === 'thetaStart') {
-      entity.setAngularConfig(value, entity.segmentConfig.thetaLength);
+      entity.setAngularConfig(value, entity.thetaLength);
     } else {
-      entity.setAngularConfig(entity.segmentConfig.thetaStart, value);
+      entity.setAngularConfig(entity.thetaStart, value);
     }
   };
 
@@ -85,7 +85,7 @@ export function CylinderProperties({ entity }: CylinderPropertiesProps) {
            <div>
              <Label htmlFor="cylinder-height" className="text-xs text-gray-400">Height</Label>
              <DragInput
-               value={entity.dimensions.height}
+               value={entity.height}
                onChange={(value) => handleDimensionChange('height', value)}
                min={0.01}
                step={0.1}
@@ -102,7 +102,7 @@ export function CylinderProperties({ entity }: CylinderPropertiesProps) {
           <div>
             <Label htmlFor="cylinder-radial-segments" className="text-xs text-gray-400">Radial</Label>
                          <DragInput
-               value={entity.segmentConfig.radial}
+               value={entity.radialSegments}
                onChange={(value) => handleSegmentChange('radial', value)}
                min={3}
                max={64}
@@ -113,7 +113,7 @@ export function CylinderProperties({ entity }: CylinderPropertiesProps) {
            <div>
              <Label htmlFor="cylinder-height-segments" className="text-xs text-gray-400">Height</Label>
              <DragInput
-               value={entity.segmentConfig.height}
+               value={entity.heightSegments}
                onChange={(value) => handleSegmentChange('height', value)}
                min={1}
                step={1}
@@ -130,7 +130,7 @@ export function CylinderProperties({ entity }: CylinderPropertiesProps) {
            <div>
              <Label htmlFor="cylinder-theta-start" className="text-xs text-gray-400">Theta Start</Label>
              <DragInput
-               value={entity.segmentConfig.thetaStart}
+               value={entity.thetaStart}
                onChange={(value) => handleAngularChange('thetaStart', value)}
                min={0}
                max={Math.PI * 2}
@@ -141,7 +141,7 @@ export function CylinderProperties({ entity }: CylinderPropertiesProps) {
            <div>
              <Label htmlFor="cylinder-theta-length" className="text-xs text-gray-400">Theta Length</Label>
              <DragInput
-               value={entity.segmentConfig.thetaLength}
+               value={entity.thetaLength}
                onChange={(value) => handleAngularChange('thetaLength', value)}
                min={0.1}
                max={Math.PI * 2}
@@ -158,7 +158,7 @@ export function CylinderProperties({ entity }: CylinderPropertiesProps) {
         <div className="flex items-center space-x-2">
           <Checkbox
             id="cylinder-open-ended"
-            checked={entity.segmentConfig.openEnded}
+            checked={entity.openEnded}
             onCheckedChange={handleOpenEndedChange}
           />
           <Label htmlFor="cylinder-open-ended" className="text-xs text-gray-400">Open Ended</Label>
@@ -172,7 +172,7 @@ export function CylinderProperties({ entity }: CylinderPropertiesProps) {
           <div className="flex items-center space-x-2">
             <Checkbox
               id="cylinder-cast-shadow"
-              checked={entity.getMesh().castShadow}
+              checked={entity.getMesh()?.castShadow ?? false}
               onCheckedChange={(checked) => handleShadowChange('cast', checked)}
             />
             <Label htmlFor="cylinder-cast-shadow" className="text-xs text-gray-400">Cast Shadow</Label>
@@ -180,7 +180,7 @@ export function CylinderProperties({ entity }: CylinderPropertiesProps) {
           <div className="flex items-center space-x-2">
             <Checkbox
               id="cylinder-receive-shadow"
-              checked={entity.getMesh().receiveShadow}
+              checked={entity.getMesh()?.receiveShadow ?? false}
               onCheckedChange={(checked) => handleShadowChange('receive', checked)}
             />
             <Label htmlFor="cylinder-receive-shadow" className="text-xs text-gray-400">Receive Shadow</Label>

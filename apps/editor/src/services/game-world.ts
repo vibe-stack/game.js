@@ -742,6 +742,3 @@ export class GameWorld extends SimpleEventEmitter {
     return this.manipulatingObjects.has(objectId);
   }
 }
-
-// Singleton instance for the editor
-export const gameWorld = new GameWorld();

@@ -51,7 +51,7 @@ export function LightProperties({ entity }: LightPropertiesProps) {
           value={light.light.intensity}
           onChange={handleIntensityChange}
           min={0}
-          max={10}
+          max={50}
           step={0.1}
           className="text-xs"
         />
@@ -76,7 +76,7 @@ export function LightProperties({ entity }: LightPropertiesProps) {
           value={light.directionalLight.intensity}
           onChange={handleIntensityChange}
           min={0}
-          max={10}
+          max={50}
           step={0.1}
           className="text-xs"
         />
@@ -131,7 +131,7 @@ export function LightProperties({ entity }: LightPropertiesProps) {
           value={light.pointLight.intensity}
           onChange={handleIntensityChange}
           min={0}
-          max={10}
+          max={50}
           step={0.1}
           className="text-xs"
         />
@@ -189,7 +189,7 @@ export function LightProperties({ entity }: LightPropertiesProps) {
           value={light.spotLight.intensity}
           onChange={handleIntensityChange}
           min={0}
-          max={10}
+          max={50}
           step={0.1}
           className="text-xs"
         />

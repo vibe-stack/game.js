@@ -143,11 +143,12 @@ export function Mesh3DProperties({ entity }: Mesh3DPropertiesProps) {
             </Label>
             <Switch
               id="cast-shadow"
-              checked={entity.castShadow}
+              checked={entity.getMesh()?.castShadow ?? false}
               onCheckedChange={(checked) => {
-                entity.castShadow = checked;
                 const mesh = entity.getMesh();
-                if (mesh) mesh.castShadow = checked;
+                if (mesh) {
+                  mesh.castShadow = checked as boolean;
+                }
               }}
             />
           </div>
@@ -158,11 +159,12 @@ export function Mesh3DProperties({ entity }: Mesh3DPropertiesProps) {
             </Label>
             <Switch
               id="receive-shadow"
-              checked={entity.receiveShadow}
+              checked={entity.getMesh()?.receiveShadow ?? false}
               onCheckedChange={(checked) => {
-                entity.receiveShadow = checked;
                 const mesh = entity.getMesh();
-                if (mesh) mesh.receiveShadow = checked;
+                if (mesh) {
+                  mesh.receiveShadow = checked as boolean;
+                }
               }}
             />
           </div>

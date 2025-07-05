@@ -74,9 +74,13 @@ export class GameWorld {
       antialias: config.antialias ?? true,
     });
 
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
     // Don't set initial size here - let React/CSS handle it first
     // We'll set the proper size during initialization
     this.renderer.setPixelRatio(config.pixelRatio ?? window.devicePixelRatio);
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
     if (config.shadowMapEnabled) {
       this.renderer.shadowMap.enabled = true;
@@ -632,26 +636,7 @@ export class GameWorld {
   /**
    * Create a test glowing object to verify bloom is working
    */
-  createTestGlowingObject(): Entity {
-    // Create an emissive material
-    const glowMaterial = new THREE.MeshStandardMaterial({
-      color: 0x4444ff,
-      emissive: 0x0066ff,
-      emissiveIntensity: 2.0,
-      roughness: 0.1,
-      metalness: 0.1
-    });
+  createTestGlowingObject(): void {
     
-    const glowingSphere = new Sphere({
-      name: "Test Glow Sphere",
-      position: new THREE.Vector3(0, 2, 0),
-      radius: 0.5,
-      material: glowMaterial,
-      castShadow: true,
-      receiveShadow: false
-    });
-    
-    this.createEntity(glowingSphere);
-    return glowingSphere;
   }
 }

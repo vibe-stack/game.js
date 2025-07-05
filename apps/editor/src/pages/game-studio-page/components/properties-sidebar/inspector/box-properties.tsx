@@ -143,12 +143,12 @@ export function BoxProperties({ entity }: BoxPropertiesProps) {
 
         {/* Shadow Settings */}
         <div className="space-y-3">
-          <h4 className="text-xs text-gray-300 font-medium">Shadows</h4>
+          <h4 className="text-xs font-medium text-gray-300">Shadows</h4>
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="box-cast-shadow"
-                checked={entity.getMesh().castShadow}
+                checked={entity.getMesh()?.castShadow ?? false}
                 onCheckedChange={(checked) => handleShadowChange('cast', checked as boolean)}
               />
               <Label htmlFor="box-cast-shadow" className="text-xs text-gray-400">Cast Shadow</Label>
@@ -156,7 +156,7 @@ export function BoxProperties({ entity }: BoxPropertiesProps) {
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="box-receive-shadow"
-                checked={entity.getMesh().receiveShadow}
+                checked={entity.getMesh()?.receiveShadow ?? false}
                 onCheckedChange={(checked) => handleShadowChange('receive', checked as boolean)}
               />
               <Label htmlFor="box-receive-shadow" className="text-xs text-gray-400">Receive Shadow</Label>

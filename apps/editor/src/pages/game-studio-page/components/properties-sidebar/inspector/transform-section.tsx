@@ -37,7 +37,7 @@ export function TransformSection({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-lime-300 text-sm font-medium border-b border-white/10 pb-1">Transform</h3>
+      <h3 className="border-b border-white/10 pb-1 text-sm font-medium text-lime-300">Transform</h3>
       <div className="space-y-4">
         <Vector3Input
           label="Position"

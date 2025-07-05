@@ -57,6 +57,11 @@ export default function EditorModeToolbar() {
         return;
       }
 
+      // Check if Alt key is pressed
+      if (!event.altKey) {
+        return;
+      }
+
       switch (event.key.toLowerCase()) {
         case 'q':
           event.preventDefault();
@@ -203,7 +208,7 @@ export default function EditorModeToolbar() {
         variant={viewportMode === 'camera' ? 'default' : 'ghost'}
         onClick={handleViewportModeToggle}
         className="h-8 w-8 p-0"
-        title={`${viewportMode === 'orbit' ? 'Camera Follow' : 'Scene View'} Mode (V)`}
+        title={`${viewportMode === 'orbit' ? 'Camera Follow' : 'Scene View'} Mode (Alt+V)`}
       >
         {viewportMode === 'orbit' ? <Navigation size={16} /> : <MousePointer2 size={16} />}
       </Button>
@@ -220,7 +225,7 @@ export default function EditorModeToolbar() {
         variant={editorMode === "select" ? "default" : "ghost"}
         onClick={() => setEditorMode("select")}
         className="h-8 w-8 p-0"
-        title="Select Mode (Q)"
+        title="Select Mode (Alt+Q)"
       >
         <MousePointerIcon size={16} />
       </Button>
@@ -229,7 +234,7 @@ export default function EditorModeToolbar() {
         variant={editorMode === "move" ? "default" : "ghost"}
         onClick={() => setEditorMode("move")}
         className="h-8 w-8 p-0"
-        title="Move Mode (W)"
+        title="Move Mode (Alt+W)"
       >
         <Move3D size={16} />
       </Button>
@@ -238,7 +243,7 @@ export default function EditorModeToolbar() {
         variant={editorMode === "rotate" ? "default" : "ghost"}
         onClick={() => setEditorMode("rotate")}
         className="h-8 w-8 p-0"
-        title="Rotate Mode (E)"
+        title="Rotate Mode (Alt+E)"
       >
         <Rotate3d size={16} />
       </Button>
@@ -247,7 +252,7 @@ export default function EditorModeToolbar() {
         variant={editorMode === "scale" ? "default" : "ghost"}
         onClick={() => setEditorMode("scale")}
         className="h-8 w-8 p-0"
-        title="Scale Mode (R)"
+        title="Scale Mode (Alt+R)"
       >
         <Scale3d size={16} />
       </Button>

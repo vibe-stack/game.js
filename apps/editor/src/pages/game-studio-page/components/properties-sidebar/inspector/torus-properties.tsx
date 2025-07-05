@@ -12,20 +12,20 @@ interface TorusPropertiesProps {
 export function TorusProperties({ entity }: TorusPropertiesProps) {
   useEntityState(entity);
 
-  const handleDimensionChange = (field: 'radius' | 'tube', value: number) => {
-    if (field === 'radius') {
+  const handleDimensionChange = (field: "radius" | "tube", value: number) => {
+    if (field === "radius") {
       entity.setDimensions(value, entity.tube);
     } else {
       entity.setDimensions(entity.radius, value);
     }
   };
 
-  const handleSegmentChange = (field: 'radial' | 'tubular', value: number) => {
+  const handleSegmentChange = (field: "radial" | "tubular", value: number) => {
     const intValue = Math.max(1, Math.round(value));
-    if (field === 'radial') {
-      entity.setSegments(intValue, entity.segmentConfig.tubular);
+    if (field === "radial") {
+      entity.setSegments(intValue, entity.tubularSegments);
     } else {
-      entity.setSegments(entity.segmentConfig.radial, intValue);
+      entity.setSegments(entity.radialSegments, intValue);
     }
   };
 
@@ -33,8 +33,8 @@ export function TorusProperties({ entity }: TorusPropertiesProps) {
     entity.setArc(value);
   };
 
-  const handleShadowChange = (field: 'cast' | 'receive', checked: boolean) => {
-    if (field === 'cast') {
+  const handleShadowChange = (field: "cast" | "receive", checked: boolean) => {
+    if (field === "cast") {
       entity.setShadowSettings(checked, entity.getMesh().receiveShadow);
     } else {
       entity.setShadowSettings(entity.getMesh().castShadow, checked);
@@ -43,31 +43,35 @@ export function TorusProperties({ entity }: TorusPropertiesProps) {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lime-300 text-sm font-medium border-b border-white/10 pb-1">
+      <h3 className="border-b border-white/10 pb-1 text-sm font-medium text-lime-300">
         Torus Properties
       </h3>
-      
+
       {/* Dimensions */}
       <div className="space-y-3">
-        <h4 className="text-xs text-gray-300 font-medium">Dimensions</h4>
+        <h4 className="text-xs font-medium text-gray-300">Dimensions</h4>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <Label htmlFor="torus-radius" className="text-xs text-gray-400">Radius</Label>
+            <Label htmlFor="torus-radius" className="text-xs text-gray-400">
+              Radius
+            </Label>
             <DragInput
               id="torus-radius"
               value={entity.radius}
-              onChange={(value) => handleDimensionChange('radius', value)}
+              onChange={(value) => handleDimensionChange("radius", value)}
               min={0.01}
               step={0.1}
               className="text-xs"
             />
           </div>
           <div>
-            <Label htmlFor="torus-tube" className="text-xs text-gray-400">Tube</Label>
+            <Label htmlFor="torus-tube" className="text-xs text-gray-400">
+              Tube
+            </Label>
             <DragInput
               id="torus-tube"
               value={entity.tube}
-              onChange={(value) => handleDimensionChange('tube', value)}
+              onChange={(value) => handleDimensionChange("tube", value)}
               min={0.01}
               step={0.05}
               className="text-xs"
@@ -90,14 +94,19 @@ export function TorusProperties({ entity }: TorusPropertiesProps) {
 
       {/* Segments */}
       <div className="space-y-3">
-        <h4 className="text-xs text-gray-300 font-medium">Segments</h4>
+        <h4 className="text-xs font-medium text-gray-300">Segments</h4>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <Label htmlFor="torus-radial-segments" className="text-xs text-gray-400">Radial</Label>
+            <Label
+              htmlFor="torus-radial-segments"
+              className="text-xs text-gray-400"
+            >
+              Radial
+            </Label>
             <DragInput
               id="torus-radial-segments"
-              value={entity.segmentConfig.radial}
-              onChange={(value) => handleSegmentChange('radial', value)}
+              value={entity.radialSegments}
+              onChange={(value) => handleSegmentChange("radial", value)}
               min={3}
               max={64}
               step={1}
@@ -105,11 +114,16 @@ export function TorusProperties({ entity }: TorusPropertiesProps) {
             />
           </div>
           <div>
-            <Label htmlFor="torus-tubular-segments" className="text-xs text-gray-400">Tubular</Label>
+            <Label
+              htmlFor="torus-tubular-segments"
+              className="text-xs text-gray-400"
+            >
+              Tubular
+            </Label>
             <DragInput
               id="torus-tubular-segments"
-              value={entity.segmentConfig.tubular}
-              onChange={(value) => handleSegmentChange('tubular', value)}
+              value={entity.tubularSegments}
+              onChange={(value) => handleSegmentChange("tubular", value)}
               min={3}
               max={200}
               step={1}
@@ -121,12 +135,14 @@ export function TorusProperties({ entity }: TorusPropertiesProps) {
 
       {/* Arc Configuration */}
       <div className="space-y-3">
-        <h4 className="text-xs text-gray-300 font-medium">Arc Configuration</h4>
+        <h4 className="text-xs font-medium text-gray-300">Arc Configuration</h4>
         <div>
-          <Label htmlFor="torus-arc" className="text-xs text-gray-400">Arc (radians)</Label>
+          <Label htmlFor="torus-arc" className="text-xs text-gray-400">
+            Arc (radians)
+          </Label>
           <DragInput
             id="torus-arc"
-            value={entity.segmentConfig.arc}
+            value={entity.arc}
             onChange={handleArcChange}
             min={0.1}
             max={Math.PI * 2}
@@ -134,33 +150,47 @@ export function TorusProperties({ entity }: TorusPropertiesProps) {
             className="text-xs"
           />
           <Label className="text-xs text-gray-500">
-            Degrees: {(entity.segmentConfig.arc * 180 / Math.PI).toFixed(1)}°
+            Degrees: {((entity.arc * 180) / Math.PI).toFixed(1)}°
           </Label>
         </div>
       </div>
 
       {/* Shadow Settings */}
       <div className="space-y-3">
-        <h4 className="text-xs text-gray-300 font-medium">Shadows</h4>
+        <h4 className="text-xs font-medium text-gray-300">Shadows</h4>
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
             <Checkbox
               id="torus-cast-shadow"
-              checked={entity.getMesh().castShadow}
-              onCheckedChange={(checked) => handleShadowChange('cast', !!checked)}
+              checked={entity.getMesh()?.castShadow ?? false}
+              onCheckedChange={(checked) =>
+                handleShadowChange("cast", !!checked)
+              }
             />
-            <Label htmlFor="torus-cast-shadow" className="text-xs text-gray-400">Cast Shadow</Label>
+            <Label
+              htmlFor="torus-cast-shadow"
+              className="text-xs text-gray-400"
+            >
+              Cast Shadow
+            </Label>
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox
               id="torus-receive-shadow"
-              checked={entity.getMesh().receiveShadow}
-              onCheckedChange={(checked) => handleShadowChange('receive', !!checked)}
+              checked={entity.getMesh()?.receiveShadow ?? false}
+              onCheckedChange={(checked) =>
+                handleShadowChange("receive", !!checked)
+              }
             />
-            <Label htmlFor="torus-receive-shadow" className="text-xs text-gray-400">Receive Shadow</Label>
+            <Label
+              htmlFor="torus-receive-shadow"
+              className="text-xs text-gray-400"
+            >
+              Receive Shadow
+            </Label>
           </div>
         </div>
       </div>
     </div>
   );
-} 
+}

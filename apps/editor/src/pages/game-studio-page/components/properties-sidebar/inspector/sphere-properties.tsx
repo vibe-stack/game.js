@@ -60,7 +60,7 @@ export function SphereProperties({ entity }: SpherePropertiesProps) {
         
         <DragInput
           label="Width Segments"
-          value={entity.segments.width}
+          value={entity.widthSegments}
           onChange={(value) => handleSegmentsChange(value, 'width')}
           step={1}
           precision={0}
@@ -72,7 +72,7 @@ export function SphereProperties({ entity }: SpherePropertiesProps) {
         
         <DragInput
           label="Height Segments"
-          value={entity.segments.height}
+          value={entity.heightSegments}
           onChange={(value) => handleSegmentsChange(value, 'height')}
           step={1}
           precision={0}

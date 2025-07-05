@@ -416,7 +416,7 @@ export function HeightfieldProperties({ entity }: HeightfieldPropertiesProps) {
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
             <Checkbox
-              checked={entity.getMesh().castShadow}
+              checked={entity.getMesh()?.castShadow ?? false}
               onCheckedChange={(checked) =>
                 handleShadowChange("cast", checked as boolean)
               }
@@ -425,7 +425,7 @@ export function HeightfieldProperties({ entity }: HeightfieldPropertiesProps) {
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox
-              checked={entity.getMesh().receiveShadow}
+              checked={entity.getMesh()?.receiveShadow ?? false}
               onCheckedChange={(checked) =>
                 handleShadowChange("receive", checked as boolean)
               }

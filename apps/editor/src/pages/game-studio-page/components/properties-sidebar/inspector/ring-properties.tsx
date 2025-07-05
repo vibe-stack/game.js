@@ -22,17 +22,17 @@ export function RingProperties({ entity }: RingPropertiesProps) {
   const handleSegmentChange = (field: 'theta' | 'phi', value: number) => {
     const intValue = Math.max(1, Math.round(value));
     if (field === 'theta') {
-      entity.setSegments(intValue, entity.segmentConfig.phi);
+      entity.setSegments(intValue, entity.phiSegments);
     } else {
-      entity.setSegments(entity.segmentConfig.theta, intValue);
+      entity.setSegments(entity.thetaSegments, intValue);
     }
   };
 
   const handleAngularChange = (field: 'thetaStart' | 'thetaLength', value: number) => {
     if (field === 'thetaStart') {
-      entity.setAngularConfig(value, entity.segmentConfig.thetaLength);
+      entity.setAngularConfig(value, entity.thetaLength);
     } else {
-      entity.setAngularConfig(entity.segmentConfig.thetaStart, value);
+      entity.setAngularConfig(entity.thetaStart, value);
     }
   };
 
@@ -99,7 +99,7 @@ export function RingProperties({ entity }: RingPropertiesProps) {
             <Label htmlFor="ring-theta-segments" className="text-xs text-gray-400">Theta Segments</Label>
             <DragInput
               id="ring-theta-segments"
-              value={entity.segmentConfig.theta}
+              value={entity.thetaSegments}
               onChange={(value) => handleSegmentChange('theta', value)}
               min={3}
               max={128}
@@ -111,7 +111,7 @@ export function RingProperties({ entity }: RingPropertiesProps) {
             <Label htmlFor="ring-phi-segments" className="text-xs text-gray-400">Phi Segments</Label>
             <DragInput
               id="ring-phi-segments"
-              value={entity.segmentConfig.phi}
+              value={entity.phiSegments}
               onChange={(value) => handleSegmentChange('phi', value)}
               min={1}
               max={64}
@@ -130,7 +130,7 @@ export function RingProperties({ entity }: RingPropertiesProps) {
             <Label htmlFor="ring-theta-start" className="text-xs text-gray-400">Theta Start</Label>
             <DragInput
               id="ring-theta-start"
-              value={entity.segmentConfig.thetaStart}
+              value={entity.thetaStart}
               onChange={(value) => handleAngularChange('thetaStart', value)}
               min={0}
               max={Math.PI * 2}
@@ -142,7 +142,7 @@ export function RingProperties({ entity }: RingPropertiesProps) {
             <Label htmlFor="ring-theta-length" className="text-xs text-gray-400">Theta Length</Label>
             <DragInput
               id="ring-theta-length"
-              value={entity.segmentConfig.thetaLength}
+              value={entity.thetaLength}
               onChange={(value) => handleAngularChange('thetaLength', value)}
               min={0.1}
               max={Math.PI * 2}
@@ -153,7 +153,7 @@ export function RingProperties({ entity }: RingPropertiesProps) {
         </div>
         <div>
           <Label className="text-xs text-gray-500">
-            Arc: {(entity.segmentConfig.thetaLength * 180 / Math.PI).toFixed(1)}°
+              Arc: {(entity.thetaLength * 180 / Math.PI).toFixed(1)}°
           </Label>
         </div>
       </div>

@@ -228,13 +228,17 @@ export class EntityLoader {
   private createLight(config: any): Entity {
     const lightType = config.type || config.lightType;
 
+    let light = null;
+
     switch (lightType) {
-      case "ambient": return new AmbientLight(config);
-      case "directional": return new DirectionalLight(config);
-      case "point": return new PointLight(config);
-      case "spot": return new SpotLight(config);
+      case "ambient": light = new AmbientLight(config); break;
+      case "directional": light = new DirectionalLight(config); break;
+      case "point": light = new PointLight(config); break;
+      case "spot": light = new SpotLight(config); break;
       default: throw new Error(`Unsupported light type: ${lightType}`);
     }
+
+    return light;
   }
 
   private createCameraEntity(data: EntityData): Entity {

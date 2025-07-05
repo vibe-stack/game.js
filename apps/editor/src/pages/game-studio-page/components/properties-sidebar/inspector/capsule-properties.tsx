@@ -22,9 +22,9 @@ export function CapsuleProperties({ entity }: CapsulePropertiesProps) {
   const handleSegmentChange = (field: 'cap' | 'radial', value: number) => {
     const intValue = Math.max(1, Math.round(value));
     if (field === 'cap') {
-      entity.setSegments(intValue, entity.segments.radial);
+      entity.setSegments(intValue, entity.radialSegments);
     } else {
-      entity.setSegments(entity.segments.cap, intValue);
+      entity.setSegments(entity.capSegments, intValue);
     }
   };
 
@@ -84,7 +84,7 @@ export function CapsuleProperties({ entity }: CapsulePropertiesProps) {
             <Label htmlFor="capsule-cap-segments" className="text-xs text-gray-400">Cap Segments</Label>
             <DragInput
               id="capsule-cap-segments"
-              value={entity.segments.cap}
+              value={entity.capSegments}
               onChange={(value) => handleSegmentChange('cap', value)}
               min={1}
               max={32}
@@ -96,7 +96,7 @@ export function CapsuleProperties({ entity }: CapsulePropertiesProps) {
             <Label htmlFor="capsule-radial-segments" className="text-xs text-gray-400">Radial Segments</Label>
             <DragInput
               id="capsule-radial-segments"
-              value={entity.segments.radial}
+              value={entity.radialSegments}
               onChange={(value) => handleSegmentChange('radial', value)}
               min={3}
               max={64}
@@ -114,7 +114,7 @@ export function CapsuleProperties({ entity }: CapsulePropertiesProps) {
           <div className="flex items-center space-x-2">
             <Checkbox
               id="capsule-cast-shadow"
-              checked={entity.getMesh().castShadow}
+              checked={entity.getMesh()?.castShadow ?? false}
               onCheckedChange={(checked) => handleShadowChange('cast', checked as boolean)}
             />
             <Label htmlFor="capsule-cast-shadow" className="text-xs text-gray-400">Cast Shadow</Label>
@@ -122,7 +122,7 @@ export function CapsuleProperties({ entity }: CapsulePropertiesProps) {
           <div className="flex items-center space-x-2">
             <Checkbox
               id="capsule-receive-shadow"
-              checked={entity.getMesh().receiveShadow}
+              checked={entity.getMesh()?.receiveShadow ?? false}
               onCheckedChange={(checked) => handleShadowChange('receive', checked as boolean)}
             />
             <Label htmlFor="capsule-receive-shadow" className="text-xs text-gray-400">Receive Shadow</Label>

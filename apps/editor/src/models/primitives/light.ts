@@ -35,6 +35,7 @@ export abstract class Light extends Entity {
       (this.light as any).castShadow = this.castShadow;
     }
     
+    console.log("creating light, but", this.castShadow)
     if (this.castShadow) {
       this.configureShadows(config);
     }
@@ -47,17 +48,21 @@ export abstract class Light extends Entity {
   protected abstract createLight(config: LightConfig): THREE.Light;
   
   protected configureShadows(config: LightConfig) {
-    const shadowLight = this.light as any;
+    const shadowLight = this.light;
     // Shadow object is created lazily when castShadow is set to true
     // We need to ensure it exists before configuring
-    if (!shadowLight.shadow) {
+    if (!shadowLight?.shadow) {
+      console.log("Shadow light not found");
       return;
     }
+
+    console.log("shadowLight.shadow", shadowLight.shadow);
     
     // WebGPU shadow bias configuration to prevent shadow acne
     shadowLight.shadow.bias = config.shadowBias ?? -0.0001;
-    shadowLight.shadow.normalBias = config.shadowNormalBias ?? 0.02;
+    shadowLight.shadow.normalBias = config.shadowNormalBias ?? 0.2;
     shadowLight.shadow.radius = config.shadowRadius ?? 4;
+    shadowLight.shadow.needsUpdate = true;
     
     // Set shadow map size for better quality
     shadowLight.shadow.mapSize.width = 2048;
@@ -148,6 +153,8 @@ export class DirectionalLight extends Light {
     shadowCamera.bottom = -50;
     shadowCamera.near = 0.1;
     shadowCamera.far = 200;
+
+    this.directionalLight.shadow.needsUpdate = true;
   }
   
   setTarget(target: THREE.Vector3) {
@@ -224,6 +231,8 @@ export class PointLight extends Light {
     const shadowCamera = this.pointLight.shadow.camera as THREE.PerspectiveCamera;
     shadowCamera.near = 0.1;
     shadowCamera.far = this.pointLight.distance || 100;
+
+    this.pointLight.shadow.needsUpdate = true;
   }
   
   setColor(color: THREE.ColorRepresentation): this {
@@ -309,7 +318,7 @@ export class SpotLight extends Light {
   
   protected configureShadows(config: LightConfig) {
     super.configureShadows(config);
-    if (!this.spotLight.shadow) {
+    if (!this.spotLight?.shadow) {
       return;
     }
     
@@ -319,6 +328,8 @@ export class SpotLight extends Light {
     shadowCamera.far = this.spotLight.distance || 100;
     shadowCamera.fov = THREE.MathUtils.radToDeg(this.spotLight.angle) * 2;
     shadowCamera.updateProjectionMatrix();
+
+    this.spotLight.shadow.needsUpdate = true;
   }
   
   setTarget(target: THREE.Vector3) {

@@ -59,6 +59,9 @@ export class SceneLoader {
       // Load editor settings (including grid settings)
       await this.loadEditorSettings(context, sceneData);
 
+      gameWorld.getRenderer().shadowMap.enabled = true;
+      gameWorld.getRenderer().shadowMap.type = THREE.PCFShadowMap;
+
     } catch (error) {
       console.error(`Failed to load scene "${sceneData.name}":`, error);
       throw error;
