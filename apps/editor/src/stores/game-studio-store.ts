@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
-import { Entity, GameWorld } from "@/models";
+import { Entity, GameWorld, LoadingProgress } from "@/models";
 import { GameProject, SceneData } from "@/types/project";
 import { GameWorldService } from "@/pages/game-studio-page/services/game-world-service";
 
@@ -31,6 +31,7 @@ interface GameStudioState {
   shaderEditorOpen: boolean;
   shaderEditorEntity: string | null;
   selectedShaderId: string | null;
+  loadingProgress: LoadingProgress | null;
   // Actions - These should mostly set state, logic is in services/models
   setCurrentProject: (project: GameProject | null) => void;
   setCurrentScene: (scene: SceneData | null) => void;
@@ -60,6 +61,7 @@ interface GameStudioState {
   setShaderEditorOpen: (open: boolean) => void;
   setShaderEditorEntity: (entityId: string | null) => void;
   setSelectedShaderId: (shaderId: string | null) => void;
+  setLoadingProgress: (progress: LoadingProgress | null) => void;
   // Game control actions - These trigger service calls and update state
   playGame: () => void;
   pauseGame: () => void;
@@ -95,6 +97,7 @@ const useGameStudioStore = create<GameStudioState>()(
     shaderEditorOpen: false,
     shaderEditorEntity: null,
     selectedShaderId: null,
+    loadingProgress: null,
 
     // Basic Setters
     setCurrentProject: (project) => {
@@ -126,6 +129,7 @@ const useGameStudioStore = create<GameStudioState>()(
     setShaderEditorOpen: (open) => set({ shaderEditorOpen: open }),
     setShaderEditorEntity: (entityId) => set({ shaderEditorEntity: entityId }),
     setSelectedShaderId: (shaderId) => set({ selectedShaderId: shaderId }),
+    setLoadingProgress: (progress) => set({ loadingProgress: progress }),
     loadScene: (sceneName) => {
       set({ currentSceneName: sceneName, shouldLoadScene: true, isLoading: true, error: null });
     },

@@ -1,4 +1,4 @@
-import { GameWorld, SceneLoader, SceneSerializer, CharacterController, Entity, AssetManager } from "@/models";
+import { GameWorld, SceneLoader, EnhancedSceneLoader, SceneSerializer, CharacterController, Entity, AssetManager, LoadingProgress } from "@/models";
 import useGameStudioStore from "@/stores/game-studio-store";
 import { materialSystem } from "@/services/material-system";
 import { EditorCameraService } from "./editor-camera-service";
@@ -10,6 +10,7 @@ import { ScriptLoaderService } from "@/services/script-loader-service";
 export class GameWorldService {
   private gameWorld: GameWorld | null = null;
   private sceneLoader: SceneLoader;
+  private enhancedSceneLoader: EnhancedSceneLoader;
   private sceneSerializer: SceneSerializer;
   private assetManager: AssetManager;
   private currentSceneData: any = null;
@@ -19,16 +20,47 @@ export class GameWorldService {
   private helperManager: HelperManager;
   private prePlaActiveCamera: string | null = null; // Store active camera before gameplay
   private scriptLoaderService: ScriptLoaderService;
+  
+  // Loading progress tracking
+  private loadingProgress: LoadingProgress | null = null;
+  private onLoadingProgressCallback?: (progress: LoadingProgress) => void;
 
   constructor() {
     this.assetManager = new AssetManager();
-    this.sceneLoader = new SceneLoader(this.assetManager);
+    this.sceneLoader = new SceneLoader(this.assetManager); // Keep for compatibility/validation
+    this.enhancedSceneLoader = new EnhancedSceneLoader(this.assetManager);
     this.sceneSerializer = new SceneSerializer();
     this.editorCameraService = new EditorCameraService();
     this.selectionManager = new SelectionManager();
     this.transformControlsManager = new TransformControlsManager();
     this.helperManager = new HelperManager();
     this.scriptLoaderService = ScriptLoaderService.getInstance();
+    
+    this.setupEnhancedSceneLoaderCallbacks();
+  }
+  
+  private setupEnhancedSceneLoaderCallbacks(): void {
+    this.enhancedSceneLoader.onProgress((progress) => {
+      this.loadingProgress = progress;
+      this.onLoadingProgressCallback?.(progress);
+      
+      // Update the game studio store with loading progress
+      const { setLoadingProgress } = useGameStudioStore.getState();
+      setLoadingProgress(progress);
+    });
+    
+    this.enhancedSceneLoader.onComplete((success, error) => {
+      if (error) {
+        console.error('Enhanced scene loading failed:', error);
+        const { setError } = useGameStudioStore.getState();
+        setError(`Scene loading failed: ${error.message}`);
+      }
+      
+      // Clear loading progress
+      this.loadingProgress = null;
+      const { setLoadingProgress } = useGameStudioStore.getState();
+      setLoadingProgress(null);
+    });
   }
 
   async initialize(canvas: HTMLCanvasElement): Promise<void> {
@@ -139,7 +171,24 @@ async loadScene(sceneData: any): Promise<void> {
         }
       }
       
+      // TEMPORARY: Use standard scene loader until enhanced loader asset URL issue is fixed
+      // The enhanced loader has an issue with asset URL handling - it tries to create data: URLs
+      // from file paths which doesn't work. Need to fix asset preloader to use project API properly.
       await this.sceneLoader.loadScene(this.gameWorld, sceneData);
+      
+      // TODO: Fix enhanced scene loader asset URL handling and re-enable:
+      // try {
+      //   await this.enhancedSceneLoader.loadScene(this.gameWorld, sceneData, {
+      //     maxConcurrentLoads: 8,
+      //     enableProgressiveLoading: true,
+      //     enablePlaceholders: true,
+      //     prioritizeVisibleAssets: true,
+      //     timeoutMs: 30000,
+      //   });
+      // } catch (enhancedError) {
+      //   console.warn('Enhanced scene loader failed, falling back to standard loader:', enhancedError);
+      //   await this.sceneLoader.loadScene(this.gameWorld, sceneData);
+      // }
       this.currentSceneData = sceneData; // Keep a copy for reset
       
       // Reinitialize editor camera service after scene reload
@@ -413,6 +462,19 @@ stop(): void {
   }
 }
 
+// Public API for loading progress
+onLoadingProgress(callback: (progress: LoadingProgress) => void): void {
+  this.onLoadingProgressCallback = callback;
+}
+
+getLoadingProgress(): LoadingProgress | null {
+  return this.loadingProgress;
+}
+
+cancelSceneLoading(): void {
+  this.enhancedSceneLoader.cancelLoading();
+}
+
 dispose(): void {
   // Stop watching project scripts
   const { currentProject } = useGameStudioStore.getState();
@@ -430,6 +492,7 @@ dispose(): void {
     this.transformControlsManager.dispose();
     this.helperManager.dispose();
     this.assetManager.dispose();
+    this.enhancedSceneLoader.dispose();
   } catch (error) {
     console.error("Failed to dispose game world:", error);
   }

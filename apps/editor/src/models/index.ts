@@ -24,11 +24,14 @@ export {
 // Scene Loader System
 export { 
   SceneLoader,
+  EnhancedSceneLoader,
   EntityLoader,
   CameraLoader,
   LightingLoader,
   PhysicsLoader,
   SceneSerializer,
+  AssetPreloader,
+  ParallelAssetLoader,
 } from "./scene-loader";
 
 // Script System
@@ -157,7 +160,6 @@ export type {
 export type {
   AssetManifest,
   MaterialDefinition,
-  LoadingProgress,
   AssetData,
 } from "./asset-manager";
 
@@ -167,7 +169,6 @@ export type {
   StreamingConfig,
   AssetStreamingState,
   StreamingAsset,
-  AssetBundle,
   PipelineMetrics,
 } from "./asset-pipeline";
 
@@ -209,6 +210,12 @@ export type {
   LightingData,
   PhysicsData,
   LoaderContext,
+  AssetReference,
+  AssetLoadingPlan,
+  AssetBundle,
+  LoadingProgress,
+  LoadingOptions,
+  EnhancedSceneLoaderOptions,
 } from "./scene-loader";
 
 // Basic primitive types
