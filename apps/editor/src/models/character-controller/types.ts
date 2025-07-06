@@ -72,6 +72,12 @@ export interface CharacterControllerConfig {
     cameraDownLimit: number; // in radians
     cameraSensitivity: number;
     
+    // Character rotation settings
+    enableMovementRotation: boolean; // Whether character rotates to face movement direction
+    rotationSpeed: number; // Speed of character rotation (radians per second)
+    rotationDeadZone: number; // Minimum movement speed to trigger rotation
+    rotationSmoothing: number; // Smoothing factor for rotation (0-1, higher = smoother)
+    
     // Animation settings
     idleAnimation?: string;
     walkAnimation?: string;

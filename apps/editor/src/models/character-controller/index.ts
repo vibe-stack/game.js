@@ -100,6 +100,12 @@ export class CharacterController {
       cameraUpLimit: Math.PI / 3,
       cameraDownLimit: -Math.PI / 3,
       cameraSensitivity: 0.002,
+      
+      // Character rotation settings
+      enableMovementRotation: true,
+      rotationSpeed: 6.0, // Moderate rotation speed for third-person
+      rotationDeadZone: 0.1,
+      rotationSmoothing: 0.7,
       ...config
     };
     
@@ -192,6 +198,10 @@ export class CharacterController {
   public deactivate(): void {
     this.enabled = false;
     this.characterInput.setActive(false);
+    
+    // Deactivate the character camera
+    this.characterCamera.deactivate();
+    
     // Exit pointer lock if active
     if (this.characterInput.isPointerLocked() && document.pointerLockElement) {
       document.exitPointerLock();

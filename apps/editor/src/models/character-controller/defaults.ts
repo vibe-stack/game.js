@@ -13,6 +13,12 @@ export const FPS_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
     cameraSensitivity: 0.002,
     snapToGroundDistance: 0.05,
     
+    // Character rotation settings for FPS
+    enableMovementRotation: true,
+    rotationSpeed: 8.0, // Fast rotation for FPS
+    rotationDeadZone: 0.1,
+    rotationSmoothing: 0.8,
+    
     // Crouch and Slide mechanics for FPS
     crouchSpeedMultiplier: 0.4,
     slideSpeedMultiplier: 1.8,
@@ -48,6 +54,12 @@ export const FPS_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
     acceleration: 50.0,
     jumpForce: 12.0,
     cameraSensitivity: 0.002,
+    
+    // Character rotation settings for third-person (Fortnite-like)
+    enableMovementRotation: true,
+    rotationSpeed: 6.0, // Moderate rotation speed for third-person
+    rotationDeadZone: 0.1,
+    rotationSmoothing: 0.7,
     
     // Crouch and Slide mechanics for third-person
     crouchSpeedMultiplier: 0.5,
@@ -86,6 +98,12 @@ export const FPS_CHARACTER_CONFIG: Partial<CharacterControllerConfig> = {
     cameraSensitivity: 0.0015,
     autoStepMaxHeight: 0.8,
     snapToGroundDistance: 0.5,
+    
+    // Character rotation settings for platformer
+    enableMovementRotation: true,
+    rotationSpeed: 7.0, // Quick rotation for platformer
+    rotationDeadZone: 0.1,
+    rotationSmoothing: 0.6,
     
     // CS-style movement for platformer
     airAcceleration: 45.0,

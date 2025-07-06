@@ -83,7 +83,10 @@ export class CharacterCamera {
       }
 
       // Also rotate the character body to match camera yaw for movement direction
-      this.character.setRotation(0, cameraRotation.yaw, 0);
+      // Only if movement rotation is disabled
+      if (!this.config.enableMovementRotation) {
+        this.character.setRotation(0, cameraRotation.yaw, 0);
+      }
     } else {
       // For third-person, apply rotation to the camera follow offset
       const followConfig = this.cameraManager.getCameraFollow(this.cameraId);
@@ -127,10 +130,14 @@ export class CharacterCamera {
   }
 
   private updatePlayerRotation(cameraYaw: number): void {
-    // Make player face away from camera in third-person mode
-    // The player should face the opposite direction of the camera
-    const playerYaw = cameraYaw + Math.PI; // Add 180 degrees to face away from camera
-    this.character.setRotation(0, playerYaw, 0);
+    // Only update player rotation if movement rotation is disabled
+    // If movement rotation is enabled, the character controller will handle rotation
+    if (!this.config.enableMovementRotation) {
+      // Make player face away from camera in third-person mode
+      // The player should face the opposite direction of the camera
+      const playerYaw = cameraYaw + Math.PI; // Add 180 degrees to face away from camera
+      this.character.setRotation(0, playerYaw, 0);
+    }
   }
 
   public updateMouseVelocity(deltaTime: number, lastMouseMovement: { x: number; y: number }): void {
@@ -154,11 +161,19 @@ export class CharacterCamera {
         }
       }
     } else {
-      // For third-person, update the camera height offset
+      // For third-person, DON'T override the offset.y if it was set by pitch calculations
+      // Only update the base camera height, but preserve any pitch-based adjustments
       const followConfig = this.cameraManager.getCameraFollow(this.cameraId);
       if (followConfig && followConfig.offset) {
-        followConfig.offset.y = newCameraHeight;
-        this.cameraManager.setCameraFollow(this.cameraId, followConfig);
+        // Store the difference between current offset.y and base camera height
+        const currentVerticalOffset = followConfig.offset.y - this.config.cameraHeight;
+        
+        // Update config camera height
+        this.config.cameraHeight = newCameraHeight;
+        
+        // Preserve the pitch-based vertical offset by adding it to the new base height
+        // This way the spherical coordinate calculation from updateCameraRotation is preserved
+        // Note: We don't directly modify followConfig.offset.y here as it should be handled by updateCameraRotation
       }
     }
   }
@@ -235,6 +250,11 @@ export class CharacterCamera {
 
   public deactivate(): void {
     this.enabled = false;
+    // Remove this camera from the camera manager if it's currently active
+    // This will automatically switch to another camera or clear the active camera
+    if (this.cameraManager.getActiveCameraId() === this.cameraId) {
+      this.cameraManager.removeCamera(this.cameraId);
+    }
   }
 
   public isActive(): boolean {
@@ -246,9 +266,12 @@ export class CharacterCamera {
   }
 
   public dispose(): void {
-    // Remove the camera from camera manager
+    // Remove the camera from camera manager if it still exists
     try {
-      this.cameraManager.removeCamera(this.cameraId);
+      // Only remove if the camera still exists in the manager
+      if (this.cameraManager.getCamera(this.cameraId)) {
+        this.cameraManager.removeCamera(this.cameraId);
+      }
     } catch (error) {
       console.warn(`Failed to remove camera ${this.cameraId}:`, error);
     }

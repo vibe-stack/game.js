@@ -23,6 +23,10 @@ export class CharacterMovement {
   private coyoteTime: number = 0;
   private readonly JUMP_BUFFER_TIME = 0.15; // 150ms jump buffer
   private readonly COYOTE_TIME = 0.1; // 100ms coyote time
+  
+  // Character rotation
+  private currentRotation: number = 0; // Current Y rotation of character
+  private targetRotation: number = 0; // Target Y rotation based on movement
 
   constructor(
     physicsManager: PhysicsManager,
@@ -88,6 +92,9 @@ export class CharacterMovement {
     // Update state velocity
     state.velocity.copy(this.currentVelocity);
     state.currentSpeed = currentSpeed;
+    
+    // Update character rotation based on movement direction
+    this.updateCharacterRotation(deltaTime, inputDirection, state);
   }
 
   private updateGroundMovement(
@@ -201,6 +208,44 @@ export class CharacterMovement {
     const newSpeed = Math.max(0, speed - frictionAmount);
     
     this.currentVelocity.multiplyScalar(newSpeed / speed);
+  }
+
+  private updateCharacterRotation(deltaTime: number, inputDirection: THREE.Vector3, state: CharacterState): void {
+    // Only rotate if movement rotation is enabled
+    if (!this.config.enableMovementRotation) {
+      return;
+    }
+
+    // Check if we're moving enough to warrant rotation
+    const movementSpeed = inputDirection.length();
+    if (movementSpeed < this.config.rotationDeadZone) {
+      return;
+    }
+
+    // Calculate target rotation based on movement direction
+    this.targetRotation = Math.atan2(inputDirection.x, inputDirection.z);
+    
+    // Smooth rotation towards target
+    const rotationDiff = this.targetRotation - this.currentRotation;
+    
+    // Handle angle wrapping (shortest path)
+    let shortestAngle = ((rotationDiff % (2 * Math.PI)) + (3 * Math.PI)) % (2 * Math.PI) - Math.PI;
+    
+    // Apply rotation smoothing
+    const maxRotationChange = this.config.rotationSpeed * deltaTime;
+    const smoothedRotationChange = shortestAngle * this.config.rotationSmoothing;
+    
+    // Clamp rotation change to max rotation speed
+    const finalRotationChange = Math.sign(smoothedRotationChange) * Math.min(Math.abs(smoothedRotationChange), maxRotationChange);
+    
+    // Update current rotation
+    this.currentRotation += finalRotationChange;
+    
+    // Keep rotation in valid range
+    this.currentRotation = ((this.currentRotation % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+    
+    // Apply rotation to character entity
+    this.character.setRotation(0, this.currentRotation, 0);
   }
 
   public jump(): void {
