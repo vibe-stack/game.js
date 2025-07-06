@@ -134,58 +134,56 @@ export class TransformControlsManager {
 
     this.currentEntity = entity;
 
-    // Attach transform controls to the entity
-    this.transformControls.attach(entity);
-
-    // Update the transform mode based on current editor mode
+    // Don't attach transform controls here - let updateTransformMode handle it
+    // This ensures we respect the current editor mode
     const { editorMode } = useGameStudioStore.getState();
     this.updateTransformMode(editorMode);
   }
 
   private updateTransformMode(editorMode: "select" | "move" | "rotate" | "scale"): void {
-    if (!this.transformControls || !this.currentEntity) {
+    if (!this.transformControls) {
       return;
     }
 
     const { gameState } = useGameStudioStore.getState();
     
-    // Only show transform controls when not playing and not in select mode
+    // Completely disable transform controls when playing or in select mode
     if (gameState === "playing" || editorMode === "select") {
-      // Hide the helper object that was added to the scene
-      const helper = this.transformControls.getHelper();
-      if (helper) {
-        helper.visible = false;
-      }
+      // Detach from entity to completely disable interaction
+      this.transformControls.detach();
       this.currentMode = null;
       return;
     }
 
-    // Show and configure transform controls based on editor mode
-    const helper = this.transformControls.getHelper();
-    if (helper) {
-      helper.visible = true;
-    }
-    
-    switch (editorMode) {
-      case "move":
-        this.transformControls.setMode("translate");
-        this.currentMode = "translate";
-        break;
-      case "rotate":
-        this.transformControls.setMode("rotate");
-        this.currentMode = "rotate";
-        break;
-      case "scale":
-        this.transformControls.setMode("scale");
-        this.currentMode = "scale";
-        break;
-      default:
-        // Hide for unknown modes
-        if (helper) {
-          helper.visible = false;
-        }
-        this.currentMode = null;
-        break;
+    // Only attach to entity if we have one and we're not in select mode
+    if (this.currentEntity) {
+      this.transformControls.attach(this.currentEntity);
+      
+      // Show and configure transform controls based on editor mode
+      const helper = this.transformControls.getHelper();
+      if (helper) {
+        helper.visible = true;
+      }
+      
+      switch (editorMode) {
+        case "move":
+          this.transformControls.setMode("translate");
+          this.currentMode = "translate";
+          break;
+        case "rotate":
+          this.transformControls.setMode("rotate");
+          this.currentMode = "rotate";
+          break;
+        case "scale":
+          this.transformControls.setMode("scale");
+          this.currentMode = "scale";
+          break;
+        default:
+          // Detach for unknown modes
+          this.transformControls.detach();
+          this.currentMode = null;
+          break;
+      }
     }
   }
 

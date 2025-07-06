@@ -7,6 +7,7 @@ export class EditorCameraService {
   private orbitControls: OrbitControls | null = null;
   private gameWorld: GameWorld | null = null;
   private _isEditorCameraActive = false;
+  private _isOrbitControlsActive = false;
   
   public static readonly EDITOR_CAMERA_ID = "__editor_orbit_camera__";
 
@@ -33,6 +34,9 @@ export class EditorCameraService {
     this.orbitControls.enableRotate = true;
     this.orbitControls.enablePan = true;
     
+    // Set up orbit controls event listeners to track usage
+    this.setupOrbitControlsListeners();
+    
     // Add the editor camera to the camera manager but mark it as special
     const cameraManager = gameWorld.getCameraManager();
     cameraManager.addCamera(
@@ -40,6 +44,25 @@ export class EditorCameraService {
       "Editor Camera",
       this.editorCamera
     );
+  }
+
+  private setupOrbitControlsListeners(): void {
+    if (!this.orbitControls) return;
+
+    // Track when orbit controls start being used
+    this.orbitControls.addEventListener('start', () => {
+      this._isOrbitControlsActive = true;
+    });
+
+    // Track when orbit controls stop being used
+    this.orbitControls.addEventListener('end', () => {
+      this._isOrbitControlsActive = false;
+    });
+  }
+
+  // Method to check if orbit controls are currently active (being used)
+  isOrbitControlsActive(): boolean {
+    return this._isOrbitControlsActive && this._isEditorCameraActive;
   }
 
   switchToEditorCamera(): boolean {
@@ -122,5 +145,6 @@ export class EditorCameraService {
     this.editorCamera = null;
     this.gameWorld = null;
     this._isEditorCameraActive = false;
+    this._isOrbitControlsActive = false;
   }
 } 

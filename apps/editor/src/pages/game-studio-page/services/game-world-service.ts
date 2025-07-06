@@ -118,6 +118,14 @@ export class GameWorldService {
         this.transformControlsManager.setOrbitControls(orbitControls);
       }
       
+      // Connect editor camera service to interaction manager to block clicks during orbit operations
+      const interactionManager = this.gameWorld.getInteractionManager();
+      if (interactionManager) {
+        interactionManager.setInteractionBlockedCallback(() => {
+          return this.editorCameraService.isOrbitControlsActive();
+        });
+      }
+      
       // Update transform controls camera
       const activeCamera = this.gameWorld.getCameraManager().getActiveCamera();
       if (activeCamera) {
@@ -207,6 +215,14 @@ async loadScene(sceneData: any): Promise<void> {
       const orbitControls = this.editorCameraService.getOrbitControls();
       if (orbitControls) {
         this.transformControlsManager.setOrbitControls(orbitControls);
+      }
+      
+      // Connect editor camera service to interaction manager to block clicks during orbit operations
+      const interactionManager = this.gameWorld.getInteractionManager();
+      if (interactionManager) {
+        interactionManager.setInteractionBlockedCallback(() => {
+          return this.editorCameraService.isOrbitControlsActive();
+        });
       }
       
       // Discover and update available cameras in the store

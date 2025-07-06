@@ -49,12 +49,12 @@ export class SelectionManager {
   private setupEntityClickHandler(entity: Entity): void {
     if (!entity) return;
 
-    // Set up onClick handler that only works when not in PLAY mode
+    // Set up onClick handler that only works when in SELECT mode and not in PLAY mode
     entity.onClick((event) => {
-      const { gameState } = useGameStudioStore.getState();
+      const { gameState, editorMode } = useGameStudioStore.getState();
       
-      // Only handle clicks when not in PLAY mode
-      if (gameState !== "playing") {
+      // Only handle clicks when in SELECT mode and not in PLAY mode
+      if (gameState !== "playing" && editorMode === "select") {
         this.selectEntity(entity.entityId);
         event.stopPropagation();
       }

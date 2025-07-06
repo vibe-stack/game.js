@@ -75,6 +75,14 @@ export class InteractionManager {
   raycaster: THREE.Raycaster;
   treatTouchEventsAsMouseEvents: boolean;
 
+  // Track mouse positions for click/drag detection
+  private mouseDownPosition: Vector2 = new Vector2();
+  private mouseMoveThreshold: number = 5; // pixels
+  private isDragging: boolean = false;
+  
+  // External interaction blocking (for orbit controls, etc.)
+  private isInteractionBlocked: () => boolean = () => false;
+
   constructor(
     renderer: THREE.Renderer,
     cameraManager: CameraManager,
@@ -309,6 +317,17 @@ export class InteractionManager {
 
     this.mapPositionToPoint(this.mouse, mouseEvent.clientX, mouseEvent.clientY);
 
+    // Check if we're dragging (mouse moved significantly since mousedown)
+    if (!this.isDragging) {
+      const deltaX = mouseEvent.clientX - this.mouseDownPosition.x;
+      const deltaY = mouseEvent.clientY - this.mouseDownPosition.y;
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      
+      if (distance > this.mouseMoveThreshold) {
+        this.isDragging = true;
+      }
+    }
+
     const event = new InteractiveEvent("mousemove", mouseEvent);
 
     // Sort all objects by distance (closest first) and dispatch
@@ -328,6 +347,17 @@ export class InteractionManager {
       pointerEvent.clientX,
       pointerEvent.clientY,
     );
+
+    // Check if we're dragging (pointer moved significantly since pointerdown)
+    if (!this.isDragging) {
+      const deltaX = pointerEvent.clientX - this.mouseDownPosition.x;
+      const deltaY = pointerEvent.clientY - this.mouseDownPosition.y;
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      
+      if (distance > this.mouseMoveThreshold) {
+        this.isDragging = true;
+      }
+    }
 
     const event = new InteractiveEvent("pointermove", pointerEvent);
 
@@ -349,6 +379,17 @@ export class InteractionManager {
         touchEvent.touches[0].clientX,
         touchEvent.touches[0].clientY,
       );
+
+      // Check if we're dragging (touch moved significantly since touchstart)
+      if (!this.isDragging) {
+        const deltaX = touchEvent.touches[0].clientX - this.mouseDownPosition.x;
+        const deltaY = touchEvent.touches[0].clientY - this.mouseDownPosition.y;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        if (distance > this.mouseMoveThreshold) {
+          this.isDragging = true;
+        }
+      }
     }
 
     const event = new InteractiveEvent(
@@ -366,6 +407,11 @@ export class InteractionManager {
   };
 
   onMouseClick = (mouseEvent: MouseEvent) => {
+    // Only dispatch click events if we haven't been dragging and interactions aren't blocked
+    if (this.isDragging || this.isInteractionBlocked()) {
+      return;
+    }
+
     this.update();
 
     const event = new InteractiveEvent("click", mouseEvent);
@@ -383,6 +429,10 @@ export class InteractionManager {
   };
 
   onMouseDown = (mouseEvent: MouseEvent) => {
+    // Store the mouse position for drag detection (screen coordinates)
+    this.mouseDownPosition.set(mouseEvent.clientX, mouseEvent.clientY);
+    this.isDragging = false;
+
     this.mapPositionToPoint(this.mouse, mouseEvent.clientX, mouseEvent.clientY);
 
     this.update();
@@ -407,6 +457,10 @@ export class InteractionManager {
   };
 
   onPointerDown = (pointerEvent: PointerEvent) => {
+    // Store the pointer position for drag detection (screen coordinates)
+    this.mouseDownPosition.set(pointerEvent.clientX, pointerEvent.clientY);
+    this.isDragging = false;
+
     this.mapPositionToPoint(
       this.mouse,
       pointerEvent.clientX,
@@ -431,6 +485,13 @@ export class InteractionManager {
 
   onTouchStart = (touchEvent: TouchEvent) => {
     if (touchEvent.touches.length > 0) {
+      // Store the touch position for drag detection (screen coordinates)
+      this.mouseDownPosition.set(
+        touchEvent.touches[0].clientX,
+        touchEvent.touches[0].clientY
+      );
+      this.isDragging = false;
+
       this.mapPositionToPoint(
         this.mouse,
         touchEvent.touches[0].clientX,
@@ -470,6 +531,9 @@ export class InteractionManager {
       this.dispatch(object, event);
       if (event.cancelBubble) break;
     }
+
+    // Reset dragging state after mouse up
+    this.isDragging = false;
   };
 
   onPointerUp = (pointerEvent: PointerEvent) => {
@@ -485,6 +549,9 @@ export class InteractionManager {
       this.dispatch(object, event);
       if (event.cancelBubble) break;
     }
+
+    // Reset dragging state after pointer up
+    this.isDragging = false;
   };
 
   onTouchEnd = (touchEvent: TouchEvent) => {
@@ -513,6 +580,9 @@ export class InteractionManager {
       this.dispatch(object, event);
       if (event.cancelBubble) break;
     }
+
+    // Reset dragging state after touch end
+    this.isDragging = false;
   };
 
   dispatch = (object: InteractiveObject, event: InteractiveEvent) => {
@@ -532,4 +602,9 @@ export class InteractionManager {
     point.x = ((x - rect.left) / rect.width) * 2 - 1;
     point.y = -((y - rect.top) / rect.height) * 2 + 1;
   };
+
+  // Method to set external interaction blocking callback
+  setInteractionBlockedCallback(callback: () => boolean): void {
+    this.isInteractionBlocked = callback;
+  }
 }

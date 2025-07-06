@@ -381,6 +381,9 @@ export class GameWorld {
   getInputManager(): InputManager {
     return this.inputManager;
   }
+  getInteractionManager(): InteractionManager {
+    return this.interactionManager;
+  }
   getScriptManager(): ScriptManager {
     return this.scriptManager;
   }
