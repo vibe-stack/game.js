@@ -90,15 +90,16 @@ export class CharacterCamera {
       if (followConfig) {
         // Calculate the camera position relative to the character
         const distance = Math.abs(this.config.cameraDistance);
-        const offset = new THREE.Vector3(
-          Math.sin(cameraRotation.yaw) * distance,
-          this.config.cameraHeight,
-          Math.cos(cameraRotation.yaw) * distance
-        );
         
-        // Apply pitch rotation
-        const pitchOffset = Math.sin(cameraRotation.pitch) * distance;
-        offset.y += pitchOffset;
+        // Calculate spherical coordinates for proper pitch and yaw
+        const horizontalDistance = distance * Math.cos(cameraRotation.pitch);
+        const verticalDistance = distance * Math.sin(cameraRotation.pitch);
+        
+        const offset = new THREE.Vector3(
+          Math.sin(cameraRotation.yaw) * horizontalDistance,
+          this.config.cameraHeight + verticalDistance,
+          Math.cos(cameraRotation.yaw) * horizontalDistance
+        );
         
         followConfig.offset = offset;
         this.cameraManager.setCameraFollow(this.cameraId, followConfig);
@@ -108,6 +109,9 @@ export class CharacterCamera {
         
         // Update camera collision for third-person
         this.updateThirdPersonCameraCollision(followConfig);
+        
+        // Make player face away from camera
+        this.updatePlayerRotation(cameraRotation.yaw);
       }
     }
   }
@@ -120,6 +124,13 @@ export class CharacterCamera {
     const lookAtTarget = this.character.position.clone();
     lookAtTarget.y += this.config.cameraHeight * 0.7; // Look at character's upper body/head
     camera.lookAt(lookAtTarget);
+  }
+
+  private updatePlayerRotation(cameraYaw: number): void {
+    // Make player face away from camera in third-person mode
+    // The player should face the opposite direction of the camera
+    const playerYaw = cameraYaw + Math.PI; // Add 180 degrees to face away from camera
+    this.character.setRotation(0, playerYaw, 0);
   }
 
   public updateMouseVelocity(deltaTime: number, lastMouseMovement: { x: number; y: number }): void {

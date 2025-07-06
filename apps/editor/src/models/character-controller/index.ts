@@ -92,7 +92,7 @@ export class CharacterController {
       snapToGroundDistance: 0.3,
       gravityScale: 20.0,
       maxFallSpeed: -25.0,
-      cameraMode: "first-person",
+      cameraMode: "third-person",
       cameraDistance: -5.0,
       cameraHeight: 1.7,
       cameraMinDistance: -1.0,
@@ -117,6 +117,9 @@ export class CharacterController {
     // Initialize all modules
     this.characterPhysics.initialize();
     this.characterCamera.initialize();
+    
+    // Activate the camera so the character controller can work
+    this.characterCamera.activateCamera();
     
     // Set input system as active
     this.characterInput.setActive(true);
@@ -176,8 +179,8 @@ export class CharacterController {
     // Update animation based on current state
     this.characterState.updateAnimation();
     
-    // Make sure entity syncs with physics
-    this.character.syncVisualsFromPhysics();
+    // Note: We don't call syncVisualsFromPhysics() here because the character controller
+    // manages its own position updates in computeColliderMovement()
   }
   
   public activateCamera(): void {
