@@ -1,3 +1,5 @@
+import * as THREE from "three/webgpu";
+
 export interface CharacterControllerConfig {
     // Capsule collider setup
     capsuleHalfHeight: number;

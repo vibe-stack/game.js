@@ -74,6 +74,20 @@ export {
   PLATFORMER_CHARACTER_CONFIG 
 } from "./character-controller";
 
+// Character controller modules
+export { CharacterPhysics } from "./character-controller/character-physics";
+export { CharacterInput } from "./character-controller/character-input";
+export { CharacterCamera } from "./character-controller/character-camera";
+export { CharacterMovement } from "./character-controller/character-movement";
+export { CharacterStateManager } from "./character-controller/character-state";
+export { CharacterPlatforms } from "./character-controller/character-platforms";
+
+// Entity modules
+export { EntityPhysics } from "./entity/entity-physics";
+export { EntityGeometry } from "./entity/entity-geometry";
+export { EntityScripts } from "./entity/entity-scripts";
+export { EntityCharacter } from "./entity/entity-character";
+
 // Basic primitives
 export { Sphere } from "./primitives/sphere";
 export { Box } from "./primitives/box";
