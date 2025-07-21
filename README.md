@@ -42,6 +42,11 @@ A visual game development environment for creating Three.js-based games with the
 ## Getting Started
 
 ### Development
+0. Open the editor folder:
+```sh
+ cd apps/editor
+```
+
 1. Install dependencies:
    ```sh
    pnpm install
