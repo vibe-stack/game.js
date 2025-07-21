@@ -1,5 +1,5 @@
 import { LoaderContext, EntityData } from "./types";
-import { Entity, Box, Sphere, Cylinder, Cone, Torus, Capsule, Ring, Plane, Heightfield, Mesh3D, AmbientLight, DirectionalLight, PointLight, SpotLight, Camera, PerspectiveCamera, OrthographicCamera, Group } from "../index";
+import { Entity, Box, Sphere, Cylinder, Cone, Torus, Capsule, Ring, Plane, Heightfield, Mesh3D, AmbientLight, DirectionalLight, PointLight, SpotLight, Camera, PerspectiveCamera, OrthographicCamera, Group, Overlay, WorldSpaceUI } from "../index";
 import { CameraManager } from "../camera-manager";
 import * as THREE from "three/webgpu";
 import useGameStudioStore from "../../stores/game-studio-store";
@@ -146,6 +146,8 @@ export class EntityLoader {
       case "group": entity = new Group(config); break;
       case "light": entity = this.createLight(config); break;
       case "camera": entity = this.createCameraEntity(data); break;
+      case "overlay": entity = new Overlay(config); break;
+      case "world-space-ui": entity = new WorldSpaceUI(config); break;
       default: throw new Error(`Unsupported entity type: ${data.type}`);
     }
 

@@ -15,7 +15,8 @@ const config: ForgeConfig = {
       x64ArchFiles: '*',
     },
   },
-  rebuildConfig: {},
+  rebuildConfig: {
+  },
   makers: [
     // Windows builds using Squirrel.Windows
     new MakerSquirrel({

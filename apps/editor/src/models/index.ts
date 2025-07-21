@@ -254,4 +254,47 @@ export type {
   TSLConnectionDefinition,
   CompiledShader,
   ShaderContext
-} from "./types"; 
+} from "./types";
+
+// UI System
+export {
+  UIManager,
+  UIOverlay,
+  UIWorldSpace,
+  UIElement,
+} from "./ui-manager";
+
+export type {
+  UIType,
+  UIAnchor,
+  UIAlignment,
+  UIElementConfig,
+  UIOverlayConfig,
+  UIWorldSpaceConfig,
+  UIEvent,
+  UIEventCallback,
+  UIManagerConfig,
+  UILayout,
+  UIAnimation,
+  UIBreakpoint,
+  UITheme,
+} from "./ui-manager";
+
+export {
+  DEFAULT_THEME,
+  DARK_THEME,
+  FLEX_LAYOUTS,
+  UI_COMPONENT_STYLES,
+  ANIMATION_PRESETS,
+  initializeUIStyles,
+  createCSSClass,
+  createResponsiveStyles,
+  createUIComponentFactory,
+} from "./ui-manager/ui-utils";
+
+// UI Primitives
+export { Overlay } from "./primitives/overlay";
+export { WorldSpaceUI } from "./primitives/world-space-ui";
+
+export type { OverlayConfig } from "./primitives/overlay";
+export type { WorldSpaceUIConfig } from "./primitives/world-space-ui";

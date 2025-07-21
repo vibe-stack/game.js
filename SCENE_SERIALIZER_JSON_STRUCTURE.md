@@ -6,7 +6,7 @@ This document describes the complete JSON structure used by the Scene Serializer
 
 ```json
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "Scene Name",
   "metadata": {
     "created": 1234567890,

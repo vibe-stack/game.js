@@ -12,6 +12,7 @@ import { GameConfig } from "./types";
 import { ScriptManager } from "./script-manager";
 import { CharacterController } from "./character-controller";
 import { Sphere } from "./primitives/sphere";
+import { UIManager } from "./ui-manager";
 
 // New TSL post-processing imports
 import { pass, mrt, output, emissive } from "three/tsl";
@@ -31,6 +32,7 @@ export class GameWorld {
   private debugRenderer: DebugRenderer;
   private inputManager: InputManager;
   private scriptManager: ScriptManager;
+  private uiManager: UIManager;
 
   private entities: Registry<Entity>;
   private cameras: Registry<THREE.Camera>;
@@ -110,6 +112,10 @@ export class GameWorld {
         // Reinitialize post-processing with the new camera
         this.reinitializePostProcessing();
       }
+      // Update UI manager camera
+      if (camera) {
+        this.uiManager.setCamera(camera);
+      }
     });
     
     // Set up callback to initialize post-processing when first camera is added
@@ -131,6 +137,7 @@ export class GameWorld {
     this.debugRenderer = new DebugRenderer(this.scene, this.physicsManager);
     this.inputManager = new InputManager(config.canvas);
     this.scriptManager = new ScriptManager(this);
+    this.uiManager = UIManager.getInstance();
 
     if (config.enablePhysics !== false) {
       this.initializePhysics(config.gravity);
@@ -155,6 +162,40 @@ export class GameWorld {
     
     // Setup post-processing after renderer is initialized
     this.initializePostProcessing();
+    
+    // Configure UIManager with scene and camera
+    this.uiManager.setScene(this.scene);
+    const activeCamera = this.cameraManager.getActiveCamera();
+    if (activeCamera) {
+      this.uiManager.setCamera(activeCamera);
+    }
+    
+    // Configure UIManager with canvas parent container for proper positioning (safe approach)
+    try {
+      const canvasParent = this.renderer.domElement.parentElement;
+      if (canvasParent) {
+        // Create a dedicated UI overlay container that won't interfere with the canvas
+        const uiContainer = document.createElement('div');
+        uiContainer.id = 'game-ui-overlay-container';
+        uiContainer.style.cssText = `
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          z-index: 100;
+        `;
+        canvasParent.appendChild(uiContainer);
+        
+        this.uiManager.configure({
+          overlayContainer: uiContainer,
+        });
+        console.log("UIManager configured successfully");
+      }
+    } catch (error) {
+      console.warn("Failed to configure UIManager:", error);
+    }
     
     this.startRenderLoop();
   }
@@ -203,6 +244,13 @@ export class GameWorld {
           this.postProcessing.render();
         } else {
           this.renderer.render(this.scene, activeCamera);
+        }
+        
+        // Render UI elements
+        try {
+          this.uiManager.render();
+        } catch (error) {
+          console.warn("UIManager render error:", error);
         }
       }
     };
@@ -351,6 +399,13 @@ export class GameWorld {
 
     // Update scripts
     this.scriptManager.update(delta);
+    
+    // Update UI manager
+    try {
+      this.uiManager.update(delta);
+    } catch (error) {
+      console.warn("UIManager update error:", error);
+    }
   };
 
   // ... (getters and other methods)
@@ -386,6 +441,9 @@ export class GameWorld {
   }
   getScriptManager(): ScriptManager {
     return this.scriptManager;
+  }
+  getUIManager(): UIManager {
+    return this.uiManager;
   }
   getEntitiesByTag(tag: string): Entity[] {
     return this.entities.getByTag(tag);
@@ -449,6 +507,9 @@ export class GameWorld {
 
     // Update camera aspect ratios
     this.cameraManager.resize(width, height);
+
+    // Update UI renderers
+    this.uiManager.resize(width, height);
   }
 
   private calculatePixelRatio(
@@ -520,6 +581,7 @@ export class GameWorld {
     this.physicsManager.dispose();
     this.inputManager.dispose();
     this.scriptManager.dispose();
+    this.uiManager.dispose();
     if (
       this.postProcessing &&
       typeof this.postProcessing.dispose === "function"

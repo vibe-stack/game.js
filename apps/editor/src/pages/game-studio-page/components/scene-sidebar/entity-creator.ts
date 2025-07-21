@@ -23,7 +23,9 @@ import {
   OrthographicCamera,
   Entity,
   Mesh3D,
-  Group
+  Group,
+  Overlay,
+  WorldSpaceUI
 } from "@/models";
 import { GameWorldService } from "../../services/game-world-service";
 import useGameStudioStore from "@/stores/game-studio-store";
@@ -256,6 +258,51 @@ export class EntityCreator {
           far: 1000
         });
         break;
+
+      // UI Elements
+      case "overlay":
+        entity = new Overlay({
+          id: `overlay-${this.entityCounter}`,
+          content: `<div style="
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-family: system-ui;
+          ">
+            <h3 style="margin: 0 0 8px 0; font-size: 14px;">Screen Overlay ${this.entityCounter}</h3>
+            <p style="margin: 0; font-size: 12px; opacity: 0.8;">Click to edit content</p>
+          </div>`,
+          anchor: 'top-left',
+          offset: { x: 20, y: 20 },
+          interactive: true,
+        });
+        this.entityCounter++;
+        break;
+
+      case "world-space-ui":
+        entity = new WorldSpaceUI({
+          id: `world-ui-${this.entityCounter}`,
+          content: `<div style="
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 120px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          ">
+            <div style="font-size: 18px; margin-bottom: 4px;">🎯</div>
+            <div style="font-size: 12px;">World UI ${this.entityCounter}</div>
+          </div>`,
+          position: spawnPosition,
+          billboarding: true,
+          distanceScaling: false,
+          maxDistance: 50,
+          interactive: true,
+        });
+        this.entityCounter++;
+        break;
       
       default:
         throw new Error(`Unknown entity type: ${entityType}`);
@@ -410,6 +457,8 @@ export class EntityCreator {
         case "directional-light": newEntity = new DirectionalLight(config); break;
         case "point-light": newEntity = new PointLight(config); break;
         case "spot-light": newEntity = new SpotLight(config); break;
+        case "overlay": newEntity = new Overlay(config); break;
+        case "world-space-ui": newEntity = new WorldSpaceUI(config); break;
         default: throw new Error(`Unsupported entity type for duplication: ${entityType}`);
       }
 

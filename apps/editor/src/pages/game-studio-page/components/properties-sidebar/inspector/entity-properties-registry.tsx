@@ -14,6 +14,8 @@ import { Light } from "@/models/primitives/light";
 import { Camera } from "@/models/primitives/camera";
 import { Heightfield } from "@/models/primitives/heightfield";
 import { Mesh3D } from "@/models/primitives/mesh-3d";
+import { Overlay } from "@/models/primitives/overlay";
+import { WorldSpaceUI } from "@/models/primitives/world-space-ui";
 import { BoxProperties } from "./box-properties";
 import { SphereProperties } from "./sphere-properties";
 import { ConeProperties } from "./cone-properties";
@@ -26,6 +28,7 @@ import { LightProperties } from "./light-properties";
 import { CameraProperties } from "./camera-properties";
 import { HeightfieldProperties } from "./heightfield-properties";
 import { Mesh3DProperties } from "./mesh-3d-properties";
+import { OverlayProperties, WorldSpaceUIProperties } from "./ui-properties";
 import { PhysicsProperties } from "./physics-properties";
 import { MaterialsSection } from "./materials-section";
 import { CharacterControllerSection } from "./character-controller-section";
@@ -87,6 +90,14 @@ export function EntityPropertiesRegistry({ entity, gameWorldService }: EntityPro
 
     if (entity instanceof Mesh3D) {
       return <Mesh3DProperties entity={entity} />;
+    }
+
+    if (entity instanceof Overlay) {
+      return <OverlayProperties entity={entity} />;
+    }
+
+    if (entity instanceof WorldSpaceUI) {
+      return <WorldSpaceUIProperties entity={entity} />;
     }
 
     // For entities without specific property components, show a generic message

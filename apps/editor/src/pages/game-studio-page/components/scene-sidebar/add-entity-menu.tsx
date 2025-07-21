@@ -10,7 +10,9 @@ import {
   Shapes,
   ChevronRight,
   Package,
-  Camera
+  Camera,
+  Monitor,
+  Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -173,6 +175,25 @@ const ENTITY_CATEGORIES: EntityCategory[] = [
         name: "Custom Heightfield",
         icon: <Mountain className="h-4 w-4" />,
         description: "A customizable terrain heightfield",
+      },
+    ],
+  },
+  {
+    id: "ui",
+    name: "User Interface",
+    icon: <Monitor className="h-4 w-4" />,
+    entities: [
+      {
+        id: "overlay",
+        name: "Screen Overlay",
+        icon: <Monitor className="h-4 w-4" />,
+        description: "2D UI overlay element positioned on screen",
+      },
+      {
+        id: "world-space-ui",
+        name: "World Space UI",
+        icon: <Globe className="h-4 w-4" />,
+        description: "3D UI element positioned in world space",
       },
     ],
   },
